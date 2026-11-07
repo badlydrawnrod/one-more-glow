@@ -1,5 +1,6 @@
 import type { Color, DrawingContext, RendererOptions } from "./graphics.ts";
 import { createViewport, type Viewport } from "./viewport.ts";
+import { createTransformStack } from "./transform.ts";
 
 const vertexSource = `#version 300 es
 precision highp float;
@@ -168,6 +169,7 @@ export function createWebGL2Renderer(
   let intensity = 1;
   let position: readonly [number, number] | undefined;
   let commands: number[][] = [];
+  const transforms = createTransformStack();
   return {
     beginFrame() {
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -177,6 +179,7 @@ export function createWebGL2Renderer(
       gl.clear(gl.COLOR_BUFFER_BIT);
       position = undefined;
       commands = [];
+      transforms.reset();
     },
     endFrame() {
       if (commands.length > 0) {
@@ -197,24 +200,41 @@ export function createWebGL2Renderer(
     setIntensity(value) {
       intensity = Math.max(0, Math.min(1, value));
     },
+    pushTransform() {
+      transforms.push();
+    },
+    popTransform() {
+      transforms.pop();
+    },
+    translate(x, y) {
+      transforms.translate(x, y);
+    },
+    rotate(angleDegrees) {
+      transforms.rotate(angleDegrees);
+    },
+    scale(x, y) {
+      transforms.scale(x, y);
+    },
     moveTo(x, y) {
-      position = [x, y];
+      position = transforms.apply(x, y);
     },
     lineTo(x, y) {
       if (!position) return;
       if (position[0] !== x || position[1] !== y) {
         const currentViewport = viewport();
+        const [logicalX, logicalY] = transforms.apply(x, y);
         const [startX, startY] = currentViewport.mapPoint(position[0], position[1]);
-        const [endX, endY] = currentViewport.mapPoint(x, y);
+        const [endX, endY] = currentViewport.mapPoint(logicalX, logicalY);
         commands.push([
           startX, startY, endX, endY,
           color[0], color[1], color[2], intensity, 0,
         ]);
       }
-      position = [x, y];
+      position = transforms.apply(x, y);
     },
     point(x, y) {
-      const [outputX, outputY] = viewport().mapPoint(x, y);
+      const [logicalX, logicalY] = transforms.apply(x, y);
+      const [outputX, outputY] = viewport().mapPoint(logicalX, logicalY);
       commands.push([
         outputX, outputY, outputX, outputY,
         color[0], color[1], color[2], intensity, 1,

@@ -186,7 +186,7 @@ Canvas 2D uses opacity for intensity, a 1.5-pixel rounded line stroke, and circu
 
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a side-on craft, terrain, fuel pod and tractor beam. Use `?scene=testcard` to inspect the focused geometry and intensity examples: open paths and closed outlines in colour-coded ladders, a central line/triangle/point study, line and point samples, circles, ellipses, circular and elliptical arcs, and nested rectangles. Add `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
+The Vite diagnostic defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a transformed side-on craft, terrain, fuel pod and tractor beam. Use `?scene=testcard` to inspect the focused geometry, transform and intensity examples: open paths and closed outlines in colour-coded ladders, a row of locally defined crafts at different positions, rotations and scales, a central line/triangle/point study, line and point samples, circles, ellipses, circular and elliptical arcs, and nested rectangles. Add `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
 
 Visual comparison found the Canvas 2D and WebGL2 outputs close overall at the diagnostic scale. Canvas retains a slightly softer outer wash. WebGL2 line-end halos were reduced until they no longer read as separate flares, and point halos were reduced to better match Canvas. A much wider WebGL2 cutoff made the result too diffuse, so its current cutoff remains at 25 pixels. Canvas isolates and composites a blurred halo layer beneath the core; WebGL2 combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. These renderer-specific techniques implement the same accepted appearance without requiring pixel-identical output. Their numeric profiles remain adjustable if later visual feedback warrants it.
 
@@ -215,13 +215,13 @@ The accepted helpers, their semantics and their current implementation status ar
 
 ### Transformations
 
-**Status: Deferred**
+**Status: Accepted and implemented**
 
-Translation, rotation, scaling and a push/pop transformation stack have not been designed or accepted as part of the public API.
-
-If transformations are pursued, their coordinate model, composition order and relationship to drawing state must be decided and tested consistently across renderers.
-
-Avoid general-purpose matrix dependencies without a concrete need.
+Translation, rotation, scaling and a push/pop transformation stack are accepted
+for the public drawing contract. Their coordinate system, composition order,
+frame behavior and relationship to beam sizing are defined in the
+[Transformation Specification](transformations.md). The specification does
+not require a public matrix type or a general-purpose matrix dependency.
 
 ### Logical coordinates and viewport
 

@@ -1,5 +1,6 @@
 import type { Color, DrawingContext, RendererOptions } from "./graphics.ts";
 import { createViewport, type Viewport } from "./viewport.ts";
+import { createTransformStack } from "./transform.ts";
 
 function unit(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -43,6 +44,7 @@ export function createCanvasRenderer(
   let haloWidth = 0;
   let haloHeight = 0;
   let haloPixelScale = 0;
+  const transforms = createTransformStack();
 
   context.lineCap = "round";
 
@@ -161,6 +163,7 @@ export function createCanvasRenderer(
       syncHaloSize(currentViewport.pixelScale);
       context.clearRect(0, 0, context.canvas.width, context.canvas.height);
       position = undefined;
+      transforms.reset();
     },
     endFrame() {},
     setColor(nextColor) {
@@ -171,18 +174,35 @@ export function createCanvasRenderer(
       intensity = unit(value);
       applyStyle();
     },
+    pushTransform() {
+      transforms.push();
+    },
+    popTransform() {
+      transforms.pop();
+    },
+    translate(x, y) {
+      transforms.translate(x, y);
+    },
+    rotate(angleDegrees) {
+      transforms.rotate(angleDegrees);
+    },
+    scale(x, y) {
+      transforms.scale(x, y);
+    },
     moveTo(x, y) {
-      const [outputX, outputY] = viewport().mapPoint(x, y);
+      const [logicalX, logicalY] = transforms.apply(x, y);
+      const [outputX, outputY] = viewport().mapPoint(logicalX, logicalY);
       context.beginPath();
       context.moveTo(outputX, outputY);
-      position = [x, y];
+      position = [logicalX, logicalY];
     },
     lineTo(x, y) {
       if (!position) return;
       const currentViewport = viewport();
       syncHaloSize(currentViewport.pixelScale);
+      const [logicalX, logicalY] = transforms.apply(x, y);
       const [startX, startY] = currentViewport.mapPoint(position[0], position[1]);
-      const [endX, endY] = currentViewport.mapPoint(x, y);
+      const [endX, endY] = currentViewport.mapPoint(logicalX, logicalY);
       context.beginPath();
       context.moveTo(startX, startY);
       context.lineTo(endX, endY);
@@ -197,13 +217,14 @@ export function createCanvasRenderer(
       context.stroke();
       context.beginPath();
       context.moveTo(endX, endY);
-      position = [x, y];
+      position = [logicalX, logicalY];
     },
     point(x, y) {
       applyStyle();
       const currentViewport = viewport();
       syncHaloSize(currentViewport.pixelScale);
-      const [outputX, outputY] = currentViewport.mapPoint(x, y);
+      const [logicalX, logicalY] = transforms.apply(x, y);
+      const [outputX, outputY] = currentViewport.mapPoint(logicalX, logicalY);
       drawHaloPoint(outputX, outputY, currentViewport.pixelScale);
       context.globalAlpha = intensity;
       context.shadowBlur = 0;

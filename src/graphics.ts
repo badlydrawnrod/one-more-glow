@@ -15,6 +15,11 @@ export interface DrawingContext {
   endFrame(): void;
   setColor(color: Color): void;
   setIntensity(value: number): void;
+  pushTransform(): void;
+  popTransform(): void;
+  translate(x: number, y: number): void;
+  rotate(angleDegrees: number): void;
+  scale(x: number, y: number): void;
   moveTo(x: number, y: number): void;
   lineTo(x: number, y: number): void;
   point(x: number, y: number): void;

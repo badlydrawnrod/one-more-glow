@@ -109,6 +109,19 @@ function drawTestCard(): void {
   line(178, 15);
   point(0, 15);
 
+  // A small local-coordinate craft row shows translation, rotation and scaling.
+  renderer.setColor(amber);
+  for (const [x, angle, size] of [[-150, -25, 0.8], [0, 0, 1], [150, 25, 1.2]]) {
+    renderer.pushTransform();
+    renderer.translate(...project(x, 205));
+    renderer.rotate(angle);
+    renderer.scale(size, size);
+    drawPolygonOutline(renderer, [
+      [0, 30], [-18, -20], [0, -10], [18, -20],
+    ]);
+    renderer.popTransform();
+  }
+
   // Short line and point samples show three distinct intensity levels.
   renderer.setColor(cyan);
   for (const [intensity, y] of [[0.25, -170], [0.6, -225], [1, -280]]) {
@@ -176,14 +189,18 @@ function drawGameScene(): void {
   // Thrust-style craft and its exhaust.
   renderer.setColor(cyan);
   renderer.setIntensity(1);
+  renderer.pushTransform();
+  renderer.translate(...project(0, 130));
+  renderer.rotate(-12);
   drawPolygonOutline(renderer, [
-    [0, 164], [-19, 119], [-10, 125], [-10, 94],
-    [10, 94], [10, 125], [19, 119],
-  ].map(([x, y]) => project(x, y)));
+    [0, 34], [-19, -11], [-10, -5], [-10, -36],
+    [10, -36], [10, -5], [19, -11],
+  ]);
   renderer.setColor(amber);
   renderer.setIntensity(0.85);
-  drawPolyline(renderer, [[-7, 88], [0, 57], [7, 88]].map(([x, y]) => project(x, y)));
-  point(0, 57);
+  drawPolyline(renderer, [[-7, -42], [0, -73], [7, -42]]);
+  point(0, -73);
+  renderer.popTransform();
 
   // Tractor beam links the craft to a fuel pod above the surface.
   renderer.setColor(cyan);

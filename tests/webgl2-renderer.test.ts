@@ -96,6 +96,44 @@ test("WebGL2 renderer snapshots normalized colour and clamped intensity per comm
   assert.deepEqual([...upload], [...new Float32Array([x, y, x, y, 0, 0.5, 1, 1, 1])]);
 });
 
+test("WebGL2 transforms geometry in local space and restores the parent transform", () => {
+  const { calls, gl } = fakeContext();
+  const display = createWebGL2Renderer(gl);
+  const viewport = createViewport(320, 200, 320, 200, "landscape");
+
+  display.pushTransform();
+  display.translate(10, 20);
+  display.rotate(90);
+  display.scale(2, 3);
+  display.moveTo(1, 0);
+  display.lineTo(1, 1);
+  display.popTransform();
+  display.point(1, 0);
+  display.endFrame();
+
+  const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
+  assert.deepEqual([...upload], [...new Float32Array([
+    ...viewport.mapPoint(10, 22), ...viewport.mapPoint(7, 22), 1, 1, 1, 1, 0,
+    ...viewport.mapPoint(1, 0), ...viewport.mapPoint(1, 0), 1, 1, 1, 1, 1,
+  ])]);
+});
+
+test("WebGL2 beginFrame resets the transform stack", () => {
+  const { calls, gl } = fakeContext();
+  const display = createWebGL2Renderer(gl);
+  const viewport = createViewport(320, 200, 320, 200, "landscape");
+
+  display.translate(100, 0);
+  display.beginFrame();
+  display.point(0, 0);
+  display.endFrame();
+
+  const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
+  assert.deepEqual([...upload], [...new Float32Array([
+    ...viewport.mapPoint(0, 0), ...viewport.mapPoint(0, 0), 1, 1, 1, 1, 1,
+  ])]);
+});
+
 test("WebGL2 shader includes a bounded halo around the beam core", () => {
   const { calls, gl } = fakeContext();
   createWebGL2Renderer(gl);
