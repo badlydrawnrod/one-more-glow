@@ -20,6 +20,7 @@ function fakeContext() {
     STREAM_DRAW: 11,
     LINES: 12,
     POINTS: 13,
+    TRIANGLES: 14,
     createShader: () => ({ id: nextId++ }),
     shaderSource: (...args: unknown[]) => calls.push(["shaderSource", ...args]),
     compileShader: (...args: unknown[]) => calls.push(["compileShader", ...args]),
@@ -44,6 +45,7 @@ function fakeContext() {
     uniform2f: (...args: unknown[]) => calls.push(["uniform2f", ...args]),
     uniform3f: (...args: unknown[]) => calls.push(["uniform3f", ...args]),
     uniform1f: (...args: unknown[]) => calls.push(["uniform1f", ...args]),
+    uniform1i: (...args: unknown[]) => calls.push(["uniform1i", ...args]),
     viewport: (...args: unknown[]) => calls.push(["viewport", ...args]),
     clearColor: (...args: unknown[]) => calls.push(["clearColor", ...args]),
     clear: (...args: unknown[]) => calls.push(["clear", ...args]),
@@ -66,7 +68,7 @@ test("WebGL2 renderer clears per frame and submits line segments and points", ()
   display.endFrame();
 
   assert.deepEqual(calls.filter(([name]) => name === "drawArrays"), [
-    ["drawArrays", gl.LINES, 0, 2],
+    ["drawArrays", gl.TRIANGLES, 0, 6],
     ["drawArrays", gl.POINTS, 0, 1],
   ]);
   assert.deepEqual(calls.filter(([name]) => name === "clear"), [["clear", gl.COLOR_BUFFER_BIT]]);
