@@ -1,6 +1,8 @@
 import {
   createCanvasRenderer,
   createWebGL2Renderer,
+  drawPolygonOutline,
+  drawPolyline,
   type Color,
   type DisplayOrientation,
   type DrawingContext,
@@ -43,6 +45,8 @@ const renderer: DrawingContext = params.get("renderer") === "canvas"
 
 const cyan: Color = [0, 0.9, 1];
 const amber: Color = [1, 0.55, 0.12];
+const magenta: Color = [1, 0, 1];
+const green: Color = [0, 1, 0];
 
 function project(x: number, y: number): readonly [number, number] {
   return orientation === "portrait" ? [y, -x] : [x, y];
@@ -63,11 +67,22 @@ function point(x: number, y: number): void {
 function drawDiagnostic(): void {
   renderer.beginFrame();
   renderer.setColor(cyan);
+  renderer.setIntensity(1);
   move(-358, 243);
   line(358, 243);
   line(358, -243);
   line(-358, -243);
   line(-358, 243);
+
+  for (const [intensity, inset] of [[0.75, 18], [0.5, 36], [0.25, 54]]) {
+    renderer.setIntensity(intensity);
+    drawPolygonOutline(renderer, [
+      [-358 + inset, 243 - inset],
+      [358 - inset, 243 - inset],
+      [358 - inset, -243 + inset],
+      [-358 + inset, -243 + inset],
+    ].map(([x, y]) => project(x, y)));
+  }
 
   renderer.setColor(amber);
   renderer.setIntensity(0.75);
@@ -81,6 +96,42 @@ function drawDiagnostic(): void {
   renderer.setColor(cyan);
   move(-179, 0);
   line(179, 0);
+
+  renderer.setColor(magenta);
+  drawPolyline(renderer, [
+    [-320, 125],
+    [-270, 185],
+    [-220, 125],
+    [-170, 185],
+  ].map(([x, y]) => project(x, y)));
+
+  renderer.setColor(green);
+  drawPolygonOutline(renderer, [
+    [170, 150],
+    [310, 150],
+    [290, 35],
+    [190, 35],
+  ].map(([x, y]) => project(x, y)));
+
+  for (const [intensity, offsetY] of [[0.75, -100], [0.5, -200], [0.25, -300]]) {
+    renderer.setIntensity(intensity);
+
+    renderer.setColor(magenta);
+    drawPolyline(renderer, [
+      [-320, 125 + offsetY],
+      [-270, 185 + offsetY],
+      [-220, 125 + offsetY],
+      [-170, 185 + offsetY],
+    ].map(([x, y]) => project(x, y)));
+
+    renderer.setColor(green);
+    drawPolygonOutline(renderer, [
+      [170, 150 + offsetY],
+      [310, 150 + offsetY],
+      [290, 35 + offsetY],
+      [190, 35 + offsetY],
+    ].map(([x, y]) => project(x, y)));
+  }
 
   renderer.setIntensity(0.25);
   move(-384, -154);

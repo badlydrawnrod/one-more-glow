@@ -186,7 +186,7 @@ Canvas 2D uses opacity for intensity, a 1.5-pixel rounded line stroke, and circu
 
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic includes connected shapes, separate endpoints, points and repeated line/point examples at three intensity levels. Use `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
+The Vite diagnostic includes connected shapes, open-polyline and closed-outline helper examples, separate endpoints, points and repeated samples at three intensity levels. The coloured outline examples are repeated lower on the screen at decreasing intensity to compare their colour response; the exterior frame is repeated as progressively inset rectangles at decreasing intensity. Use `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
 
 Visual comparison found the Canvas 2D and WebGL2 outputs close overall at the diagnostic scale. Canvas retains a slightly softer outer wash. WebGL2 line-end halos were reduced until they no longer read as separate flares, and point halos were reduced to better match Canvas. A much wider WebGL2 cutoff made the result too diffuse, so its current cutoff remains at 25 pixels. Canvas isolates and composites a blurred halo layer beneath the core; WebGL2 combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. These renderer-specific techniques implement the same accepted appearance without requiring pixel-identical output. Their numeric profiles remain adjustable if later visual feedback warrants it.
 
@@ -209,15 +209,9 @@ These capabilities are not part of the current accepted drawing contract. Their 
 
 ### Derived geometry
 
-**Status: Proposed**
+**Status: Open polylines and polygon outlines accepted; other derived geometry deferred**
 
-Polylines, closed polygons, circles, arcs and other convenience geometry may be useful.
-
-If added, they should normally be small utilities composed from the fundamental operations rather than additions to the renderer contract.
-
-Curves could be approximated by line segments. Filled geometry is not currently required; consider it if consumers demonstrate a need.
-
-Derived geometry should retain the same drawing and beam semantics as the underlying primitives.
+The accepted helpers, their semantics and their current implementation status are defined in the [Derived Geometry Specification](derived-geometry.md). Circles, arcs, curves and filled geometry remain outside the accepted scope until a concrete consumer need is established.
 
 ### Transformations
 
