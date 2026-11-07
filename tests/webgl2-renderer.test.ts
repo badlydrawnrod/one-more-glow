@@ -91,3 +91,22 @@ test("WebGL2 renderer snapshots normalized colour and clamped intensity per comm
   const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
   assert.deepEqual([...upload], [7, 8, 7, 8, 0, 0.5, 1, 1, 1]);
 });
+
+test("WebGL2 shader includes a bounded halo around the beam core", () => {
+  const { calls, gl } = fakeContext();
+  createWebGL2Renderer(gl);
+
+  const sources = calls
+    .filter(([name]) => name === "shaderSource")
+    .map(([, , source]) => source as string);
+  const fragment = sources.find((source) => source.includes("out vec4 outputColor"));
+
+  assert.ok(fragment?.includes("float coreCoverage"));
+  assert.ok(fragment?.includes("float halo = (0.12 * exp(-haloDistance * haloDistance / 250.0)"));
+  assert.ok(fragment?.includes("+ 0.07 * exp(-haloDistance * haloDistance / 32.0)"));
+  assert.ok(fragment?.includes("smoothstep(16.0, 25.0"));
+  assert.ok(fragment?.includes("float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45"));
+  assert.ok(fragment?.includes("endDistance = beamLength * 0.5 - abs(edgePosition.x)"));
+  assert.ok(fragment?.includes("mix(0.35, 1.0, smoothstep(-4.0, 10.0, endDistance))"));
+  assert.ok(fragment?.includes("mix(beamColor, vec3(1.0), 0.2 + 0.65 * beamIntensity)"));
+});

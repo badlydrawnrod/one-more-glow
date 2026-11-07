@@ -27,13 +27,13 @@ void main() {
     beamLength = length(delta);
     vec2 tangent = delta / max(beamLength, 0.0001);
     vec2 normal = vec2(-tangent.y, tangent.x);
-    float along = corner.x * (beamLength * 0.5 + 1.75);
-    float across = corner.y * 1.75;
+    float along = corner.x * (beamLength * 0.5 + 25.5);
+    float across = corner.y * 25.5;
     position = (startPoint + endPoint) * 0.5 + tangent * along + normal * across;
     edgePosition = vec2(along, across);
   } else {
     beamLength = 0.0;
-    edgePosition = corner * 2.5;
+    edgePosition = corner * 25.5;
     position = startPoint + edgePosition;
   }
   vec2 clip = (position / resolution) * 2.0 - 1.0;
@@ -56,8 +56,25 @@ void main() {
   } else {
     signedDistance = length(edgePosition) - 1.5;
   }
-  float coverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
-  outputColor = vec4(beamColor, beamIntensity * coverage);
+  float coreCoverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
+  float haloDistance = max(signedDistance, 0.0);
+  float halo = (0.12 * exp(-haloDistance * haloDistance / 250.0)
+    + 0.07 * exp(-haloDistance * haloDistance / 32.0))
+    * (1.0 - smoothstep(16.0, 25.0, haloDistance));
+  float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45;
+  halo *= primitiveHalo;
+  if (beamKind < 0.5) {
+    float endDistance = beamLength * 0.5 - abs(edgePosition.x);
+    halo *= mix(0.35, 1.0, smoothstep(-4.0, 10.0, endDistance));
+  }
+  float baseAlpha = beamIntensity
+    * (coreCoverage + halo * (1.0 - coreCoverage));
+  float coreAlpha = beamIntensity * coreCoverage;
+  float alpha = coreAlpha + baseAlpha * (1.0 - coreAlpha);
+  vec3 coreColor = mix(beamColor, vec3(1.0), 0.2 + 0.65 * beamIntensity);
+  vec3 premultiplied = coreColor * coreAlpha
+    + beamColor * baseAlpha * (1.0 - coreAlpha);
+  outputColor = vec4(premultiplied / max(alpha, 0.0001), alpha);
 }`;
 
 function compileShader(

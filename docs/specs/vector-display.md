@@ -90,7 +90,7 @@ These characteristics establish the intended aesthetic. They do not require ever
 
 ### Beam characteristics
 
-**Status: Colour and intensity accepted and implemented; other characteristics proposed or deferred**
+**Status: Colour, intensity, beam width, bright core and halo accepted and implemented; light accumulation deferred**
 
 A beam is the conceptual source of illumination for vector geometry.
 
@@ -98,18 +98,18 @@ A beam is the conceptual source of illumination for vector geometry.
 |---|---|---|
 | Colour | Illuminate geometry using its specified RGB colour. | Implemented |
 | Intensity | Control relative illumination independently of colour. | Implemented |
-| Beam width | Control the apparent thickness of the luminous core. | Proposed |
-| Bright core | Give lines and points a sharply defined, bright centre. | Proposed |
-| Halo / bloom | Produce a soft coloured glow surrounding illuminated geometry. | Deferred |
+| Beam width | Control the apparent thickness of the luminous core. | Accepted and implemented |
+| Bright core | Give lines and points a sharply defined, bright centre that moves toward white as intensity rises. | Accepted and implemented |
+| Halo / bloom | Produce a broad, soft coloured glow surrounding illuminated geometry. | Accepted and implemented |
 | Light accumulation | Allow overlapping illumination to appear brighter, subject to defined compositing semantics. | Deferred |
 
 Beam width and intensity are distinct concepts. Increasing intensity should not implicitly change geometric line width. An apparent widening caused by brighter bloom is a display effect rather than a change in geometry.
 
-Colour and intensity belong to drawing descriptions. Whether beam width belongs to drawing state, display configuration, or both remains undecided.
+Colour and intensity belong to drawing descriptions. The accepted beam width is currently a fixed renderer profile; whether consumers should be able to configure it through drawing state or display configuration remains undecided.
 
 A bright core and its surrounding halo are aspects of the same illuminated geometry. Consumers should not need to submit additional decorative geometry to reproduce these effects.
 
-The exact appearance, configuration and interaction of these characteristics remain open until their behaviour is designed.
+The bright core and halo are one presentation treatment. Higher intensity moves the core toward white while preserving the selected colour in the surrounding halo. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The renderers use fixed internal profiles rather than public controls. Their current dimensions and falloff values are adjustable later if visual feedback warrants it; they are starting settings, not permanent limits.
 
 ### Baseline beam
 
@@ -121,21 +121,21 @@ The exact appearance, configuration and interaction of these characteristics rem
 - Corners and endpoints should not exhibit unintended gaps or obvious rendering artefacts.
 - Colour and intensity produce perceptibly distinct results without relying on bloom.
 
-The accepted baseline uses a 1.5-pixel line core with rounded ends and circular points with a 1.5-pixel radius. These dimensions may be revisited if later visual feedback indicates a need to adjust them.
+The accepted baseline uses a 1.5-pixel line core with rounded ends and circular points with a 1.5-pixel radius. These dimensions are the current fixed renderer profile and may be adjusted later if visual feedback indicates a need.
 
 ### Display effects
 
-**Status: Deferred**
+**Status: Bloom accepted and implemented; other effects deferred**
 
 Display effects determine how beam illumination appears on screen. They are conceptually separate from drawing commands and game state.
 
 #### Bloom
 
-Bloom produces a soft coloured halo around illuminated geometry.
+Bloom produces a broad, soft coloured halo around illuminated geometry, paired with a sharply defined core. Consumers do not submit separate geometry for either part.
 
 The result should retain a recognisable, sharply defined core rather than simply blurring the entire image.
 
-The relationship between beam intensity, beam width, bloom strength and colour remains to be designed.
+The current profile is fixed inside each renderer and preserves the submitted colour in the halo. Consumers do not configure bloom yet. The implementation may be tuned later without changing the accepted visual intent.
 
 #### Light accumulation
 
@@ -186,9 +186,9 @@ Canvas 2D uses opacity for intensity, a 1.5-pixel rounded line stroke, and circu
 
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic includes connected shapes, separate endpoints, points and repeated line/point examples at three intensity levels. Use `?renderer=canvas` to compare Canvas 2D with WebGL2. Initial screenshot review found the two backends closely matched at the displayed scale, with no conspicuous gaps; point visibility remains a visual choice for further feedback.
+The Vite diagnostic includes connected shapes, separate endpoints, points and repeated line/point examples at three intensity levels. Use `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
 
-These implementations establish the baseline drawing behaviour. They do not yet implement the full intended luminous display character.
+Visual comparison found the Canvas 2D and WebGL2 outputs close overall at the diagnostic scale. Canvas retains a slightly softer outer wash. WebGL2 line-end halos were reduced until they no longer read as separate flares, and point halos were reduced to better match Canvas. A much wider WebGL2 cutoff made the result too diffuse, so its current cutoff remains at 25 pixels. Canvas isolates and composites a blurred halo layer beneath the core; WebGL2 combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. These renderer-specific techniques implement the same accepted appearance without requiring pixel-identical output. Their numeric profiles remain adjustable if later visual feedback warrants it.
 
 ### Display design constraints
 
@@ -269,9 +269,9 @@ Testing conventions are maintained in `docs/engineering.md`.
 
 Tests should focus on observable behavior at the shared public contract; backend tests may verify renderer-specific invariants when those are necessary to preserve the contract.
 
-The accepted drawing contract and both backends are implemented. Automated tests cover frame clearing and pen behavior in Canvas, plus WebGL2 frame batching, command ordering and per-command style snapshots.
+The accepted drawing contract and both backends are implemented. Automated tests cover Canvas frame clearing, pen behavior, halo compositing and intensity-driven core colour, plus WebGL2 frame batching, command ordering, per-command style snapshots and halo profile invariants.
 
-Deferred and proposed capabilities above are not implemented requirements.
+Proposed capabilities above remain subject to evaluation even when an experimental implementation is present. Deferred capabilities are not implemented requirements.
 
 As display characteristics and effects become accepted, their externally observable semantics should be specified and tested consistently across backends. Visual appearance may additionally require diagnostic examples or visual comparisons, without imposing pixel-identical output.
 
