@@ -231,11 +231,25 @@ Avoid general-purpose matrix dependencies without a concrete need.
 
 ### Logical coordinates and viewport
 
-**Status: Proposed**
+**Status: Accepted**
 
-Drawing in configurable logical coordinates independent of physical canvas resolution may be useful.
+**Implementation: Not implemented**
 
-No logical resolution, scaling, aspect-ratio or clipping contract is currently accepted.
+The imaginary console should provide fixed logical coordinate spaces for landscape 4:3 and portrait 3:4 displays. Consumers use the selected console space rather than choosing their own logical dimensions. The origin is at the centre, positive X points right, and positive Y points up.
+
+**Accepted decision:** The long axis spans `-512` to `+512`; the short axis spans `-384` to `+384`. This gives logical extents of 1024 × 768 units in landscape and 768 × 1024 units in portrait. Coordinates may be fractional; these extents do not prescribe a raster resolution.
+
+Map the selected logical space to the physical canvas with uniform scaling, preserving geometry proportions and letterboxing unused canvas space as needed. The mapping affects geometry position and dimensions while preserving the current apparent screen-space beam profile. In particular, scaling logical geometry must not scale the beam core width, point radius or halo size: these remain measured in output pixels.
+
+**Accepted decision:** The host sizes the canvas to the selected console aspect ratio and letterboxes the canvas within the page as needed. The renderer does not draw page letterboxing; any halo beyond the canvas is naturally not presented.
+
+**Accepted decision:** Geometry and its halo are clipped at the logical display bounds. Since those bounds map to the canvas edges, the Canvas and WebGL2 surfaces provide this clipping; no separate logical clipping pass is required.
+
+**Accepted decision:** Consumers select landscape or portrait orientation when configuring a renderer. Landscape is the default.
+
+**Accepted decision:** Drawing coordinates may lie outside the logical extents. Geometry is rendered normally and the portion beyond the display bounds is clipped by the canvas surface.
+
+**Accepted decision:** Beam dimensions are measured in CSS pixels. The canvas backing resolution accounts for device-pixel ratio, and renderers scale the beam profile accordingly so its apparent size remains stable across display densities.
 
 Resolve these semantics before requiring backends to implement them.
 
