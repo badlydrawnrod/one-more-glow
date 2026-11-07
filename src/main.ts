@@ -1,13 +1,14 @@
+import { createWebGL2Renderer } from "./webgl2-renderer.ts";
 import { createCanvasRenderer } from "./canvas-renderer.ts";
 import type { Color } from "./graphics.ts";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing #screen canvas");
 
-const context = canvas.getContext("2d");
-if (!context) throw new Error("Canvas 2D is unavailable");
-
-const display = createCanvasRenderer(context);
+const renderer = new URLSearchParams(location.search).get("renderer");
+const display = renderer === "canvas"
+  ? createCanvasRenderer(requireContext(canvas.getContext("2d"), "Canvas 2D"))
+  : createWebGL2Renderer(requireContext(canvas.getContext("webgl2", { alpha: true }), "WebGL2"));
 const cyan: Color = [0, 0.9, 1];
 const amber: Color = [1, 0.55, 0.12];
 
@@ -32,3 +33,8 @@ display.setColor(cyan);
 display.moveTo(260, 300);
 display.lineTo(540, 300);
 display.endFrame();
+
+function requireContext<T>(context: T | null, name: string): T {
+  if (!context) throw new Error(`${name} is unavailable`);
+  return context;
+}
