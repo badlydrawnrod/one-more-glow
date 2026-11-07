@@ -66,87 +66,65 @@ function point(x: number, y: number): void {
 
 function drawDiagnostic(): void {
   renderer.beginFrame();
-  renderer.setColor(cyan);
-  renderer.setIntensity(1);
-  move(-358, 243);
-  line(358, 243);
-  line(358, -243);
-  line(-358, -243);
-  line(-358, 243);
 
-  for (const [intensity, inset] of [[0.75, 18], [0.5, 36], [0.25, 54]]) {
+  // A dim frame gives the samples a shared boundary without competing with them.
+  renderer.setColor(cyan);
+  renderer.setIntensity(0.25);
+  drawPolygonOutline(renderer, [
+    [-470, -330], [470, -330], [470, 330], [-470, 330],
+  ].map(([x, y]) => project(x, y)));
+
+  // Open connected paths, stepping down in intensity.
+  renderer.setColor(magenta);
+  for (const [intensity, y] of [[1, 220], [0.75, 145], [0.5, 70], [0.25, -5]]) {
     renderer.setIntensity(intensity);
-    drawPolygonOutline(renderer, [
-      [-358 + inset, 243 - inset],
-      [358 - inset, 243 - inset],
-      [358 - inset, -243 + inset],
-      [-358 + inset, -243 + inset],
-    ].map(([x, y]) => project(x, y)));
+    drawPolyline(renderer, [
+      [-430, y - 28], [-385, y + 28], [-340, y - 28], [-295, y + 28],
+    ].map(([x, py]) => project(x, py)));
   }
 
+  // Closed outlines use the same geometry at matching intensity steps.
+  renderer.setColor(green);
+  for (const [intensity, y] of [[1, 220], [0.75, 145], [0.5, 70], [0.25, -5]]) {
+    renderer.setIntensity(intensity);
+    drawPolygonOutline(renderer, [
+      [295, y + 28], [430, y + 28], [412, y - 28], [313, y - 28],
+    ].map(([x, py]) => project(x, py)));
+  }
+
+  // A central beam study: line crossing a closed vector shape and a point.
   renderer.setColor(amber);
   renderer.setIntensity(0.75);
-  move(0, 141);
-  line(90, -64);
-  line(-90, -64);
-  line(0, 141);
-  point(0, 0);
-
-  renderer.setIntensity(1);
-  renderer.setColor(cyan);
-  move(-179, 0);
-  line(179, 0);
-
-  renderer.setColor(magenta);
-  drawPolyline(renderer, [
-    [-320, 125],
-    [-270, 185],
-    [-220, 125],
-    [-170, 185],
-  ].map(([x, y]) => project(x, y)));
-
-  renderer.setColor(green);
   drawPolygonOutline(renderer, [
-    [170, 150],
-    [310, 150],
-    [290, 35],
-    [190, 35],
+    [-78, -72], [0, 108], [78, -72],
   ].map(([x, y]) => project(x, y)));
+  renderer.setColor(cyan);
+  renderer.setIntensity(1);
+  move(-178, 15);
+  line(178, 15);
+  point(0, 15);
 
-  for (const [intensity, offsetY] of [[0.75, -100], [0.5, -200], [0.25, -300]]) {
+  // Short line and point samples show three distinct intensity levels.
+  renderer.setColor(cyan);
+  for (const [intensity, y] of [[0.25, -170], [0.6, -225], [1, -280]]) {
     renderer.setIntensity(intensity);
+    move(-430, y);
+    line(-270, y);
+    point(-238, y);
+  }
 
-    renderer.setColor(magenta);
-    drawPolyline(renderer, [
-      [-320, 125 + offsetY],
-      [-270, 185 + offsetY],
-      [-220, 125 + offsetY],
-      [-170, 185 + offsetY],
-    ].map(([x, y]) => project(x, y)));
-
-    renderer.setColor(green);
+  // Nested rectangles make the high-intensity halo response easy to compare.
+  renderer.setColor(cyan);
+  for (const [intensity, inset] of [[1, 0], [0.75, 16], [0.5, 32], [0.25, 48]]) {
+    renderer.setIntensity(intensity);
     drawPolygonOutline(renderer, [
-      [170, 150 + offsetY],
-      [310, 150 + offsetY],
-      [290, 35 + offsetY],
-      [190, 35 + offsetY],
+      [210 + inset, -115 - inset],
+      [450 - inset, -115 - inset],
+      [450 - inset, -310 + inset],
+      [210 + inset, -310 + inset],
     ].map(([x, y]) => project(x, y)));
   }
 
-  renderer.setIntensity(0.25);
-  move(-384, -154);
-  line(-128, -154);
-  point(-64, -154);
-
-  renderer.setIntensity(0.6);
-  move(-384, -205);
-  line(-128, -205);
-  point(-64, -205);
-
-  renderer.setIntensity(1);
-  move(-384, -256);
-  line(-128, -256);
-  point(-64, -256);
   renderer.endFrame();
 }
 
