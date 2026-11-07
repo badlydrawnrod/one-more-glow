@@ -1,287 +1,130 @@
 # One More Glow — Vector Display Specification
 
-**Status:** Initial design
+This specification records accepted intent, deferred capabilities, proposals and implementation status separately. A capability marked deferred or proposed is not an instruction to implement it.
 
-## 1. Purpose
+## Purpose and guiding principles
 
-One More Glow is a lightweight TypeScript library for rendering luminous, vector-style 2D graphics.
+**Status: Accepted**
 
-Its visual inspiration includes classic vector arcade machines such as Asteroids, Tempest and the Vectrex, together with modern interpretations such as Geometry Wars.
+One More Glow is a small TypeScript library for drawing retro-inspired 2D vector graphics with a luminous character. Its visual inspiration includes classic vector arcade machines and modern interpretations. The guiding fiction is an imaginary late-1980s colour vector console, provisionally called **OMG-1**; accurate hardware emulation is not a goal.
 
-The guiding concept is an imaginary late-1980s colour vector console, provisionally called **OMG-1**.
+The library provides a small, coherent drawing vocabulary for games and other consumers. It is not a game engine. Consumers own game state, timing, input, physics, audio and animation. The library owns vector drawing and its presentation.
 
-The objective is not to emulate historical hardware accurately. It is to provide a small, coherent drawing vocabulary with a distinctive aesthetic.
+Prefer a small, understandable contract and explicit dependencies. Avoid unnecessary abstractions, dependencies and runtime overhead.
 
-The library should be suitable for building multiple arcade-style games without becoming a general-purpose game engine.
+## Architecture
 
-## 2. Design goals
+**Status: Accepted**
 
-The library should:
+**Implementation: Implemented**
 
-1. Expose a small, renderer-independent drawing API.
-2. Support both Canvas 2D and WebGL2 implementations.
-3. Represent graphics primarily as points, lines and paths.
-4. Support colour, beam intensity and geometric transformations.
-5. Provide the foundation for glowing beams and phosphor-like persistence.
-6. Keep rendering separate from game logic.
-7. Be straightforward to understand, test and extend.
-8. Avoid unnecessary dependencies and runtime overhead.
+The library has a renderer-independent drawing contract and interchangeable Canvas 2D and WebGL2 implementations. The public contract must not expose Canvas or WebGL types. Backend setup, resource ownership and internal rendering techniques may differ, while drawing commands retain equivalent geometry, colour, intensity and ordering semantics.
 
-Simplicity is a design goal, not merely an implementation preference.
+The core must not depend on either renderer or browser graphics APIs. The development diagnostic is a consumer of the public library API and must not depend on renderer internals.
 
-## 3. Architecture
+## Drawing contract
 
-The core defines the drawing contract and supporting data types.
+**Status: Accepted**
 
-Two rendering backends implement that contract:
+**Implementation: Implemented**
 
-- **Canvas 2D:** A straightforward reference implementation using `CanvasRenderingContext2D`.
-- **WebGL2:** A GPU-based implementation intended to support more sophisticated luminous display effects.
+The library uses immediate-mode drawing. Consumers submit drawing commands between frame boundaries; the library does not retain game objects or own their behavior.
 
-Both backends must support the same fundamental drawing operations.
-
-The public drawing API must not expose Canvas or WebGL2 types.
-
-Backend-specific setup and resource ownership may differ, but clients should not need to change their drawing logic when switching backends.
-
-An implementation may initially support only a subset of the intended visual effects. The essential requirement is consistent drawing semantics.
-
-## 4. Drawing model
-
-The library uses an immediate-mode drawing API.
-
-A client begins a frame, issues drawing commands, and ends the frame.
-
-The library is not a retained-mode scene graph. It does not own game objects or maintain their geometry between frames.
-
-A frame describes what should be drawn, not how objects move or behave.
-
-### 4.1 Fundamental primitives
-
-The core drawing operations are:
+The accepted fundamental operations are:
 
 | Operation | Meaning |
 |---|---|
-| `moveTo(x, y)` | Move the virtual drawing position without producing a visible line |
-| `lineTo(x, y)` | Draw from the current position to the specified position |
-| `point(x, y)` | Draw a luminous point |
-| `setColor(color)` | Select the drawing colour |
-| `setIntensity(value)` | Select beam intensity |
+| `beginFrame()` | Begin a frame and clear/reset its submitted drawing |
+| `endFrame()` | Finish submitting the frame for presentation |
+| `setColor(color)` | Select the RGB drawing colour |
+| `setIntensity(value)` | Select relative beam intensity |
+| `moveTo(x, y)` | Set the current drawing position without drawing |
+| `lineTo(x, y)` | Draw from the current position and advance it |
+| `point(x, y)` | Draw a point without changing the current position |
 
-Paths are constructed from ordered drawing operations.
+`Color` is RGB with each component in the range 0–1. Intensity is also in the range 0–1. Values outside those ranges are clamped. Colour and intensity are separate state: colour selects chromatic properties, while intensity controls relative brightness.
 
-The distinction between moving without drawing and drawing a line is intentional. It preserves the conceptual model of a vector display with a moving beam.
+### Frame and pen behavior
 
-The library does not initially simulate the timing or physical behaviour of an electron beam.
+**Status: Accepted**
 
-### 4.2 Derived primitives
+**Implementation: Implemented**
 
-Higher-level geometry may be implemented in terms of the fundamental operations:
+There is one `beginFrame()` and one `endFrame()` per display refresh. `beginFrame()` clears the current frame and resets the drawing position. Drawing state such as colour and intensity remains in effect until changed. A `lineTo()` issued before any `moveTo()` in the frame draws nothing. Each successful `lineTo()` advances the current position; `point()` does not.
 
-- Polylines
-- Closed polygons
-- Circles
-- Arcs
-- Vector text
+Lifecycle misuse (including nested, repeated or out-of-frame calls) is currently undefined and is not required to be detected.
 
-These operations should normally be implemented as small utilities rather than additions to the fundamental rendering contract.
+The Canvas renderer draws commands as they are issued. The WebGL2 renderer collects commands and submits them at `endFrame()`. This batching strategy is an implementation detail; a particular command-buffer representation is not part of the public contract.
 
-Curves may be approximated by line segments.
+## Display character
 
-Filled geometry is outside the initial core scope. It may be considered if actual games demonstrate a need.
+**Status: Accepted at the level of intent; specific effects below are deferred or proposed**
 
-### 4.3 Drawing state
+The display should give vector geometry a distinctive luminous character. Colour and intensity belong to drawing descriptions, while display effects belong to renderer presentation. A predominantly dark background is appropriate for the diagnostic and intended aesthetic.
 
-Drawing state includes:
+### Deferred effects
 
-- Current position
-- Colour
-- Intensity
-- Geometric transformation
+**Status: Deferred**
 
-Colour and intensity are distinct. A colour identifies the beam's chromatic properties; intensity expresses its relative brightness.
+The following effects are intentionally outside the current implementation slice:
 
-The initial design uses RGB colour and intensity values in the range 0 to 1.
-
-Values outside supported ranges must have documented behaviour.
-
-### 4.4 Geometric transformations
-
-The library supports 2D transformations:
-
-- Translation
-- Rotation
-- Scaling
-- A push/pop transformation stack
-
-Geometry is defined in logical display coordinates and transformed before rendering.
-
-Transformation order and composition semantics must be explicitly documented and tested.
-
-The initial implementation should avoid introducing general-purpose scene or matrix libraries unless there is a compelling need.
-
-### 4.5 Coordinates and viewport
-
-Drawing operations use logical coordinates independent of the physical canvas resolution.
-
-The display has a defined logical width and height.
-
-The renderer is responsible for mapping these coordinates into its output surface.
-
-Viewport scaling, aspect-ratio handling and clipping must be consistent across implementations.
-
-The logical resolution is configurable. No particular historical resolution is required.
-
-## 5. Display appearance
-
-The characteristic OMG appearance comes from how vector geometry is presented.
-
-The intended visual features are:
-
-- Thin, bright line cores
 - Coloured halos or bloom
-- Variable beam intensity
 - Additive-looking illumination
-- Optional phosphor-like persistence
-- A predominantly dark background
+- Phosphor-like persistence
+- Adjustable beam width and a defined bright line core
 
-These are primarily **display properties**, not game-object properties.
+Persistence is conceptually separate from frame submission. Beginning a frame must not implicitly specify how previous images fade. Persistence should be off by default if introduced. The exact appearance and controls for these effects remain open until their behavior is designed.
 
-A game should describe its geometry and beam attributes without needing to know the details of bloom shaders or compositing passes.
+### Current backend behavior
 
-### 5.1 Backend capabilities
+**Implementation: Implemented**
 
-Canvas 2D should prioritise correctness and simplicity.
+Canvas 2D uses opacity for intensity and draws thin lines and small points. WebGL2 uses alpha blending, shader-expanded line and point quads, and per-frame batching. Pixel-identical output is not required; equivalent drawing meaning and ordering are required.
 
-WebGL2 may use multipass rendering, shaders and intermediate buffers to produce more sophisticated effects.
+## Deferred and proposed capabilities
 
-Pixel-identical results are not required.
+These capabilities are not part of the current accepted drawing contract. Their inclusion, API shape and detailed behavior remain open unless stated otherwise.
 
-The two implementations should preserve equivalent geometry, colours, drawing order and intensity semantics as far as their rendering capabilities allow.
+### Derived geometry
 
-### 5.2 Persistence
+**Status: Proposed**
 
-Phosphor persistence is conceptually separate from frame submission.
+Polylines, closed polygons, circles, arcs and other convenience geometry may be useful. If added, they should normally be small utilities composed from the fundamental operations rather than additions to the renderer contract. Curves could be approximated by line segments. Filled geometry is not currently required; consider it if consumers demonstrate a need.
 
-Beginning a frame clears or resets the current frame's drawing commands. It must not implicitly define how previous displayed images fade.
+### Transformations
 
-Persistence is an optional display effect controlled independently from game logic.
+**Status: Deferred**
 
-Persistence must be disabled by default during initial development to make results predictable.
+Translation, rotation, scaling and a push/pop transformation stack have not been designed or accepted as part of the public API. If transformations are pursued, their coordinate model, composition order and relationship to drawing state must be decided and tested consistently across renderers. Avoid general-purpose matrix dependencies without a concrete need.
 
-## 6. Text
+### Logical coordinates and viewport
 
-Vector lettering is part of the intended display vocabulary.
+**Status: Proposed**
 
-An initial text utility should use a simple stroke font expressed through the normal path operations.
+Drawing in configurable logical coordinates independent of physical canvas resolution may be useful. No logical resolution, scaling, aspect-ratio or clipping contract is currently accepted. Resolve these semantics before requiring backends to implement them.
 
-Text should not require a browser font-rendering API.
+### Vector text
 
-Initial support may be limited to an appropriate ASCII subset.
+**Status: Deferred**
 
-Alignment, rotation and scaling can be added incrementally.
+Vector text may be useful, potentially through a small stroke font composed from normal drawing operations and without browser font rendering. Font coverage, alignment and other text behavior are undecided. Text is not part of the current contract.
 
-## 7. Rendering lifecycle
+## Non-goals
 
-The conceptual rendering sequence is:
-
-1. Initialise the display and renderer.
-2. Begin a frame.
-3. Submit drawing commands.
-4. End the frame.
-5. Present the resulting image.
-
-The core contract defines frame boundaries but does not own the application's animation loop.
-
-Games remain responsible for their own timing and state updates.
-
-The implementation may batch commands internally.
-
-No particular command-buffer representation is mandated initially.
-
-## 8. Explicit non-goals
+**Status: Accepted**
 
 One More Glow is not intended to provide:
 
-- An entity-component system
-- A scene graph
-- Physics or collision detection
-- Input handling
-- Audio management
-- A game loop
-- Animation or particle simulation
+- An entity-component system, scene graph or game loop
+- Physics, collision detection, input handling, audio, animation or game state
 - Sprite or texture-based game rendering
-- A general-purpose UI framework
-- A full 3D renderer
+- A general-purpose UI framework or full 3D renderer
 - Accurate analogue vector-display hardware emulation
 
-These capabilities belong to games, separate utilities or future projects if needed.
+These responsibilities belong to consumers or separate utilities.
 
-## 9. Testing
+## Testing and implementation status
 
-Test externally observable drawing behaviour through the shared public contract where practical.
+Testing conventions are maintained in `docs/engineering.md`. Tests should focus on observable behavior at the shared public contract; backend tests may verify renderer-specific invariants when those are necessary to preserve the contract.
 
-Core tests should cover:
-
-- Geometry construction
-- Transformation semantics
-- Drawing-state changes
-- Frame lifecycle rules
-- Expected command ordering
-
-Backend tests should verify that each implementation honours the common contract.
-
-The Canvas and WebGL2 backends should share behavioural test cases where appropriate.
-
-Avoid testing private implementation details unless they enforce an important invariant.
-
-Visual comparison tests may be introduced once the intended display appearance is established.
-
-## 10. Initial development milestones
-
-### Milestone 1 — Minimal drawing contract
-
-Define the public drawing interface and simple geometry types.
-
-Implement a Canvas 2D renderer supporting:
-
-- Frame lifecycle
-- Colour and intensity
-- Points and lines
-- Transformations
-
-Create a diagnostic application that draws basic test patterns.
-
-### Milestone 2 — WebGL2 backend
-
-Implement the same public drawing contract using WebGL2.
-
-Confirm that the existing diagnostic works without changing its drawing logic.
-
-Optimise only as required by observed performance.
-
-### Milestone 3 — Display character
-
-Experiment with:
-
-- Glowing line cores
-- Bloom
-- Beam width
-- Additive illumination
-- Persistence
-
-Establish a coherent default appearance.
-
-### Milestone 4 — Extended vocabulary
-
-Introduce useful derived primitives such as circles, polygons and vector text.
-
-Avoid promoting convenience functions into core rendering operations without justification.
-
-## 11. Guiding principle
-
-**Games describe vectors. The display makes them glow.**
-
-The library should remain small enough that its architecture can be understood without extensive documentation.
-
-When faced with competing designs, prefer the one that provides the necessary capability with fewer concepts, simpler contracts and less coupling.
+The accepted drawing contract and both backends are implemented. Automated tests cover frame clearing and pen behavior in Canvas, plus WebGL2 frame batching, command ordering and per-command style snapshots. Deferred and proposed capabilities above are not implemented requirements.
