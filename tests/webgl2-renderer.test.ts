@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createWebGL2Renderer } from "../src/webgl2-renderer.ts";
+import { createViewport } from "../src/viewport.ts";
 
 function fakeContext() {
   const calls: Array<[string, ...unknown[]]> = [];
@@ -45,6 +46,7 @@ function fakeContext() {
     enable: (...args: unknown[]) => calls.push(["enable", ...args]),
     blendFunc: (...args: unknown[]) => calls.push(["blendFunc", ...args]),
     uniform2f: (...args: unknown[]) => calls.push(["uniform2f", ...args]),
+    uniform1f: (...args: unknown[]) => calls.push(["uniform1f", ...args]),
     viewport: (...args: unknown[]) => calls.push(["viewport", ...args]),
     clearColor: (...args: unknown[]) => calls.push(["clearColor", ...args]),
     clear: (...args: unknown[]) => calls.push(["clear", ...args]),
@@ -58,6 +60,7 @@ function fakeContext() {
 test("WebGL2 renderer clears per frame and submits line segments and points", () => {
   const { calls, gl } = fakeContext();
   const display = createWebGL2Renderer(gl);
+  const viewport = createViewport(320, 200, 320, 200, "landscape");
 
   display.beginFrame();
   display.lineTo(99, 99);
@@ -71,10 +74,10 @@ test("WebGL2 renderer clears per frame and submits line segments and points", ()
     ["drawArraysInstanced", gl.TRIANGLES, 0, 6, 2],
   ]);
   const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
-  assert.deepEqual([...upload], [
-    10, 20, 30, 40, 1, 1, 1, 1, 0,
-    50, 60, 50, 60, 1, 1, 1, 1, 1,
-  ]);
+  assert.deepEqual([...upload], [...new Float32Array([
+    ...viewport.mapPoint(10, 20), ...viewport.mapPoint(30, 40), 1, 1, 1, 1, 0,
+    ...viewport.mapPoint(50, 60), ...viewport.mapPoint(50, 60), 1, 1, 1, 1, 1,
+  ])]);
   assert.deepEqual(calls.filter(([name]) => name === "clear"), [["clear", gl.COLOR_BUFFER_BIT]]);
   assert.deepEqual(calls.filter(([name]) => name === "flush"), [["flush"]]);
 });
@@ -82,6 +85,7 @@ test("WebGL2 renderer clears per frame and submits line segments and points", ()
 test("WebGL2 renderer snapshots normalized colour and clamped intensity per command", () => {
   const { calls, gl } = fakeContext();
   const display = createWebGL2Renderer(gl);
+  const [x, y] = createViewport(320, 200, 320, 200, "landscape").mapPoint(7, 8);
 
   display.setColor([-1, 0.5, 2]);
   display.setIntensity(2);
@@ -89,7 +93,7 @@ test("WebGL2 renderer snapshots normalized colour and clamped intensity per comm
   display.endFrame();
 
   const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
-  assert.deepEqual([...upload], [7, 8, 7, 8, 0, 0.5, 1, 1, 1]);
+  assert.deepEqual([...upload], [...new Float32Array([x, y, x, y, 0, 0.5, 1, 1, 1])]);
 });
 
 test("WebGL2 shader includes a bounded halo around the beam core", () => {
@@ -102,11 +106,11 @@ test("WebGL2 shader includes a bounded halo around the beam core", () => {
   const fragment = sources.find((source) => source.includes("out vec4 outputColor"));
 
   assert.ok(fragment?.includes("float coreCoverage"));
-  assert.ok(fragment?.includes("float halo = (0.12 * exp(-haloDistance * haloDistance / 250.0)"));
-  assert.ok(fragment?.includes("+ 0.07 * exp(-haloDistance * haloDistance / 32.0)"));
-  assert.ok(fragment?.includes("smoothstep(16.0, 25.0"));
+  assert.ok(fragment?.includes("float halo = (0.12 * exp(-haloDistance * haloDistance / (250.0 * pixelScale * pixelScale))"));
+  assert.ok(fragment?.includes("+ 0.07 * exp(-haloDistance * haloDistance / (32.0 * pixelScale * pixelScale))"));
+  assert.ok(fragment?.includes("smoothstep(16.0 * pixelScale, 25.0 * pixelScale"));
   assert.ok(fragment?.includes("float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45"));
   assert.ok(fragment?.includes("endDistance = beamLength * 0.5 - abs(edgePosition.x)"));
-  assert.ok(fragment?.includes("mix(0.35, 1.0, smoothstep(-4.0, 10.0, endDistance))"));
+  assert.ok(fragment?.includes("mix(0.35, 1.0, smoothstep(-4.0 * pixelScale, 10.0 * pixelScale, endDistance))"));
   assert.ok(fragment?.includes("mix(beamColor, vec3(1.0), 0.2 + 0.65 * beamIntensity)"));
 });

@@ -26,12 +26,37 @@ Inputs with fewer than two points for a polyline, or fewer than three points for
 
 The helpers belong in a renderer-independent geometry module and are exported through the public library entry point. They are utilities, not methods on `DrawingContext`.
 
+## Circles and ellipses
+
+**Status: Accepted**
+**Implementation: Implemented**
+
+Add `drawCircle(drawing, center, radius)` and `drawEllipse(drawing, center, radiusX, radiusY)` helpers. A circle is a common operation in its own right, even though it can also be expressed as an ellipse with equal radii.
+
+Both helpers approximate the curve with line segments and submit the result as a closed outline. The generated geometry uses the same colour, intensity, beam profile and ordering semantics as other line-based outlines.
+
+Choose the segment count from a maximum chord error of 0.5 logical coordinate units. For a circle of radius `r`, use:
+
+```text
+segments = ceil(π / acos(1 - 0.5 / r))
+```
+
+Use at least 12 segments. For an ellipse, apply the same calculation using the larger of `radiusX` and `radiusY`; this conservatively bounds the deviation for the ellipse. The number of segments is an internal implementation detail, not a caller option. This rule gives a deterministic approximation in logical units without coupling geometry helpers to renderer or canvas sizing.
+
+If the circle radius is zero or negative, the helper produces no drawing operations. If either ellipse radius is zero or negative, the helper also produces no drawing operations. Invalid drawing dimensions do not throw.
+
+## Arcs
+
+**Status: Deferred**
+**Implementation: Not implemented**
+
+Arc helpers are deferred. Their coordinate convention, direction, angle units, treatment of full circles, and endpoint behavior should be decided when a concrete use case is taken up. Circular and elliptical arcs may be considered then.
+
 ## Out of scope
 
 - Filled polygons
-- Circles, arcs and curves
-- Automatic curve tessellation
+- Curves other than the accepted circle and ellipse outlines
 - Geometry validation, simplification or clipping beyond renderer surface clipping
 - New renderer contract operations
 
-These may be considered separately when a concrete consumer need arises.
+Other derived geometry may be considered separately when a concrete consumer need arises.

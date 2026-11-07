@@ -1,6 +1,8 @@
 import {
   createCanvasRenderer,
   createWebGL2Renderer,
+  drawCircle,
+  drawEllipse,
   drawPolygonOutline,
   drawPolyline,
   type Color,
@@ -112,6 +114,13 @@ function drawDiagnostic(): void {
     line(-270, y);
     point(-238, y);
   }
+
+  renderer.setIntensity(0.75);
+  renderer.setColor(amber);
+  drawCircle(renderer, project(-75, -215), 43);
+  renderer.setColor(green);
+  const ellipseRadii: readonly [number, number] = orientation === "portrait" ? [40, 72] : [72, 40];
+  drawEllipse(renderer, project(75, -215), ...ellipseRadii);
 
   // Nested rectangles make the high-intensity halo response easy to compare.
   renderer.setColor(cyan);

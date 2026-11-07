@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createCanvasRenderer } from "../src/canvas-renderer.ts";
+import { createViewport } from "../src/viewport.ts";
 
 type Call = [string, ...number[]];
 
@@ -39,7 +40,9 @@ function fakeContext() {
   haloContext = makeContext(haloCanvas, haloCalls);
   const canvas = {
     width: 320,
-    height: 200,
+    height: 240,
+    clientWidth: 320,
+    clientHeight: 240,
     ownerDocument: { createElement: () => haloCanvas },
   };
   const context = makeContext(canvas, calls) as unknown as CanvasRenderingContext2D;
@@ -54,12 +57,14 @@ test("beginFrame clears the canvas and resets the pen position", () => {
   display.beginFrame();
   display.lineTo(30, 40);
 
-  assert.deepEqual(calls, [["clearRect", 0, 0, 320, 200]]);
+  assert.deepEqual(calls, [["clearRect", 0, 0, 320, 240]]);
 });
 
 test("baseline beam uses a thin stroke with rounded ends", () => {
   const { context } = fakeContext();
-  createCanvasRenderer(context);
+  const display = createCanvasRenderer(context);
+  display.moveTo(0, 0);
+  display.lineTo(1, 1);
 
   assert.equal(context.lineWidth, 1.5);
   assert.equal(context.lineCap, "round");
@@ -98,16 +103,23 @@ test("lineTo draws from the moved position and leaves the pen at its endpoint", 
   display.lineTo(3, 4);
   display.lineTo(5, 6);
 
+  const viewport = createViewport(320, 240, 320, 240, "landscape");
+  const start = viewport.mapPoint(1, 2);
+  const middle = viewport.mapPoint(3, 4);
+  const end = viewport.mapPoint(5, 6);
+
   assert.deepEqual(calls.filter(([name]) => ["moveTo", "lineTo", "stroke"].includes(name)), [
-    ["moveTo", 1, 2],
-    ["lineTo", 3, 4],
+    ["moveTo", ...start],
+    ["moveTo", ...start],
+    ["lineTo", ...middle],
     ["stroke"],
     ["stroke"],
-    ["moveTo", 3, 4],
-    ["lineTo", 5, 6],
+    ["moveTo", ...middle],
+    ["moveTo", ...middle],
+    ["lineTo", ...end],
     ["stroke"],
     ["stroke"],
-    ["moveTo", 5, 6],
+    ["moveTo", ...end],
   ]);
 });
 
@@ -118,12 +130,13 @@ test("colour channels and intensity are clamped and points use the current style
   display.setColor([-1, 0.5, 2]);
   display.setIntensity(3);
   display.point(7, 8);
+  const [x, y] = createViewport(320, 240, 320, 240, "landscape").mapPoint(7, 8);
 
   assert.equal(context.shadowColor, "rgb(0 128 255)");
   assert.equal(context.fillStyle, "rgb(217 236 255)");
   assert.equal(context.globalAlpha, 1);
   assert.deepEqual(calls.filter(([name]) => ["arc", "fill"].includes(name)), [
-    ["arc", 7, 8, 1.5, 0, Math.PI * 2],
+    ["arc", x, y, 1.5, 0, Math.PI * 2],
     ["fill"],
     ["fill"],
   ]);
