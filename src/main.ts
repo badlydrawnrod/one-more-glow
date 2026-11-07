@@ -1,8 +1,10 @@
 import {
   createCanvasRenderer,
   createWebGL2Renderer,
+  drawArc,
   drawCircle,
   drawEllipse,
+  drawEllipseArc,
   drawPolygonOutline,
   drawPolyline,
   type Color,
@@ -123,6 +125,14 @@ function drawTestCard(): void {
   const ellipseRadii: readonly [number, number] = orientation === "portrait" ? [40, 72] : [72, 40];
   drawEllipse(renderer, project(75, -215), ...ellipseRadii);
 
+  // Open arcs contrast with the closed circle and ellipse outlines.
+  renderer.setColor(magenta);
+  renderer.setIntensity(0.8);
+  drawArc(renderer, project(-75, -215), 58, 25, 155);
+  renderer.setColor(cyan);
+  const arcRadii: readonly [number, number] = orientation === "portrait" ? [52, 86] : [86, 52];
+  drawEllipseArc(renderer, project(75, -215), arcRadii[0], arcRadii[1], 205, 335);
+
   // Nested rectangles make the high-intensity halo response easy to compare.
   renderer.setColor(cyan);
   for (const [intensity, inset] of [[1, 0], [0.75, 16], [0.5, 32], [0.25, 48]]) {
@@ -197,6 +207,9 @@ function drawGameScene(): void {
     [-255, 122], [-232, 145], [-209, 122], [-232, 99],
   ].map(([x, y]) => project(x, y)));
   drawCircle(renderer, project(-232, 122), 36);
+  renderer.setColor(cyan);
+  renderer.setIntensity(0.45);
+  drawArc(renderer, project(-232, 122), 54, 205, 335);
 
   renderer.setColor(green);
   renderer.setIntensity(0.85);
@@ -207,6 +220,9 @@ function drawGameScene(): void {
   renderer.setColor(cyan);
   renderer.setIntensity(0.45);
   drawEllipse(renderer, project(226, 108), 56, 72);
+  renderer.setColor(amber);
+  renderer.setIntensity(0.55);
+  drawEllipseArc(renderer, project(226, 108), 78, 96, 25, 155);
 
   // A few bright shots connect the action without suggesting animation.
   renderer.setColor(amber);

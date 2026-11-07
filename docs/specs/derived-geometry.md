@@ -47,10 +47,33 @@ If the circle radius is zero or negative, the helper produces no drawing operati
 
 ## Arcs
 
-**Status: Deferred**
-**Implementation: Not implemented**
+**Status: Accepted**
+**Implementation: Implemented**
 
-Arc helpers are deferred. Their coordinate convention, direction, angle units, treatment of full circles, and endpoint behavior should be decided when a concrete use case is taken up. Circular and elliptical arcs may be considered then.
+Provide open circular and elliptical arc helpers:
+
+```ts
+drawArc(
+  drawing: DrawingContext,
+  center: Point,
+  radius: number,
+  startAngleDegrees: number,
+  endAngleDegrees: number,
+): void
+
+drawEllipseArc(
+  drawing: DrawingContext,
+  center: Point,
+  radiusX: number,
+  radiusY: number,
+  startAngleDegrees: number,
+  endAngleDegrees: number,
+): void
+```
+
+Angles are in degrees, measured counter-clockwise from positive X in the logical coordinate system, where positive Y points up. Both endpoint positions are included. The arc is an open curve: it does not add lines from its endpoints to the centre. The segment count is selected internally, using the same maximum chord error of 0.5 logical units as circles and ellipses; for an ellipse, use the larger radius to bound the error.
+
+For circular arcs, a nonpositive radius produces no drawing operations. For elliptical arcs, either nonpositive radius produces no drawing operations. Invalid dimensions do not throw. Full circles remain the responsibility of `drawCircle` and `drawEllipse`.
 
 ## Out of scope
 

@@ -12,6 +12,28 @@ function curveSegmentCount(maxRadius: number): number {
   return Math.max(MIN_CURVE_SEGMENTS, segments);
 }
 
+function drawArcSegments(
+  drawing: DrawingContext,
+  center: Point,
+  radiusX: number,
+  radiusY: number,
+  startAngleDegrees: number,
+  endAngleDegrees: number,
+): void {
+  const sweepRadians = ((endAngleDegrees - startAngleDegrees) * Math.PI) / 180;
+  if (sweepRadians === 0) return;
+
+  const fullCircleSegments = curveSegmentCount(Math.max(radiusX, radiusY));
+  const segments = Math.max(1, Math.ceil(fullCircleSegments * Math.abs(sweepRadians) / (2 * Math.PI)));
+  const startRadians = (startAngleDegrees * Math.PI) / 180;
+  drawing.moveTo(center[0] + Math.cos(startRadians) * radiusX, center[1] + Math.sin(startRadians) * radiusY);
+
+  for (let index = 1; index <= segments; index += 1) {
+    const angle = startRadians + (sweepRadians * index) / segments;
+    drawing.lineTo(center[0] + Math.cos(angle) * radiusX, center[1] + Math.sin(angle) * radiusY);
+  }
+}
+
 /** Draw a connected, open path through the given points. */
 export function drawPolyline(drawing: DrawingContext, points: readonly Point[]): void {
   if (points.length < 2) return;
@@ -61,4 +83,29 @@ export function drawEllipse(
   }
 
   drawPolygonOutline(drawing, points);
+}
+
+/** Draw an open circular arc, including both endpoint positions. */
+export function drawArc(
+  drawing: DrawingContext,
+  center: Point,
+  radius: number,
+  startAngleDegrees: number,
+  endAngleDegrees: number,
+): void {
+  if (radius <= 0) return;
+  drawArcSegments(drawing, center, radius, radius, startAngleDegrees, endAngleDegrees);
+}
+
+/** Draw an open elliptical arc, including both endpoint positions. */
+export function drawEllipseArc(
+  drawing: DrawingContext,
+  center: Point,
+  radiusX: number,
+  radiusY: number,
+  startAngleDegrees: number,
+  endAngleDegrees: number,
+): void {
+  if (radiusX <= 0 || radiusY <= 0) return;
+  drawArcSegments(drawing, center, radiusX, radiusY, startAngleDegrees, endAngleDegrees);
 }

@@ -186,7 +186,7 @@ Canvas 2D uses opacity for intensity, a 1.5-pixel rounded line stroke, and circu
 
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a side-on craft, terrain, fuel pod and tractor beam. Use `?scene=testcard` to inspect the focused geometry and intensity examples: open paths and closed outlines in colour-coded ladders, a central line/triangle/point study, line and point samples, circles, ellipses and nested rectangles. Add `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
+The Vite diagnostic defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a side-on craft, terrain, fuel pod and tractor beam. Use `?scene=testcard` to inspect the focused geometry and intensity examples: open paths and closed outlines in colour-coded ladders, a central line/triangle/point study, line and point samples, circles, ellipses, circular and elliptical arcs, and nested rectangles. Add `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
 
 Visual comparison found the Canvas 2D and WebGL2 outputs close overall at the diagnostic scale. Canvas retains a slightly softer outer wash. WebGL2 line-end halos were reduced until they no longer read as separate flares, and point halos were reduced to better match Canvas. A much wider WebGL2 cutoff made the result too diffuse, so its current cutoff remains at 25 pixels. Canvas isolates and composites a blurred halo layer beneath the core; WebGL2 combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. These renderer-specific techniques implement the same accepted appearance without requiring pixel-identical output. Their numeric profiles remain adjustable if later visual feedback warrants it.
 
@@ -209,9 +209,9 @@ These capabilities are not part of the current accepted drawing contract. Their 
 
 ### Derived geometry
 
-**Status: Open polylines, polygon outlines, circles and ellipses accepted and implemented; arcs and other derived geometry deferred**
+**Status: Open polylines, polygon outlines, circles, ellipses and arcs accepted and implemented; other derived geometry deferred**
 
-The accepted helpers, their semantics and their current implementation status are defined in the [Derived Geometry Specification](derived-geometry.md). Arcs, other curves and filled geometry remain outside the accepted scope until their behavior is defined and a concrete consumer need is established.
+The accepted helpers, their semantics and their current implementation status are defined in the [Derived Geometry Specification](derived-geometry.md). Other curves and filled geometry remain outside the accepted scope until their behavior is defined and a concrete consumer need is established.
 
 ### Transformations
 
@@ -277,7 +277,7 @@ Testing conventions are maintained in `docs/engineering.md`.
 
 Tests should focus on observable behavior at the shared public contract; backend tests may verify renderer-specific invariants when those are necessary to preserve the contract.
 
-The accepted drawing contract, both backends and the accepted derived geometry helpers are implemented. Automated tests cover polyline and polygon helper semantics, circle and ellipse tessellation and invalid-radius no-ops, Canvas frame clearing, pen behavior, halo compositing and intensity-driven core colour, plus WebGL2 frame batching, command ordering, per-command style snapshots and halo profile invariants.
+The accepted drawing contract, both backends and the accepted derived geometry helpers are implemented. Automated tests cover polyline and polygon helper semantics, circle, ellipse and arc tessellation, angle direction and endpoints, invalid-radius no-ops, Canvas frame clearing, pen behavior, halo compositing and intensity-driven core colour, plus WebGL2 frame batching, command ordering, per-command style snapshots and halo profile invariants.
 
 Proposed capabilities above remain subject to evaluation even when an experimental implementation is present. Deferred capabilities are not implemented requirements.
 

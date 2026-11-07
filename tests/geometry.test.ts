@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  drawArc,
   drawCircle,
   drawEllipse,
+  drawEllipseArc,
   drawPolygonOutline,
   drawPolyline,
   type DrawingContext,
@@ -96,6 +98,46 @@ test("nonpositive radii produce no drawing operations", () => {
   drawCircle(drawing, [0, 0], -2);
   drawEllipse(drawing, [0, 0], 5, 0);
   drawEllipse(drawing, [0, 0], -1, 5);
+
+  assert.deepEqual(calls, []);
+});
+
+test("drawArc includes its endpoints and sweeps counter-clockwise in logical coordinates", () => {
+  const { calls, drawing } = recordingDrawing();
+
+  drawArc(drawing, [2, 3], 10, 0, 90);
+
+  assert.deepEqual(calls[0], ["moveTo", 12, 3]);
+  const [lastOperation, lastX, lastY] = calls.at(-1)!;
+  assert.equal(lastOperation, "lineTo");
+  assert.ok(Math.abs(lastX - 2) < 1e-10);
+  assert.ok(Math.abs(lastY - 13) < 1e-10);
+  assert.ok(calls.length > 2);
+  assert.notDeepEqual(calls.at(-1)?.slice(1), calls[0].slice(1));
+});
+
+test("drawEllipseArc handles clockwise sweeps and uses the larger radius for tessellation", () => {
+  const { calls, drawing } = recordingDrawing();
+
+  drawEllipseArc(drawing, [0, 0], 5, 20, 90, 0);
+
+  assert.equal(calls[0][0], "moveTo");
+  assert.ok(Math.abs(calls[0][1] - 0) < 1e-10);
+  assert.ok(Math.abs(calls[0][2] - 20) < 1e-10);
+  const [lastOperation, lastX, lastY] = calls.at(-1)!;
+  assert.equal(lastOperation, "lineTo");
+  assert.ok(Math.abs(lastX - 5) < 1e-10);
+  assert.ok(Math.abs(lastY) < 1e-10);
+  assert.equal(calls.length, Math.ceil(expectedSegments(20) / 4) + 1);
+});
+
+test("arcs with invalid radii or zero sweep produce no drawing operations", () => {
+  const { calls, drawing } = recordingDrawing();
+
+  drawArc(drawing, [0, 0], 0, 0, 90);
+  drawArc(drawing, [0, 0], 10, 45, 45);
+  drawEllipseArc(drawing, [0, 0], 0, 10, 0, 90);
+  drawEllipseArc(drawing, [0, 0], 10, -1, 0, 90);
 
   assert.deepEqual(calls, []);
 });
