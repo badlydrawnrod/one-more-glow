@@ -23,6 +23,12 @@ Defines shared public drawing types and interfaces.
 
 Must not depend on renderer implementations or application code.
 
+### Viewport mapping
+
+`src/viewport.ts`
+
+Maps the accepted logical display coordinates to output coordinates and derives the backing-store scale for CSS-pixel beam dimensions. It is a small renderer-independent calculation and must not use browser graphics APIs.
+
 ### Canvas renderer
 
 `src/canvas-renderer.ts`

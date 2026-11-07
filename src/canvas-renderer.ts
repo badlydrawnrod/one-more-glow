@@ -1,4 +1,5 @@
-import type { Color, DrawingContext } from "./graphics.ts";
+import type { Color, DrawingContext, RendererOptions } from "./graphics.ts";
+import { createViewport, type Viewport } from "./viewport.ts";
 
 function unit(value: number): number {
   return Math.max(0, Math.min(1, value));
@@ -31,6 +32,7 @@ function requireContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D {
 /** Create the Canvas 2D implementation of the renderer-independent API. */
 export function createCanvasRenderer(
   context: CanvasRenderingContext2D,
+  options: RendererOptions = {},
 ): DrawingContext {
   const haloCanvas = context.canvas.ownerDocument.createElement("canvas");
   const haloContext = requireContext(haloCanvas);
@@ -40,9 +42,20 @@ export function createCanvasRenderer(
   let position: readonly [number, number] | undefined;
   let haloWidth = 0;
   let haloHeight = 0;
+  let haloPixelScale = 0;
 
-  context.lineWidth = 1.5;
   context.lineCap = "round";
+
+  function viewport(): Viewport {
+    const canvas = context.canvas;
+    return createViewport(
+      canvas.width,
+      canvas.height,
+      canvas.clientWidth,
+      canvas.clientHeight,
+      options.orientation ?? "landscape",
+    );
+  }
 
   function applyStyle(): void {
     context.strokeStyle = cssColor(color);
@@ -51,7 +64,7 @@ export function createCanvasRenderer(
     context.shadowColor = cssColor(color);
   }
 
-  function syncHaloSize(): void {
+  function syncHaloSize(pixelScale: number): void {
     if (haloWidth !== context.canvas.width) {
       haloCanvas.width = context.canvas.width;
       haloWidth = context.canvas.width;
@@ -60,19 +73,28 @@ export function createCanvasRenderer(
       haloCanvas.height = context.canvas.height;
       haloHeight = context.canvas.height;
     }
+    if (haloPixelScale !== pixelScale) {
+      haloPixelScale = pixelScale;
+      haloContext.lineWidth = 1.5 * pixelScale;
+      haloContext.shadowBlur = haloBlur * pixelScale;
+    }
     haloContext.lineCap = "round";
   }
 
-  function regionFor(...points: readonly [number, number][]): [number, number, number, number] {
-    const left = Math.max(0, Math.floor(Math.min(...points.map(([x]) => x)) - haloPadding));
-    const top = Math.max(0, Math.floor(Math.min(...points.map(([, y]) => y)) - haloPadding));
+  function regionFor(
+    pixelScale: number,
+    ...points: readonly [number, number][]
+  ): [number, number, number, number] {
+    const padding = haloPadding * pixelScale;
+    const left = Math.max(0, Math.floor(Math.min(...points.map(([x]) => x)) - padding));
+    const top = Math.max(0, Math.floor(Math.min(...points.map(([, y]) => y)) - padding));
     const right = Math.min(
       haloWidth,
-      Math.ceil(Math.max(...points.map(([x]) => x)) + haloPadding),
+      Math.ceil(Math.max(...points.map(([x]) => x)) + padding),
     );
     const bottom = Math.min(
       haloHeight,
-      Math.ceil(Math.max(...points.map(([, y]) => y)) + haloPadding),
+      Math.ceil(Math.max(...points.map(([, y]) => y)) + padding),
     );
     return [left, top, Math.max(0, right - left), Math.max(0, bottom - top)];
   }
@@ -82,8 +104,10 @@ export function createCanvasRenderer(
     startY: number,
     endX: number,
     endY: number,
+    pixelScale: number,
   ): void {
     const [left, top, width, height] = regionFor(
+      pixelScale,
       [startX, startY], [endX, endY],
     );
     if (width === 0 || height === 0) return;
@@ -91,10 +115,10 @@ export function createCanvasRenderer(
     haloContext.beginPath();
     haloContext.moveTo(startX, startY);
     haloContext.lineTo(endX, endY);
-    haloContext.lineWidth = 1.5;
+    haloContext.lineWidth = 1.5 * pixelScale;
     haloContext.strokeStyle = cssColor(color);
     haloContext.shadowColor = cssColor(color);
-    haloContext.shadowBlur = haloBlur;
+    haloContext.shadowBlur = haloBlur * pixelScale;
     haloContext.globalAlpha = 1;
     haloContext.globalCompositeOperation = "lighter";
     for (let pass = 0; pass < haloPasses; pass++) haloContext.stroke();
@@ -107,15 +131,15 @@ export function createCanvasRenderer(
     context.drawImage(haloCanvas, left, top, width, height, left, top, width, height);
   }
 
-  function drawHaloPoint(x: number, y: number): void {
-    const [left, top, width, height] = regionFor([x, y]);
+  function drawHaloPoint(x: number, y: number, pixelScale: number): void {
+    const [left, top, width, height] = regionFor(pixelScale, [x, y]);
     if (width === 0 || height === 0) return;
     haloContext.clearRect(left, top, width, height);
     haloContext.beginPath();
-    haloContext.arc(x, y, 1.5, 0, Math.PI * 2);
+    haloContext.arc(x, y, 1.5 * pixelScale, 0, Math.PI * 2);
     haloContext.fillStyle = cssColor(color);
     haloContext.shadowColor = cssColor(color);
-    haloContext.shadowBlur = haloBlur;
+    haloContext.shadowBlur = haloBlur * pixelScale;
     haloContext.globalAlpha = 1;
     haloContext.globalCompositeOperation = "lighter";
     for (let pass = 0; pass < haloPasses; pass++) haloContext.fill();
@@ -128,12 +152,13 @@ export function createCanvasRenderer(
     context.drawImage(haloCanvas, left, top, width, height, left, top, width, height);
   }
 
-  syncHaloSize();
+  syncHaloSize(viewport().pixelScale);
   applyStyle();
 
   return {
     beginFrame() {
-      syncHaloSize();
+      const currentViewport = viewport();
+      syncHaloSize(currentViewport.pixelScale);
       context.clearRect(0, 0, context.canvas.width, context.canvas.height);
       position = undefined;
     },
@@ -147,32 +172,43 @@ export function createCanvasRenderer(
       applyStyle();
     },
     moveTo(x, y) {
+      const [outputX, outputY] = viewport().mapPoint(x, y);
       context.beginPath();
-      context.moveTo(x, y);
+      context.moveTo(outputX, outputY);
       position = [x, y];
     },
     lineTo(x, y) {
       if (!position) return;
-      context.lineTo(x, y);
-      drawHaloLine(position[0], position[1], x, y);
+      const currentViewport = viewport();
+      syncHaloSize(currentViewport.pixelScale);
+      const [startX, startY] = currentViewport.mapPoint(position[0], position[1]);
+      const [endX, endY] = currentViewport.mapPoint(x, y);
+      context.beginPath();
+      context.moveTo(startX, startY);
+      context.lineTo(endX, endY);
+      drawHaloLine(startX, startY, endX, endY, currentViewport.pixelScale);
       context.globalAlpha = intensity;
       context.shadowBlur = 0;
-      context.lineWidth = 1.5;
+      context.lineWidth = 1.5 * currentViewport.pixelScale;
+      context.lineCap = "round";
       context.strokeStyle = cssColor(color);
       context.stroke();
       context.strokeStyle = cssColor(brightCoreColor(color, intensity));
       context.stroke();
       context.beginPath();
-      context.moveTo(x, y);
+      context.moveTo(endX, endY);
       position = [x, y];
     },
     point(x, y) {
       applyStyle();
-      drawHaloPoint(x, y);
+      const currentViewport = viewport();
+      syncHaloSize(currentViewport.pixelScale);
+      const [outputX, outputY] = currentViewport.mapPoint(x, y);
+      drawHaloPoint(outputX, outputY, currentViewport.pixelScale);
       context.globalAlpha = intensity;
       context.shadowBlur = 0;
       context.beginPath();
-      context.arc(x, y, 1.5, 0, Math.PI * 2);
+      context.arc(outputX, outputY, 1.5 * currentViewport.pixelScale, 0, Math.PI * 2);
       context.fillStyle = cssColor(color);
       context.fill();
       context.fillStyle = cssColor(brightCoreColor(color, intensity));

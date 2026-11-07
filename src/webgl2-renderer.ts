@@ -1,12 +1,15 @@
-import type { Color, DrawingContext } from "./graphics.ts";
+import type { Color, DrawingContext, RendererOptions } from "./graphics.ts";
+import { createViewport, type Viewport } from "./viewport.ts";
 
 const vertexSource = `#version 300 es
+precision highp float;
 in vec2 startPoint;
 in vec2 endPoint;
 in vec3 color;
 in float intensity;
 in float primitiveKind;
 uniform vec2 resolution;
+uniform float pixelScale;
 out vec3 beamColor;
 out float beamIntensity;
 out vec2 edgePosition;
@@ -27,13 +30,14 @@ void main() {
     beamLength = length(delta);
     vec2 tangent = delta / max(beamLength, 0.0001);
     vec2 normal = vec2(-tangent.y, tangent.x);
-    float along = corner.x * (beamLength * 0.5 + 25.5);
-    float across = corner.y * 25.5;
+    float haloExtent = 25.5 * pixelScale;
+    float along = corner.x * (beamLength * 0.5 + haloExtent);
+    float across = corner.y * haloExtent;
     position = (startPoint + endPoint) * 0.5 + tangent * along + normal * across;
     edgePosition = vec2(along, across);
   } else {
     beamLength = 0.0;
-    edgePosition = corner * 25.5;
+    edgePosition = corner * (25.5 * pixelScale);
     position = startPoint + edgePosition;
   }
   vec2 clip = (position / resolution) * 2.0 - 1.0;
@@ -41,31 +45,32 @@ void main() {
 }`;
 
 const fragmentSource = `#version 300 es
-precision mediump float;
+precision highp float;
 in vec3 beamColor;
 in float beamIntensity;
 in vec2 edgePosition;
 flat in float beamLength;
 flat in float beamKind;
+uniform float pixelScale;
 out vec4 outputColor;
 void main() {
   float signedDistance;
   if (beamKind < 0.5) {
     float along = clamp(edgePosition.x, -beamLength * 0.5, beamLength * 0.5);
-    signedDistance = length(edgePosition - vec2(along, 0.0)) - 0.75;
+    signedDistance = length(edgePosition - vec2(along, 0.0)) - 0.75 * pixelScale;
   } else {
-    signedDistance = length(edgePosition) - 1.5;
+    signedDistance = length(edgePosition) - 1.5 * pixelScale;
   }
   float coreCoverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
   float haloDistance = max(signedDistance, 0.0);
-  float halo = (0.12 * exp(-haloDistance * haloDistance / 250.0)
-    + 0.07 * exp(-haloDistance * haloDistance / 32.0))
-    * (1.0 - smoothstep(16.0, 25.0, haloDistance));
+  float halo = (0.12 * exp(-haloDistance * haloDistance / (250.0 * pixelScale * pixelScale))
+    + 0.07 * exp(-haloDistance * haloDistance / (32.0 * pixelScale * pixelScale)))
+    * (1.0 - smoothstep(16.0 * pixelScale, 25.0 * pixelScale, haloDistance));
   float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45;
   halo *= primitiveHalo;
   if (beamKind < 0.5) {
     float endDistance = beamLength * 0.5 - abs(edgePosition.x);
-    halo *= mix(0.35, 1.0, smoothstep(-4.0, 10.0, endDistance));
+    halo *= mix(0.35, 1.0, smoothstep(-4.0 * pixelScale, 10.0 * pixelScale, endDistance));
   }
   float baseAlpha = beamIntensity
     * (coreCoverage + halo * (1.0 - coreCoverage));
@@ -95,7 +100,10 @@ function compileShader(
 }
 
 /** Create a WebGL2 implementation of the renderer-independent drawing API. */
-export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext {
+export function createWebGL2Renderer(
+  gl: WebGL2RenderingContext,
+  options: RendererOptions = {},
+): DrawingContext {
   const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
   const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
   const program = gl.createProgram();
@@ -122,6 +130,20 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
   const intensityLocation = gl.getAttribLocation(program, "intensity");
   const kindLocation = gl.getAttribLocation(program, "primitiveKind");
   const resolutionLocation = gl.getUniformLocation(program, "resolution");
+  const pixelScaleLocation = gl.getUniformLocation(program, "pixelScale");
+
+  function viewport(): Viewport {
+    const cssSize = "clientWidth" in gl.canvas
+      ? [gl.canvas.clientWidth, gl.canvas.clientHeight] as const
+      : [gl.canvas.width, gl.canvas.height] as const;
+    return createViewport(
+      gl.canvas.width,
+      gl.canvas.height,
+      cssSize[0],
+      cssSize[1],
+      options.orientation ?? "landscape",
+    );
+  }
 
   gl.useProgram(program);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
@@ -140,6 +162,7 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+  gl.uniform1f(pixelScaleLocation, viewport().pixelScale);
 
   let color: Color = [1, 1, 1];
   let intensity = 1;
@@ -149,6 +172,7 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
     beginFrame() {
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
       gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
+      gl.uniform1f(pixelScaleLocation, viewport().pixelScale);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       position = undefined;
@@ -179,15 +203,22 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
     lineTo(x, y) {
       if (!position) return;
       if (position[0] !== x || position[1] !== y) {
+        const currentViewport = viewport();
+        const [startX, startY] = currentViewport.mapPoint(position[0], position[1]);
+        const [endX, endY] = currentViewport.mapPoint(x, y);
         commands.push([
-          position[0], position[1], x, y,
+          startX, startY, endX, endY,
           color[0], color[1], color[2], intensity, 0,
         ]);
       }
       position = [x, y];
     },
     point(x, y) {
-      commands.push([x, y, x, y, color[0], color[1], color[2], intensity, 1]);
+      const [outputX, outputY] = viewport().mapPoint(x, y);
+      commands.push([
+        outputX, outputY, outputX, outputY,
+        color[0], color[1], color[2], intensity, 1,
+      ]);
     },
   };
 }
