@@ -1,71 +1,67 @@
-# One More Glow — Agent Guidance
+# Agent instructions
 
-## Project
+One More Glow is a small TypeScript library for retro-inspired vector graphics. It supports interchangeable Canvas 2D and WebGL2 renderers.
 
-One More Glow (OMG) is a small TypeScript graphics library for creating games inspired by classic vector-display arcade machines.
+The project values simple, predictable, maintainable engineering over cleverness or fashionable abstractions.
 
-The guiding fiction is a colour vector-based arcade console that might have existed in the late 1980s, but never did.
+## Read before working
 
-The library provides a coherent set of 2D drawing primitives and a luminous vector-display aesthetic. Games are consumers of the library, not part of it.
+- `docs/engineering.md` — engineering principles and conventions.
+- `docs/architecture.md` — module boundaries and dependencies.
+- Relevant files in `docs/specs/` — durable behavioural requirements.
+- Relevant active plans in `plans/active/` — current implementation progress.
 
-See `docs/specs/vector-display.md` for the intended capabilities and architectural boundaries.
+Read only the documentation relevant to the task.
 
-## Engineering principles
+## Working rules
 
-- Prefer simple, understandable, conventional TypeScript.
-- Build a small graphics library, **not a game engine**.
-- Favour explicit dependencies and clear module boundaries.
-- Prefer functions and simple data types over elaborate object hierarchies.
-- Introduce abstractions only when they solve a demonstrated problem.
-- Do not add dependencies without a concrete reason.
-- Avoid frameworks, dependency injection containers, ECS architectures, scene graphs and plugin systems.
-- Keep the public API small and independent of rendering technology.
-- Prefer testable, deterministic behaviour at stable boundaries.
-- Preserve existing behaviour when refactoring.
+1. Preserve architectural boundaries.
+2. Prefer small, explicit, understandable changes.
+3. Do not introduce abstractions, dependencies or infrastructure speculatively.
+4. Maintain the renderer-independent drawing contract.
+5. Test observable behaviour through stable public interfaces.
+6. Prefer deterministic, mechanically enforced rules over conventions alone.
+7. Keep durable specifications consistent with intended behaviour.
+8. Do not treat implementation plans as specifications.
+9. Distinguish accepted requirements from proposals, deferred decisions and implemented behaviour. Do not treat an unimplemented or unsettled specification as an instruction to implement it.
 
-An abstraction shared by two implementations is not automatically a good abstraction. Prefer a small, meaningful contract over a comprehensive one.
+## Specifications
 
-## Architecture
+Specifications under `docs/specs/` are durable records of evolving intent, not necessarily completed designs.
 
-The library has three conceptual parts:
+Follow the specification lifecycle described in `docs/engineering.md`.
 
-1. **Core:** Backend-independent drawing contracts, geometry and related utilities.
-2. **Canvas renderer:** An implementation using the browser Canvas 2D API.
-3. **WebGL2 renderer:** An implementation using WebGL2, including the eventual luminous display effects.
+When reading or updating specifications:
 
-Both renderers must implement the same public drawing contract.
+- Distinguish accepted requirements from proposals and deferred decisions.
+- Distinguish intended behaviour from implemented and verified behaviour.
+- Make unresolved questions explicit rather than silently deciding them.
+- Do not implement proposed or deferred capabilities unless they are in scope for the current task.
+- Update affected specifications when decisions are made or behaviour changes.
 
-The core must not depend on either renderer or on browser-specific graphics APIs.
+Keep specifications lightweight. Use status annotations only where they clarify genuine uncertainty or progress.
 
-Renderer implementations may use different internal techniques, but should agree on the documented meaning of drawing operations.
+## Plans
 
-The development application is a consumer of the public library API. It must not be coupled to renderer internals.
+For substantial, multi-step work, follow `plans/README.md` and use `plans/template.md` to create a plan under `plans/active/`.
 
-## Scope
+Plans are ephemeral execution records, not authoritative specifications. Do not create plans for trivial changes.
 
-The library is responsible for drawing vector geometry and presenting it with a consistent visual character.
+Keep plans resumable without conversation history. Update progress, decisions, verification results and the next action as work proceeds.
 
-It is not responsible for game loops, physics, collision detection, input handling, entities, audio or game state.
+Before resuming, reconcile the plan with the actual repository state.
 
-A display diagnostic/demo is an appropriate consumer of the library.
+On completion, preserve lasting intent and decisions in durable specifications or architecture documentation, then delete the plan.
 
-## Development workflow
+## Changes
 
-- Work incrementally, making small, understandable changes.
-- Implement only what the current task requires.
-- Keep the project compatible with the existing Vite and TypeScript setup.
-- Use the repository's existing package manager and scripts.
-- Avoid introducing build tools or runtime dependencies unnecessarily.
-- Write tests for meaningful, externally observable behaviour.
-- Do not introduce speculative infrastructure to make future changes easier.
-- Keep documentation consistent with implemented behaviour.
+Before implementation, identify affected specifications, their maturity, and relevant architectural boundaries.
 
-When a proposed change would materially expand the architecture or public API, explain the trade-off before implementing it.
+Resolve decisions required by the current task. Preserve unrelated open questions rather than expanding scope.
 
-## Source of truth
+After implementation:
 
-The specifications under `docs/specs/` capture durable product and architectural intent.
-
-Implementation plans are temporary and must not silently redefine that intent.
-
-If implementation and specification disagree, identify and resolve the discrepancy rather than assuming either is automatically correct.
+- Run relevant checks and report their results.
+- Update affected specifications to reflect agreed behaviour, decisions and implementation status.
+- Preserve durable decisions made during implementation.
+- Keep unfinished work and resumable progress in the active plan, if one exists.
