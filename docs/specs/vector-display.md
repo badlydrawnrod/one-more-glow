@@ -113,15 +113,15 @@ The exact appearance, configuration and interaction of these characteristics rem
 
 ### Baseline beam
 
-**Status:** Proposed
-**Implementation:** Experimental baseline implemented; visual evaluation pending
+**Status:** Accepted
+**Implementation:** Implemented and visually compared in Canvas 2D and WebGL2
 
 - Lines have a visually continuous, sharply defined core.
 - Points have a consistent, recognisably luminous appearance.
 - Corners and endpoints should not exhibit unintended gaps or obvious rendering artefacts.
 - Colour and intensity produce perceptibly distinct results without relying on bloom.
 
-The current experiment uses a 1.5-pixel line core with rounded ends and circular points with a 1.5-pixel radius. These values are provisional and should be revised based on visual feedback.
+The accepted baseline uses a 1.5-pixel line core with rounded ends and circular points with a 1.5-pixel radius. These dimensions may be revisited if later visual feedback indicates a need to adjust them.
 
 ### Display effects
 
@@ -184,9 +184,9 @@ Display effects should not require consumers to submit additional geometry to si
 
 Canvas 2D uses opacity for intensity, a 1.5-pixel rounded line stroke, and circular points with a 1.5-pixel radius.
 
-WebGL2 uses alpha blending, shader-expanded line and point quads with matching provisional dimensions, and per-frame batching.
+WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic includes connected shapes, separate endpoints, points and repeated line/point examples at three intensity levels. Use `?renderer=canvas` to compare Canvas 2D with WebGL2.
+The Vite diagnostic includes connected shapes, separate endpoints, points and repeated line/point examples at three intensity levels. Use `?renderer=canvas` to compare Canvas 2D with WebGL2. Initial screenshot review found the two backends closely matched at the displayed scale, with no conspicuous gaps; point visibility remains a visual choice for further feedback.
 
 These implementations establish the baseline drawing behaviour. They do not yet implement the full intended luminous display character.
 
