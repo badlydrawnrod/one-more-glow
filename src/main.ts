@@ -20,6 +20,7 @@ const orientation: DisplayOrientation = params.get("orientation") === "portrait"
   : "landscape";
 const aspectRatio = orientation === "landscape" ? 4 / 3 : 3 / 4;
 const renderOptions = { orientation };
+const scene = params.get("scene") === "testcard" ? "testcard" : "game";
 
 function resizeCanvas(): void {
   const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * aspectRatio);
@@ -66,7 +67,7 @@ function point(x: number, y: number): void {
   renderer.point(...project(x, y));
 }
 
-function drawDiagnostic(): void {
+function drawTestCard(): void {
   renderer.beginFrame();
 
   // A dim frame gives the samples a shared boundary without competing with them.
@@ -135,6 +136,107 @@ function drawDiagnostic(): void {
   }
 
   renderer.endFrame();
+}
+
+function drawGameScene(): void {
+  renderer.beginFrame();
+
+  // A sparse, low-intensity arena grid sits behind the action.
+  renderer.setColor(cyan);
+  renderer.setIntensity(0.07);
+  for (let x = -400; x <= 400; x += 100) {
+    move(x, -275);
+    line(x, 275);
+  }
+  for (let y = -250; y <= 250; y += 100) {
+    move(-450, y);
+    line(450, y);
+  }
+
+  // Rocky planet surface, with a flat central landing shelf.
+  renderer.setColor(green);
+  renderer.setIntensity(0.8);
+  drawPolyline(renderer, [
+    [-470, -188], [-410, -215], [-350, -205], [-285, -246],
+    [-215, -236], [-160, -272], [-90, -272], [-42, -248],
+    [42, -248], [90, -272], [160, -272], [215, -236],
+    [285, -246], [350, -205], [410, -215], [470, -188],
+  ].map(([x, y]) => project(x, y)));
+
+  // Thrust-style craft and its exhaust.
+  renderer.setColor(cyan);
+  renderer.setIntensity(1);
+  drawPolygonOutline(renderer, [
+    [0, 164], [-19, 119], [-10, 125], [-10, 94],
+    [10, 94], [10, 125], [19, 119],
+  ].map(([x, y]) => project(x, y)));
+  renderer.setColor(amber);
+  renderer.setIntensity(0.85);
+  drawPolyline(renderer, [[-7, 88], [0, 57], [7, 88]].map(([x, y]) => project(x, y)));
+  point(0, 57);
+
+  // Tractor beam links the craft to a fuel pod above the surface.
+  renderer.setColor(cyan);
+  renderer.setIntensity(0.45);
+  move(-5, 92);
+  line(-5, -112);
+  move(5, 92);
+  line(5, -112);
+  renderer.setColor(amber);
+  renderer.setIntensity(0.9);
+  drawPolygonOutline(renderer, [
+    [0, -93], [18, -112], [0, -145], [-18, -112],
+  ].map(([x, y]) => project(x, y)));
+  renderer.setColor(cyan);
+  point(0, -112);
+
+  // Geometric enemies and a shield-like orbit add a second arcade vocabulary.
+  renderer.setColor(magenta);
+  renderer.setIntensity(0.7);
+  drawPolygonOutline(renderer, [
+    [-255, 122], [-232, 145], [-209, 122], [-232, 99],
+  ].map(([x, y]) => project(x, y)));
+  drawCircle(renderer, project(-232, 122), 36);
+
+  renderer.setColor(green);
+  renderer.setIntensity(0.85);
+  drawPolygonOutline(renderer, [
+    [226, 160], [258, 140], [274, 108], [258, 76],
+    [226, 56], [194, 76], [178, 108], [194, 140],
+  ].map(([x, y]) => project(x, y)));
+  renderer.setColor(cyan);
+  renderer.setIntensity(0.45);
+  drawEllipse(renderer, project(226, 108), 56, 72);
+
+  // A few bright shots connect the action without suggesting animation.
+  renderer.setColor(amber);
+  renderer.setIntensity(1);
+  move(-152, 78);
+  line(-92, 98);
+  point(-78, 103);
+  move(105, 73);
+  line(157, 92);
+  point(170, 97);
+  renderer.setColor(magenta);
+  renderer.setIntensity(0.65);
+  move(184, 63);
+  line(143, 28);
+  point(132, 18);
+
+  // Small stars keep the dark gaps from feeling like unused test-card space.
+  renderer.setColor(cyan);
+  renderer.setIntensity(0.45);
+  for (const [x, y] of [
+    [-350, 190], [-125, 225], [90, 210], [355, 205],
+    [-365, 15], [-300, -85], [330, -35], [370, -112],
+  ]) point(x, y);
+
+  renderer.endFrame();
+}
+
+function drawDiagnostic(): void {
+  if (scene === "testcard") drawTestCard();
+  else drawGameScene();
 }
 
 window.addEventListener("resize", () => {
