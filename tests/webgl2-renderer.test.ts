@@ -34,23 +34,22 @@ function fakeContext() {
     getProgramInfoLog: () => "",
     deleteProgram: (...args: unknown[]) => calls.push(["deleteProgram", ...args]),
     createBuffer: () => ({ id: nextId++ }),
-    getAttribLocation: () => 0,
+    getAttribLocation: (_program: unknown, name: string) =>
+      ({ startPoint: 0, endPoint: 1, color: 2, intensity: 3, primitiveKind: 4 })[name as "startPoint" | "endPoint" | "color" | "intensity" | "primitiveKind"],
     getUniformLocation: (_program: unknown, name: string) => name,
     useProgram: (...args: unknown[]) => calls.push(["useProgram", ...args]),
     bindBuffer: (...args: unknown[]) => calls.push(["bindBuffer", ...args]),
     enableVertexAttribArray: (...args: unknown[]) => calls.push(["enableVertexAttribArray", ...args]),
     vertexAttribPointer: (...args: unknown[]) => calls.push(["vertexAttribPointer", ...args]),
+    vertexAttribDivisor: (...args: unknown[]) => calls.push(["vertexAttribDivisor", ...args]),
     enable: (...args: unknown[]) => calls.push(["enable", ...args]),
     blendFunc: (...args: unknown[]) => calls.push(["blendFunc", ...args]),
     uniform2f: (...args: unknown[]) => calls.push(["uniform2f", ...args]),
-    uniform3f: (...args: unknown[]) => calls.push(["uniform3f", ...args]),
-    uniform1f: (...args: unknown[]) => calls.push(["uniform1f", ...args]),
-    uniform1i: (...args: unknown[]) => calls.push(["uniform1i", ...args]),
     viewport: (...args: unknown[]) => calls.push(["viewport", ...args]),
     clearColor: (...args: unknown[]) => calls.push(["clearColor", ...args]),
     clear: (...args: unknown[]) => calls.push(["clear", ...args]),
     bufferData: (...args: unknown[]) => calls.push(["bufferData", ...args]),
-    drawArrays: (...args: unknown[]) => calls.push(["drawArrays", ...args]),
+    drawArraysInstanced: (...args: unknown[]) => calls.push(["drawArraysInstanced", ...args]),
     flush: () => calls.push(["flush"]),
   } as unknown as WebGL2RenderingContext;
   return { calls, gl };
@@ -65,23 +64,30 @@ test("WebGL2 renderer clears per frame and submits line segments and points", ()
   display.moveTo(10, 20);
   display.lineTo(30, 40);
   display.point(50, 60);
+  assert.deepEqual(calls.filter(([name]) => name === "drawArraysInstanced"), []);
   display.endFrame();
 
-  assert.deepEqual(calls.filter(([name]) => name === "drawArrays"), [
-    ["drawArrays", gl.TRIANGLES, 0, 6],
-    ["drawArrays", gl.POINTS, 0, 1],
+  assert.deepEqual(calls.filter(([name]) => name === "drawArraysInstanced"), [
+    ["drawArraysInstanced", gl.TRIANGLES, 0, 6, 2],
+  ]);
+  const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
+  assert.deepEqual([...upload], [
+    10, 20, 30, 40, 1, 1, 1, 1, 0,
+    50, 60, 50, 60, 1, 1, 1, 1, 1,
   ]);
   assert.deepEqual(calls.filter(([name]) => name === "clear"), [["clear", gl.COLOR_BUFFER_BIT]]);
   assert.deepEqual(calls.filter(([name]) => name === "flush"), [["flush"]]);
 });
 
-test("WebGL2 renderer applies normalized colour and clamped intensity", () => {
+test("WebGL2 renderer snapshots normalized colour and clamped intensity per command", () => {
   const { calls, gl } = fakeContext();
   const display = createWebGL2Renderer(gl);
 
   display.setColor([-1, 0.5, 2]);
   display.setIntensity(2);
+  display.point(7, 8);
+  display.endFrame();
 
-  assert.ok(calls.some((call) => call[0] === "uniform3f" && call[2] === 0 && call[3] === 0.5 && call[4] === 1));
-  assert.ok(calls.some((call) => call[0] === "uniform1f" && call[2] === 1));
+  const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
+  assert.deepEqual([...upload], [7, 8, 7, 8, 0, 0.5, 1, 1, 1]);
 });

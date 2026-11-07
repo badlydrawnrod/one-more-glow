@@ -1,33 +1,63 @@
 import type { Color, DrawingContext } from "./graphics.ts";
 
 const vertexSource = `#version 300 es
-in vec2 position;
-in vec2 edge;
+in vec2 startPoint;
+in vec2 endPoint;
+in vec3 color;
+in float intensity;
+in float primitiveKind;
 uniform vec2 resolution;
+out vec3 beamColor;
+out float beamIntensity;
 out vec2 edgePosition;
+flat out float beamLength;
+flat out float beamKind;
 void main() {
+  const vec2 corners[6] = vec2[6](
+    vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0),
+    vec2(-1.0, 1.0), vec2(1.0, -1.0), vec2(1.0, 1.0)
+  );
+  vec2 corner = corners[gl_VertexID];
+  beamColor = color;
+  beamIntensity = intensity;
+  beamKind = primitiveKind;
+  vec2 position;
+  if (primitiveKind < 0.5) {
+    vec2 delta = endPoint - startPoint;
+    beamLength = length(delta);
+    vec2 tangent = delta / max(beamLength, 0.0001);
+    vec2 normal = vec2(-tangent.y, tangent.x);
+    float along = corner.x * (beamLength * 0.5 + 1.0);
+    float across = corner.y * 1.5;
+    position = (startPoint + endPoint) * 0.5 + tangent * along + normal * across;
+    edgePosition = vec2(along, across);
+  } else {
+    beamLength = 0.0;
+    edgePosition = corner * 1.5;
+    position = startPoint + edgePosition;
+  }
   vec2 clip = (position / resolution) * 2.0 - 1.0;
   gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
-  gl_PointSize = 2.0;
-  edgePosition = edge;
 }`;
 
 const fragmentSource = `#version 300 es
 precision mediump float;
-uniform vec3 color;
-uniform float intensity;
-uniform float segmentLength;
-uniform bool smoothLine;
+in vec3 beamColor;
+in float beamIntensity;
 in vec2 edgePosition;
+flat in float beamLength;
+flat in float beamKind;
 out vec4 outputColor;
 void main() {
-  float coverage = 1.0;
-  if (smoothLine) {
-    vec2 distanceFromEdge = abs(edgePosition) - vec2(segmentLength * 0.5, 0.5);
-    float distance = length(max(distanceFromEdge, 0.0)) + min(max(distanceFromEdge.x, distanceFromEdge.y), 0.0);
-    coverage = 1.0 - smoothstep(-0.5, 0.5, distance);
+  float signedDistance;
+  if (beamKind < 0.5) {
+    vec2 distanceFromEdge = abs(edgePosition) - vec2(beamLength * 0.5, 0.5);
+    signedDistance = length(max(distanceFromEdge, 0.0)) + min(max(distanceFromEdge.x, distanceFromEdge.y), 0.0);
+  } else {
+    signedDistance = length(edgePosition) - 1.0;
   }
-  outputColor = vec4(color, intensity * coverage);
+  float coverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
+  outputColor = vec4(beamColor, beamIntensity * coverage);
 }`;
 
 function compileShader(
@@ -69,20 +99,27 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
     gl.deleteProgram(program);
     throw new Error("Unable to create WebGL2 vertex buffer");
   }
-  const positionLocation = gl.getAttribLocation(program, "position");
-  const edgeLocation = gl.getAttribLocation(program, "edge");
+  const startLocation = gl.getAttribLocation(program, "startPoint");
+  const endLocation = gl.getAttribLocation(program, "endPoint");
+  const colorLocation = gl.getAttribLocation(program, "color");
+  const intensityLocation = gl.getAttribLocation(program, "intensity");
+  const kindLocation = gl.getAttribLocation(program, "primitiveKind");
   const resolutionLocation = gl.getUniformLocation(program, "resolution");
-  const colorLocation = gl.getUniformLocation(program, "color");
-  const intensityLocation = gl.getUniformLocation(program, "intensity");
-  const segmentLengthLocation = gl.getUniformLocation(program, "segmentLength");
-  const smoothLineLocation = gl.getUniformLocation(program, "smoothLine");
 
   gl.useProgram(program);
   gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-  gl.enableVertexAttribArray(positionLocation);
-  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 16, 0);
-  gl.enableVertexAttribArray(edgeLocation);
-  gl.vertexAttribPointer(edgeLocation, 2, gl.FLOAT, false, 16, 8);
+  const stride = 9 * Float32Array.BYTES_PER_ELEMENT;
+  for (const [location, size, offset] of [
+    [startLocation, 2, 0],
+    [endLocation, 2, 8],
+    [colorLocation, 3, 16],
+    [intensityLocation, 1, 28],
+    [kindLocation, 1, 32],
+  ]) {
+    gl.enableVertexAttribArray(location);
+    gl.vertexAttribPointer(location, size, gl.FLOAT, false, stride, offset);
+    gl.vertexAttribDivisor(location, 1);
+  }
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
   gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
@@ -90,49 +127,7 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
   let color: Color = [1, 1, 1];
   let intensity = 1;
   let position: readonly [number, number] | undefined;
-
-  function applyStyle(): void {
-    gl.uniform3f(colorLocation, color[0], color[1], color[2]);
-    gl.uniform1f(intensityLocation, intensity);
-  }
-
-  function drawPoint(x: number, y: number): void {
-    gl.uniform1i(smoothLineLocation, 0);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([x, y, 0, 0]), gl.STREAM_DRAW);
-    gl.drawArrays(gl.POINTS, 0, 1);
-  }
-
-  function drawLine(from: readonly [number, number], to: readonly [number, number]): void {
-    const dx = to[0] - from[0];
-    const dy = to[1] - from[1];
-    const length = Math.hypot(dx, dy);
-    if (length === 0) return;
-
-    const tangentX = dx / length;
-    const tangentY = dy / length;
-    const normalX = -tangentY;
-    const normalY = tangentX;
-    const corners = [
-      [-1, -1], [length + 1, -1], [-1, 1],
-      [-1, 1], [length + 1, -1], [length + 1, 1],
-    ];
-    const vertices: number[] = [];
-    for (const [along, across] of corners) {
-      vertices.push(
-        from[0] + tangentX * along + normalX * across,
-        from[1] + tangentY * along + normalY * across,
-        along - length * 0.5,
-        across,
-      );
-    }
-
-    gl.uniform1f(segmentLengthLocation, length);
-    gl.uniform1i(smoothLineLocation, 1);
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STREAM_DRAW);
-    gl.drawArrays(gl.TRIANGLES, 0, 6);
-  }
-
-  applyStyle();
+  let commands: number[][] = [];
   return {
     beginFrame() {
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
@@ -140,8 +135,15 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       position = undefined;
+      commands = [];
     },
     endFrame() {
+      if (commands.length > 0) {
+        const vertices = new Float32Array(commands.flat());
+        gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STREAM_DRAW);
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, commands.length);
+      }
       gl.flush();
     },
     setColor(nextColor) {
@@ -150,24 +152,25 @@ export function createWebGL2Renderer(gl: WebGL2RenderingContext): DrawingContext
         Math.max(0, Math.min(1, nextColor[1])),
         Math.max(0, Math.min(1, nextColor[2])),
       ];
-      applyStyle();
     },
     setIntensity(value) {
       intensity = Math.max(0, Math.min(1, value));
-      applyStyle();
     },
     moveTo(x, y) {
       position = [x, y];
     },
     lineTo(x, y) {
       if (!position) return;
-      applyStyle();
-      drawLine(position, [x, y]);
+      if (position[0] !== x || position[1] !== y) {
+        commands.push([
+          position[0], position[1], x, y,
+          color[0], color[1], color[2], intensity, 0,
+        ]);
+      }
       position = [x, y];
     },
     point(x, y) {
-      applyStyle();
-      drawPoint(x, y);
+      commands.push([x, y, x, y, color[0], color[1], color[2], intensity, 1]);
     },
   };
 }
