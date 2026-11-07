@@ -17,6 +17,9 @@ export function createCanvasRenderer(
   let intensity = 1;
   let hasPosition = false;
 
+  context.lineWidth = 1.5;
+  context.lineCap = "round";
+
   function applyStyle(): void {
     context.strokeStyle = cssColor(color);
     context.fillStyle = cssColor(color);
@@ -52,7 +55,7 @@ export function createCanvasRenderer(
     point(x, y) {
       applyStyle();
       context.beginPath();
-      context.arc(x, y, 1, 0, Math.PI * 2);
+      context.arc(x, y, 1.5, 0, Math.PI * 2);
       context.fill();
     },
   };

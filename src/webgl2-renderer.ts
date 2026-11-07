@@ -27,13 +27,13 @@ void main() {
     beamLength = length(delta);
     vec2 tangent = delta / max(beamLength, 0.0001);
     vec2 normal = vec2(-tangent.y, tangent.x);
-    float along = corner.x * (beamLength * 0.5 + 1.0);
-    float across = corner.y * 1.5;
+    float along = corner.x * (beamLength * 0.5 + 1.75);
+    float across = corner.y * 1.75;
     position = (startPoint + endPoint) * 0.5 + tangent * along + normal * across;
     edgePosition = vec2(along, across);
   } else {
     beamLength = 0.0;
-    edgePosition = corner * 1.5;
+    edgePosition = corner * 2.5;
     position = startPoint + edgePosition;
   }
   vec2 clip = (position / resolution) * 2.0 - 1.0;
@@ -51,10 +51,10 @@ out vec4 outputColor;
 void main() {
   float signedDistance;
   if (beamKind < 0.5) {
-    vec2 distanceFromEdge = abs(edgePosition) - vec2(beamLength * 0.5, 0.5);
-    signedDistance = length(max(distanceFromEdge, 0.0)) + min(max(distanceFromEdge.x, distanceFromEdge.y), 0.0);
+    float along = clamp(edgePosition.x, -beamLength * 0.5, beamLength * 0.5);
+    signedDistance = length(edgePosition - vec2(along, 0.0)) - 0.75;
   } else {
-    signedDistance = length(edgePosition) - 1.0;
+    signedDistance = length(edgePosition) - 1.5;
   }
   float coverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
   outputColor = vec4(beamColor, beamIntensity * coverage);

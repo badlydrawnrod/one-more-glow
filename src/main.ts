@@ -32,6 +32,21 @@ display.setIntensity(1);
 display.setColor(cyan);
 display.moveTo(260, 300);
 display.lineTo(540, 300);
+
+display.setIntensity(0.25);
+display.moveTo(100, 420);
+display.lineTo(300, 420);
+display.point(350, 420);
+
+display.setIntensity(0.6);
+display.moveTo(100, 460);
+display.lineTo(300, 460);
+display.point(350, 460);
+
+display.setIntensity(1);
+display.moveTo(100, 500);
+display.lineTo(300, 500);
+display.point(350, 500);
 display.endFrame();
 
 function requireContext<T>(context: T | null, name: string): T {

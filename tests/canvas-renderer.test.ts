@@ -34,6 +34,14 @@ test("beginFrame clears the canvas and resets the pen position", () => {
   assert.deepEqual(calls, [["clearRect", 0, 0, 320, 200]]);
 });
 
+test("baseline beam uses a thin stroke with rounded ends", () => {
+  const { context } = fakeContext();
+  createCanvasRenderer(context);
+
+  assert.equal(context.lineWidth, 1.5);
+  assert.equal(context.lineCap, "round");
+});
+
 test("lineTo draws from the moved position and leaves the pen at its endpoint", () => {
   const { calls, context } = fakeContext();
   const display = createCanvasRenderer(context);
@@ -65,7 +73,7 @@ test("colour channels and intensity are clamped and points use the current style
   assert.equal(context.fillStyle, "rgb(0 128 255)");
   assert.equal(context.globalAlpha, 1);
   assert.deepEqual(calls.filter(([name]) => ["arc", "fill"].includes(name)), [
-    ["arc", 7, 8, 1, 0, Math.PI * 2],
+    ["arc", 7, 8, 1.5, 0, Math.PI * 2],
     ["fill"],
   ]);
 });
