@@ -16,6 +16,11 @@ out float beamIntensity;
 out vec2 edgePosition;
 flat out float beamLength;
 flat out float beamKind;
+
+// Geometry is expanded in backing-store pixels so beam dimensions stay fixed
+// in CSS pixels as the logical viewport scales.
+const float HALO_EXTENT_PIXELS = 25.5;
+
 void main() {
   const vec2 corners[6] = vec2[6](
     vec2(-1.0, -1.0), vec2(1.0, -1.0), vec2(-1.0, 1.0),
@@ -31,14 +36,16 @@ void main() {
     beamLength = length(delta);
     vec2 tangent = delta / max(beamLength, 0.0001);
     vec2 normal = vec2(-tangent.y, tangent.x);
-    float haloExtent = 25.5 * pixelScale;
+    // Expand the line quad past both ends and sides to contain its halo.
+    float haloExtent = HALO_EXTENT_PIXELS * pixelScale;
     float along = corner.x * (beamLength * 0.5 + haloExtent);
     float across = corner.y * haloExtent;
     position = (startPoint + endPoint) * 0.5 + tangent * along + normal * across;
     edgePosition = vec2(along, across);
   } else {
     beamLength = 0.0;
-    edgePosition = corner * (25.5 * pixelScale);
+    // Points use a square quad; the fragment shader clips it to a circle.
+    edgePosition = corner * (HALO_EXTENT_PIXELS * pixelScale);
     position = startPoint + edgePosition;
   }
   vec2 clip = (position / resolution) * 2.0 - 1.0;
@@ -54,25 +61,55 @@ flat in float beamLength;
 flat in float beamKind;
 uniform float pixelScale;
 out vec4 outputColor;
+
+// Beam dimensions and falloff distances are in output pixels, then scaled to
+// backing-store pixels by pixelScale.
+const float LINE_CORE_RADIUS_PIXELS = 0.75;
+const float POINT_CORE_RADIUS_PIXELS = 1.5;
+const float BROAD_HALO_WEIGHT = 0.12;
+const float BROAD_HALO_FALLOFF_SQUARED = 250.0;
+const float INNER_HALO_WEIGHT = 0.07;
+const float INNER_HALO_FALLOFF_SQUARED = 32.0;
+const float HALO_FADE_START_PIXELS = 16.0;
+const float HALO_CUTOFF_PIXELS = 25.0;
+const float LINE_END_FADE_START_PIXELS = -4.0;
+const float LINE_END_FADE_END_PIXELS = 10.0;
+
 void main() {
   float signedDistance;
   if (beamKind < 0.5) {
     float along = clamp(edgePosition.x, -beamLength * 0.5, beamLength * 0.5);
-    signedDistance = length(edgePosition - vec2(along, 0.0)) - 0.75 * pixelScale;
+    // Clamping to the segment endpoints makes the line core a rounded capsule.
+    signedDistance = length(edgePosition - vec2(along, 0.0)) - LINE_CORE_RADIUS_PIXELS * pixelScale;
   } else {
-    signedDistance = length(edgePosition) - 1.5 * pixelScale;
+    // Distance from the point centre gives a circular core.
+    signedDistance = length(edgePosition) - POINT_CORE_RADIUS_PIXELS * pixelScale;
   }
+
+  // Keep the core crisp with a narrow antialiased edge. Outside it, combine
+  // two Gaussian bands into a coloured halo with a finite cutoff.
   float coreCoverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
   float haloDistance = max(signedDistance, 0.0);
-  float halo = (0.12 * exp(-haloDistance * haloDistance / (250.0 * pixelScale * pixelScale))
-    + 0.07 * exp(-haloDistance * haloDistance / (32.0 * pixelScale * pixelScale)))
-    * (1.0 - smoothstep(16.0 * pixelScale, 25.0 * pixelScale, haloDistance));
+  float halo = (BROAD_HALO_WEIGHT * exp(-haloDistance * haloDistance
+      / (BROAD_HALO_FALLOFF_SQUARED * pixelScale * pixelScale))
+    + INNER_HALO_WEIGHT * exp(-haloDistance * haloDistance
+      / (INNER_HALO_FALLOFF_SQUARED * pixelScale * pixelScale)))
+    * (1.0 - smoothstep(HALO_FADE_START_PIXELS * pixelScale,
+      HALO_CUTOFF_PIXELS * pixelScale, haloDistance));
   float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45;
   halo *= primitiveHalo;
   if (beamKind < 0.5) {
+    // Reduce halo strength near line ends to avoid prominent endpoint flares.
     float endDistance = beamLength * 0.5 - abs(edgePosition.x);
-    halo *= mix(0.35, 1.0, smoothstep(-4.0 * pixelScale, 10.0 * pixelScale, endDistance));
+    halo *= mix(0.35, 1.0, smoothstep(
+      LINE_END_FADE_START_PIXELS * pixelScale,
+      LINE_END_FADE_END_PIXELS * pixelScale,
+      endDistance));
   }
+
+  // Intensity controls emitted brightness. The core moves toward white while
+  // the halo keeps the command colour; alpha compositing remains the backend's
+  // current presentation technique.
   float baseAlpha = beamIntensity
     * (coreCoverage + halo * (1.0 - coreCoverage));
   float coreAlpha = beamIntensity * coreCoverage;
@@ -82,6 +119,9 @@ void main() {
     + beamColor * baseAlpha * (1.0 - coreAlpha);
   outputColor = vec4(premultiplied / max(alpha, 0.0001), alpha);
 }`;
+
+const FLOATS_PER_COMMAND = 9;
+const INITIAL_COMMAND_CAPACITY = 256;
 
 function compileShader(
   gl: WebGL2RenderingContext,
@@ -168,25 +208,59 @@ export function createWebGL2Renderer(
   let color: Color = [1, 1, 1];
   let intensity = 1;
   let position: readonly [number, number] | undefined;
-  let commands: number[][] = [];
+  let commandData = new Float32Array(FLOATS_PER_COMMAND * INITIAL_COMMAND_CAPACITY);
+  let commandCount = 0;
+  let currentViewport = viewport();
   const transforms = createTransformStack();
+
+  function appendCommand(
+    startX: number,
+    startY: number,
+    endX: number,
+    endY: number,
+    commandColor: Color,
+    commandIntensity: number,
+    primitiveKind: number,
+  ): void {
+    if (commandCount === commandData.length / FLOATS_PER_COMMAND) {
+      const larger = new Float32Array(commandData.length * 2);
+      larger.set(commandData);
+      commandData = larger;
+    }
+    const offset = commandCount * FLOATS_PER_COMMAND;
+    commandData[offset] = startX;
+    commandData[offset + 1] = startY;
+    commandData[offset + 2] = endX;
+    commandData[offset + 3] = endY;
+    commandData[offset + 4] = commandColor[0];
+    commandData[offset + 5] = commandColor[1];
+    commandData[offset + 6] = commandColor[2];
+    commandData[offset + 7] = commandIntensity;
+    commandData[offset + 8] = primitiveKind;
+    commandCount += 1;
+  }
+
   return {
     beginFrame() {
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
       gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
-      gl.uniform1f(pixelScaleLocation, viewport().pixelScale);
+      currentViewport = viewport();
+      gl.uniform1f(pixelScaleLocation, currentViewport.pixelScale);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       position = undefined;
-      commands = [];
+      commandCount = 0;
       transforms.reset();
     },
     endFrame() {
-      if (commands.length > 0) {
-        const vertices = new Float32Array(commands.flat());
+      if (commandCount > 0) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
-        gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STREAM_DRAW);
-        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, commands.length);
+        gl.bufferData(
+          gl.ARRAY_BUFFER,
+          commandData.subarray(0, commandCount * FLOATS_PER_COMMAND),
+          gl.STREAM_DRAW,
+        );
+        gl.drawArraysInstanced(gl.TRIANGLES, 0, 6, commandCount);
       }
       gl.flush();
     },
@@ -220,25 +294,18 @@ export function createWebGL2Renderer(
     },
     lineTo(x, y) {
       if (!position) return;
-      if (position[0] !== x || position[1] !== y) {
-        const currentViewport = viewport();
-        const [logicalX, logicalY] = transforms.apply(x, y);
+      const nextPosition = transforms.apply(x, y);
+      if (position[0] !== nextPosition[0] || position[1] !== nextPosition[1]) {
         const [startX, startY] = currentViewport.mapPoint(position[0], position[1]);
-        const [endX, endY] = currentViewport.mapPoint(logicalX, logicalY);
-        commands.push([
-          startX, startY, endX, endY,
-          color[0], color[1], color[2], intensity, 0,
-        ]);
+        const [endX, endY] = currentViewport.mapPoint(nextPosition[0], nextPosition[1]);
+        appendCommand(startX, startY, endX, endY, color, intensity, 0);
       }
-      position = transforms.apply(x, y);
+      position = nextPosition;
     },
     point(x, y) {
       const [logicalX, logicalY] = transforms.apply(x, y);
-      const [outputX, outputY] = viewport().mapPoint(logicalX, logicalY);
-      commands.push([
-        outputX, outputY, outputX, outputY,
-        color[0], color[1], color[2], intensity, 1,
-      ]);
+      const [outputX, outputY] = currentViewport.mapPoint(logicalX, logicalY);
+      appendCommand(outputX, outputY, outputX, outputY, color, intensity, 1);
     },
   };
 }

@@ -118,6 +118,20 @@ test("WebGL2 transforms geometry in local space and restores the parent transfor
   ])]);
 });
 
+test("WebGL2 skips zero-length lines when a transform is active", () => {
+  const { calls, gl } = fakeContext();
+  const display = createWebGL2Renderer(gl);
+
+  display.beginFrame();
+  display.translate(10, 20);
+  display.moveTo(3, 4);
+  display.lineTo(3, 4);
+  display.endFrame();
+
+  assert.deepEqual(calls.filter(([name]) => name === "drawArraysInstanced"), []);
+  assert.deepEqual(calls.filter(([name]) => name === "bufferData"), []);
+});
+
 test("WebGL2 beginFrame resets the transform stack", () => {
   const { calls, gl } = fakeContext();
   const display = createWebGL2Renderer(gl);
@@ -144,11 +158,19 @@ test("WebGL2 shader includes a bounded halo around the beam core", () => {
   const fragment = sources.find((source) => source.includes("out vec4 outputColor"));
 
   assert.ok(fragment?.includes("float coreCoverage"));
-  assert.ok(fragment?.includes("float halo = (0.12 * exp(-haloDistance * haloDistance / (250.0 * pixelScale * pixelScale))"));
-  assert.ok(fragment?.includes("+ 0.07 * exp(-haloDistance * haloDistance / (32.0 * pixelScale * pixelScale))"));
-  assert.ok(fragment?.includes("smoothstep(16.0 * pixelScale, 25.0 * pixelScale"));
+  assert.ok(fragment?.includes("const float BROAD_HALO_WEIGHT = 0.12"));
+  assert.ok(fragment?.includes("const float BROAD_HALO_FALLOFF_SQUARED = 250.0"));
+  assert.ok(fragment?.includes("const float INNER_HALO_WEIGHT = 0.07"));
+  assert.ok(fragment?.includes("const float INNER_HALO_FALLOFF_SQUARED = 32.0"));
+  assert.ok(fragment?.includes("BROAD_HALO_WEIGHT * exp(-haloDistance * haloDistance"));
+  assert.ok(fragment?.includes("INNER_HALO_WEIGHT * exp(-haloDistance * haloDistance"));
+  assert.ok(fragment?.includes("smoothstep(HALO_FADE_START_PIXELS * pixelScale"));
+  assert.ok(fragment?.includes("const float HALO_FADE_START_PIXELS = 16.0"));
+  assert.ok(fragment?.includes("const float HALO_CUTOFF_PIXELS = 25.0"));
   assert.ok(fragment?.includes("float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45"));
   assert.ok(fragment?.includes("endDistance = beamLength * 0.5 - abs(edgePosition.x)"));
-  assert.ok(fragment?.includes("mix(0.35, 1.0, smoothstep(-4.0 * pixelScale, 10.0 * pixelScale, endDistance))"));
+  assert.ok(fragment?.includes("mix(0.35, 1.0, smoothstep("));
+  assert.ok(fragment?.includes("const float LINE_END_FADE_START_PIXELS = -4.0"));
+  assert.ok(fragment?.includes("const float LINE_END_FADE_END_PIXELS = 10.0"));
   assert.ok(fragment?.includes("mix(beamColor, vec3(1.0), 0.2 + 0.65 * beamIntensity)"));
 });
