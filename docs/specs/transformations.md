@@ -78,8 +78,10 @@ transforms for individual objects.
 Transforms change geometry positions and dimensions, but do not scale the
 beam's output-pixel profile. Line-core width, point radius and halo dimensions
 remain measured in CSS pixels, consistent with the logical viewport mapping.
-The Canvas 2D and WebGL2 renderers must produce equivalent transformed geometry
-and preserve drawing order. Their rasterized pixels need not be identical.
+The current WebGL2 renderer implements these transform semantics. Future
+renderers, including a possible WebGPU backend, must produce equivalent
+transformed geometry and preserve drawing order. Rasterized pixels need not be
+identical.
 
 ## Boundaries
 

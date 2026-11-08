@@ -4,14 +4,13 @@
 
 One More Glow provides a renderer-independent API for immediate-mode, 2D vector drawing.
 
-The library currently has two renderer implementations:
+The library currently has one renderer implementation: WebGL2. It implements the
+shared `DrawingContext` interface, which remains the stable boundary for future
+renderers such as WebGPU. Adding a renderer should not require consumers to
+change their drawing code.
 
-- Canvas 2D
-- WebGL2
-
-Both implement the same `DrawingContext` interface.
-
-The WebGL2 implementation batches drawing operations and represents line segments as quads.
+The WebGL2 implementation batches drawing operations and represents line
+segments as quads.
 
 ## Components
 
@@ -29,16 +28,6 @@ Must not depend on renderer implementations or application code.
 
 Maps the accepted logical display coordinates to output coordinates and derives the backing-store scale for CSS-pixel beam dimensions. It is a small renderer-independent calculation and must not use browser graphics APIs.
 
-### Canvas renderer
-
-`src/canvas-renderer.ts`
-
-Implements the drawing contract using Canvas 2D.
-
-May depend on the graphics contract.
-
-Must not depend on the WebGL2 implementation.
-
 ### WebGL2 renderer
 
 `src/webgl2-renderer.ts`
@@ -47,7 +36,7 @@ Implements the drawing contract using WebGL2.
 
 May depend on the graphics contract.
 
-Must not depend on the Canvas implementation.
+Must not depend on another renderer implementation.
 
 ### Public entry point
 
@@ -73,18 +62,19 @@ Must use the public library API rather than renderer internals.
         Public library API
                |
        DrawingContext
-          /         \
-     Canvas 2D     WebGL2
+             |
+           WebGL2
 ```
 
-The two renderers are independent implementations of one contract.
-
-Sharing an interface does not imply sharing internal implementation machinery.
+The current renderer depends on the shared contract. Future renderers should
+also implement that contract independently and must not depend on other
+renderer implementations. Sharing an interface does not imply sharing
+implementation machinery.
 
 ## Architectural constraints
 
-1. The graphics contract must remain independent of Canvas and WebGL2.
-2. Neither renderer may depend on the other.
+1. The graphics contract must remain independent of browser graphics APIs and renderer implementations.
+2. Renderer implementations must not depend on one another.
 3. Application-specific behaviour must not enter the library.
 4. Renderer-specific resources and optimisations belong inside their implementations.
 5. The public API must not expose renderer-specific implementation details.

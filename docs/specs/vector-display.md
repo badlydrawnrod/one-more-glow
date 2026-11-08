@@ -18,7 +18,7 @@ Prefer a small, understandable contract and explicit dependencies. Avoid unneces
 
 **Implementation: Implemented**
 
-The library has a renderer-independent drawing contract and interchangeable Canvas 2D and WebGL2 implementations. The public contract must not expose Canvas or WebGL types. Backend setup, resource ownership and internal rendering techniques may differ, while drawing commands retain equivalent geometry, colour, intensity and ordering semantics.
+The library has a renderer-independent drawing contract and a current WebGL2 implementation. The public contract must not expose graphics API types. Backend setup, resource ownership and internal rendering techniques may differ, while drawing commands retain equivalent geometry, colour, intensity and ordering semantics. The `DrawingContext` contract is the stable boundary for future renderers, such as WebGPU, and adding one should not require consumer drawing code to change.
 
 The core must not depend on either renderer or browser graphics APIs. The development diagnostic is a consumer of the public library API and must not depend on renderer internals.
 
@@ -46,7 +46,7 @@ The accepted fundamental operations are:
 
 Colour and intensity are separate drawing state. Colour selects chromatic properties, while intensity controls relative brightness.
 
-Intensity describes illumination, not necessarily transparency. The current renderers use alpha-based techniques, but those implementation choices do not define the enduring meaning of intensity.
+Intensity describes illumination, not necessarily transparency. The current renderer uses alpha-based techniques, but that implementation choice does not define the enduring meaning of intensity.
 
 ### Frame and pen behavior
 
@@ -60,7 +60,7 @@ A `lineTo()` issued before any `moveTo()` in the frame draws nothing. Each succe
 
 Lifecycle misuse (including nested, repeated or out-of-frame calls) is currently undefined and is not required to be detected.
 
-The Canvas renderer draws commands as they are issued. The WebGL2 renderer collects commands and submits them at `endFrame()`. This batching strategy is an implementation detail; a particular command-buffer representation is not part of the public contract.
+The WebGL2 renderer collects commands and submits them at `endFrame()`. This batching strategy is an implementation detail; a particular command-buffer representation is not part of the public contract.
 
 Clearing the current frame is distinct from any future phosphor-persistence effect. Frame submission describes the current drawing; persistence, if implemented, determines how illumination from previous frames contributes to the presented image.
 
@@ -109,12 +109,12 @@ Colour and intensity belong to drawing descriptions. The accepted beam width is 
 
 A bright core and its surrounding halo are aspects of the same illuminated geometry. Consumers should not need to submit additional decorative geometry to reproduce these effects.
 
-The bright core and halo are one presentation treatment. Higher intensity moves the core toward white while preserving the selected colour in the surrounding halo. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The renderers use fixed internal profiles rather than public controls. Their current dimensions and falloff values are adjustable later if visual feedback warrants it; they are starting settings, not permanent limits.
+The bright core and halo are one presentation treatment. Higher intensity moves the core toward white while preserving the selected colour in the surrounding halo. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The current renderer uses a fixed internal profile rather than public controls. Its dimensions and falloff values are adjustable later if visual feedback warrants it; they are starting settings, not permanent limits.
 
 ### Baseline beam
 
 **Status:** Accepted
-**Implementation:** Implemented and visually compared in Canvas 2D and WebGL2
+**Implementation:** Implemented in WebGL2.
 
 - Lines have a visually continuous, sharply defined core.
 - Points have a consistent, recognisably luminous appearance.
@@ -135,7 +135,7 @@ Bloom produces a broad, soft coloured halo around illuminated geometry, paired w
 
 The result should retain a recognisable, sharply defined core rather than simply blurring the entire image.
 
-The current profile is fixed inside each renderer and preserves the submitted colour in the halo. Consumers do not configure bloom yet. The implementation may be tuned later without changing the accepted visual intent.
+The current profile is fixed inside the WebGL2 renderer and preserves the submitted colour in the halo. Consumers do not configure bloom yet. The implementation may be tuned later without changing the accepted visual intent.
 
 #### Light accumulation
 
@@ -161,9 +161,10 @@ The decay model, timing, treatment of colour and intensity, and configuration re
 
 **Status: Accepted**
 
-Canvas 2D and WebGL2 implement the same drawing contract.
+The WebGL2 renderer implements the shared drawing contract. Any future renderer
+must preserve its semantics.
 
-Both backends must preserve:
+The current renderer and any future renderers must preserve:
 
 - Drawing primitive semantics.
 - Geometry, colour and intensity.
@@ -182,13 +183,11 @@ Display effects should not require consumers to submit additional geometry to si
 
 **Implementation: Implemented**
 
-Canvas 2D uses opacity for intensity, a 1.5-pixel rounded line stroke, and circular points with a 1.5-pixel radius.
-
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a transformed side-on craft, terrain, fuel pod and tractor beam. Add `?animate=1` to rotate the craft continuously in the game scene. Use `?scene=testcard` to inspect the focused geometry, transform and intensity examples: open paths and closed outlines in colour-coded ladders, a row of locally defined crafts at different positions, rotations and scales, a central line/triangle/point study, line and point samples, circles, ellipses, circular and elliptical arcs, and nested rectangles. Add `?renderer=canvas` to compare Canvas 2D with WebGL2. The screenshots informed the accepted core and halo treatment; the renderers are visually similar at the displayed scale but are not pixel-identical.
+The Vite diagnostic uses WebGL2 and defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a transformed side-on craft, terrain, fuel pod and tractor beam. Add `?animate=1` to rotate the craft continuously in the game scene. Use `?scene=testcard` to inspect the focused geometry, transform and intensity examples: open paths and closed outlines in colour-coded ladders, a row of locally defined crafts at different positions, rotations and scales, a central line/triangle/point study, line and point samples, circles, ellipses, circular and elliptical arcs, and nested rectangles.
 
-Visual comparison found the Canvas 2D and WebGL2 outputs close overall at the diagnostic scale. Canvas retains a slightly softer outer wash. WebGL2 line-end halos were reduced until they no longer read as separate flares, and point halos were reduced to better match Canvas. A much wider WebGL2 cutoff made the result too diffuse, so its current cutoff remains at 25 pixels. Canvas isolates and composites a blurred halo layer beneath the core; WebGL2 combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. These renderer-specific techniques implement the same accepted appearance without requiring pixel-identical output. Their numeric profiles remain adjustable if later visual feedback warrants it.
+The WebGL2 shader combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. The numeric profile remains adjustable if later visual feedback warrants it. Future backends should implement the same accepted appearance without requiring pixel-identical output.
 
 ### Display design constraints
 
@@ -229,7 +228,7 @@ not require a public matrix type or a general-purpose matrix dependency.
 
 **Implementation: Implemented**
 
-The logical mapping and beam sizing have been visually confirmed in Canvas 2D and WebGL2, in both landscape and portrait orientations.
+The logical mapping and beam sizing have been visually confirmed in WebGL2, in both landscape and portrait orientations.
 
 The imaginary console should provide fixed logical coordinate spaces for landscape 4:3 and portrait 3:4 displays. Consumers use the selected console space rather than choosing their own logical dimensions. The origin is at the centre, positive X points right, and positive Y points up.
 
@@ -239,7 +238,7 @@ Map the selected logical space to the physical canvas with uniform scaling, pres
 
 **Accepted decision:** The host sizes the canvas to the selected console aspect ratio and letterboxes the canvas within the page as needed. The renderer does not draw page letterboxing; any halo beyond the canvas is naturally not presented.
 
-**Accepted decision:** Geometry and its halo are clipped at the logical display bounds. Since those bounds map to the canvas edges, the Canvas and WebGL2 surfaces provide this clipping; no separate logical clipping pass is required.
+**Accepted decision:** Geometry and its halo are clipped at the logical display bounds. Since those bounds map to the output surface edges, the renderer surface provides this clipping; no separate logical clipping pass is required.
 
 **Accepted decision:** Consumers select landscape or portrait orientation when configuring a renderer. Landscape is the default.
 
@@ -277,7 +276,7 @@ Testing conventions are maintained in `docs/engineering.md`.
 
 Tests should focus on observable behavior at the shared public contract; backend tests may verify renderer-specific invariants when those are necessary to preserve the contract.
 
-The accepted drawing contract, both backends and the accepted derived geometry helpers are implemented. Automated tests cover polyline and polygon helper semantics, circle, ellipse and arc tessellation, angle direction and endpoints, invalid-radius no-ops, Canvas frame clearing, pen behavior, halo compositing and intensity-driven core colour, plus WebGL2 frame batching, command ordering, per-command style snapshots and halo profile invariants.
+The accepted drawing contract, WebGL2 renderer and accepted derived geometry helpers are implemented. Automated tests cover polyline and polygon helper semantics, circle, ellipse and arc tessellation, angle direction and endpoints, invalid-radius no-ops, WebGL2 frame clearing, pen behavior, frame batching, command ordering, per-command style snapshots and halo profile invariants.
 
 Proposed capabilities above remain subject to evaluation even when an experimental implementation is present. Deferred capabilities are not implemented requirements.
 

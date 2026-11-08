@@ -1,6 +1,6 @@
 # Agent instructions
 
-One More Glow is a small TypeScript library for retro-inspired vector graphics. It supports interchangeable Canvas 2D and WebGL2 renderers.
+One More Glow is a small TypeScript library for retro-inspired vector graphics. WebGL2 is its current renderer. Keep the renderer-independent `DrawingContext` as the stable boundary so future backends, such as WebGPU, can implement it without changing consumers.
 
 The project values simple, predictable, maintainable engineering over cleverness or fashionable abstractions.
 

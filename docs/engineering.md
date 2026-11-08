@@ -143,7 +143,7 @@ coordinate systems.
 ### Accepted requirements
 
 - Drawing behaviour must be backend-independent.
-- Canvas 2D and WebGL2 must have equivalent semantics.
+- Current and future renderers must implement equivalent semantics through the renderer-independent drawing contract.
 
 ### Open decisions
 

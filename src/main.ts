@@ -1,5 +1,4 @@
 import {
-  createCanvasRenderer,
   createWebGL2Renderer,
   drawArc,
   drawCircle,
@@ -39,15 +38,10 @@ function resizeCanvas(): void {
 
 resizeCanvas();
 
-const renderer: DrawingContext = params.get("renderer") === "canvas"
-  ? createCanvasRenderer(
-    requireContext(screen.getContext("2d"), "Canvas 2D"),
-    renderOptions,
-  )
-  : createWebGL2Renderer(
-    requireContext(screen.getContext("webgl2", { alpha: true }), "WebGL2"),
-    renderOptions,
-  );
+const renderer: DrawingContext = createWebGL2Renderer(
+  requireContext(screen.getContext("webgl2", { alpha: true }), "WebGL2"),
+  renderOptions,
+);
 
 const cyan: Color = [0, 0.9, 1];
 const amber: Color = [1, 0.55, 0.12];
