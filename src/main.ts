@@ -23,6 +23,7 @@ const orientation: DisplayOrientation = params.get("orientation") === "portrait"
 const aspectRatio = orientation === "landscape" ? 4 / 3 : 3 / 4;
 const renderOptions = { orientation };
 const scene = params.get("scene") === "testcard" ? "testcard" : "game";
+const animate = params.get("animate") === "1" && scene === "game";
 
 function resizeCanvas(): void {
   const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * aspectRatio);
@@ -161,7 +162,7 @@ function drawTestCard(): void {
   renderer.endFrame();
 }
 
-function drawGameScene(): void {
+function drawGameScene(shipAngle = -12): void {
   renderer.beginFrame();
 
   // A sparse, low-intensity arena grid sits behind the action.
@@ -191,7 +192,7 @@ function drawGameScene(): void {
   renderer.setIntensity(1);
   renderer.pushTransform();
   renderer.translate(...project(0, 130));
-  renderer.rotate(-12);
+  renderer.rotate(shipAngle);
   drawPolygonOutline(renderer, [
     [0, 34], [-19, -11], [-10, -5], [-10, -36],
     [10, -36], [10, -5], [19, -11],
@@ -272,12 +273,19 @@ function drawDiagnostic(): void {
   else drawGameScene();
 }
 
+function animateGame(time: number): void {
+  if (!animate) return;
+  drawGameScene((time * 0.03) % 360);
+  requestAnimationFrame(animateGame);
+}
+
 window.addEventListener("resize", () => {
   resizeCanvas();
-  drawDiagnostic();
+  if (!animate) drawDiagnostic();
 });
 
-drawDiagnostic();
+if (animate) requestAnimationFrame(animateGame);
+else drawDiagnostic();
 
 function requireContext<T>(context: T | null, name: string): T {
   if (!context) throw new Error(`${name} is unavailable`);
