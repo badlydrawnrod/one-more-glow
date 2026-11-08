@@ -90,7 +90,7 @@ These characteristics establish the intended aesthetic. They do not require ever
 
 ### Beam characteristics
 
-**Status: Colour, intensity, beam width, bright core and halo accepted and implemented; light accumulation deferred**
+**Status: Colour, intensity, beam width, bright core and halo accepted and implemented; global display-profile configuration accepted, API pending; light accumulation deferred**
 
 A beam is the conceptual source of illumination for vector geometry.
 
@@ -105,7 +105,7 @@ A beam is the conceptual source of illumination for vector geometry.
 
 Beam width and intensity are distinct concepts. Increasing intensity should not implicitly change geometric line width. An apparent widening caused by brighter bloom is a display effect rather than a change in geometry.
 
-Colour and intensity belong to drawing descriptions. The accepted beam width is currently a fixed renderer profile; whether consumers should be able to configure it through drawing state or display configuration remains undecided.
+Colour and intensity belong to drawing descriptions. Beam width and display effects such as bloom are global display-profile settings, not per-command drawing state. The current renderer uses a fixed profile; public configuration is not implemented yet.
 
 A bright core and its surrounding halo are aspects of the same illuminated geometry. Consumers should not need to submit additional decorative geometry to reproduce these effects.
 
@@ -125,9 +125,18 @@ The accepted baseline uses a 1.5-pixel line core with rounded ends and circular 
 
 ### Display effects
 
-**Status: Bloom accepted and implemented; other effects deferred**
+**Status: Bloom accepted and implemented; global configuration of the display profile accepted, API pending; other effects deferred**
 
 Display effects determine how beam illumination appears on screen. They are conceptually separate from drawing commands and game state.
+
+#### Global display-profile options
+
+**Status: Accepted**
+**Implementation: The renderer uses a fixed internal profile; public options are not implemented.**
+
+The renderer should accept global display-profile options that apply consistently to all drawing commands. Beam width and bloom/glow are accepted examples of configurable characteristics. A consumer may expose these settings as player-facing controls; the library provides the configuration, not the user interface.
+
+These options belong to renderer or display configuration, not to `DrawingContext` drawing state. Exact option names, units, ranges, defaults, which additional characteristics are configurable, and whether settings can be changed after renderer creation remain open decisions.
 
 #### Bloom
 
