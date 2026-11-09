@@ -4,6 +4,8 @@ One More Glow is a small TypeScript library for retro-inspired vector graphics. 
 
 The project values simple, predictable, maintainable engineering over cleverness or fashionable abstractions.
 
+The repository is an npm-workspaces monorepo: reusable packages are under `packages/`, runnable consumer apps under `apps/`, and root scripts coordinate workspace tasks. Apps consume libraries through package names and public exports. Keep app-specific code in its app; add a shared package only when a concrete reusable boundary exists. See `docs/architecture.md` for the dependency rules and current layout, and `README.md` for common commands.
+
 ## Read before working
 
 - `docs/engineering.md` — engineering principles and conventions.

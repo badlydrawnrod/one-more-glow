@@ -9,7 +9,7 @@ import {
   type Color,
   type DisplayOrientation,
   type DrawingContext,
-} from "./index.ts";
+} from "one-more-glow";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing #screen canvas");

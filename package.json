@@ -1,14 +1,17 @@
 {
-  "name": "one-more-glow",
+  "name": "one-more-glow-workspace",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
-    "dev": "vite",
-    "check": "tsc --noEmit",
-    "build": "tsc && vite build",
-    "test": "node --experimental-strip-types --test tests/*.test.ts",
-    "preview": "vite preview"
+    "dev": "npm run build --workspace=one-more-glow && npm run dev --workspace=diagnostics",
+    "check": "npm run build --workspace=one-more-glow && npm run check --workspace=diagnostics",
+    "build": "npm run build --workspace=one-more-glow && npm run build --workspace=diagnostics",
+    "test": "npm run test --workspace=one-more-glow",
+    "preview": "npm run preview --workspace=diagnostics"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
