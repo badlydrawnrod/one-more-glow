@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#05070c" />
+    <title>Asteroids Flight — One More Glow</title>
+  </head>
+  <body>
+    <main class="flight-app">
+      <header class="topbar">
+        <a class="wordmark" href="/" aria-label="One More Glow home">OMG<span> / </span>FLIGHT TEST</a>
+        <div class="live-status"><span class="status-light"></span><span id="input-status">KEYBOARD READY</span></div>
+      </header>
+
+      <section class="game-shell" aria-label="Asteroids style spacecraft flight demo">
+        <canvas id="screen" width="800" height="600" aria-label="Vector spacecraft in an asteroid field"></canvas>
+        <div class="screen-vignette" aria-hidden="true"></div>
+        <div class="hud hud-top"><span>SECTOR 07</span><span id="speed-readout">VELOCITY 000</span></div>
+        <div class="hud hud-bottom"><span id="thrust-readout">THRUST OFF</span><span>FREE FLIGHT</span></div>
+        <div class="crosshair" aria-hidden="true">+</div>
+      </section>
+
+      <footer class="controls">
+        <div class="control-group"><span class="control-icon">↶ ↷</span><span><b>STEER</b><small>← → &nbsp; / &nbsp; A D &nbsp; / &nbsp; STICK</small></span></div>
+        <div class="control-group"><span class="control-icon thrust-icon">↑</span><span><b>THRUST</b><small>↑ &nbsp; / &nbsp; W &nbsp; / &nbsp; A BUTTON</small></span></div>
+        <div class="control-note">Drift carries you. The arena wraps around.</div>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

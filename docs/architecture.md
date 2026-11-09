@@ -8,6 +8,7 @@ coordinate packages, but the root itself is not a publishable package.
 ```text
 apps/
   diagnostics/              # Vite app for checking library rendering
+  asteroids-demo/           # Vite app for keyboard/gamepad spacecraft flight
 packages/
   one-more-glow/            # reusable drawing library
 docs/
@@ -78,16 +79,26 @@ sample-scene views for checking rendering and exploring display behavior. It
 must import the library by package name through the public entry point, not
 from library source or renderer internals.
 
+### Asteroids demo
+
+`apps/asteroids-demo/`
+
+An independent consumer of the library package. It demonstrates a simple
+Asteroids-style flight model with keyboard and browser Gamepad API input. Input
+handling and game state belong to this app; it must use the public package
+entry point rather than library internals.
+
 ## Dependency direction
 
 ```text
-apps/diagnostics
-       |
-       v
-packages/one-more-glow public entry point
-       |
-       v
-    DrawingContext <--- WebGL2 renderer
+apps/diagnostics       apps/asteroids-demo
+       |                         |
+       +------------+------------+
+                    v
+     one-more-glow public entry point
+                    |
+                    v
+       DrawingContext <--- WebGL2 renderer
 ```
 
 The renderer implements the shared contract. Future renderers should also

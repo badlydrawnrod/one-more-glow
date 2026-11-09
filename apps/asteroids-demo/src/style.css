@@ -1,0 +1,80 @@
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  color: #d4faff;
+  background: #05070c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgb(15 29 44 / 48%), transparent 64%),
+    #05070c;
+}
+
+.flight-app {
+  width: min(100% - 36px, 1040px);
+  margin: 0 auto;
+  padding: clamp(18px, 4vh, 42px) 0 24px;
+}
+
+.topbar, .controls, .hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar { margin: 0 auto 16px; letter-spacing: .12em; }
+.wordmark { color: #d4faff; text-decoration: none; font-size: 12px; font-weight: 600; }
+.wordmark span { color: #476978; }
+.live-status { display: flex; align-items: center; gap: 9px; color: #82a3ae; font-size: 10px; letter-spacing: .12em; }
+.status-light { width: 6px; height: 6px; border-radius: 50%; background: #54e9ff; box-shadow: 0 0 9px #54e9ff; }
+.live-status.connected .status-light { background: #aaff85; box-shadow: 0 0 9px #aaff85; }
+
+.game-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid #1a3945;
+  background: #05070c;
+  box-shadow: 0 0 0 1px rgb(31 76 90 / 20%), 0 20px 80px rgb(0 0 0 / 40%);
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+.screen-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse, transparent 54%, rgb(1 4 8 / 52%) 100%); }
+.hud { position: absolute; left: 18px; right: 18px; color: #4d8492; font-size: clamp(8px, 1.15vw, 11px); letter-spacing: .1em; pointer-events: none; }
+.hud-top { top: 15px; }
+.hud-bottom { bottom: 15px; color: #638c79; }
+.crosshair { position: absolute; left: 50%; top: 50%; color: rgb(101 155 166 / 35%); font-size: 14px; transform: translate(-50%, -50%); pointer-events: none; }
+
+.controls { gap: 16px; padding: 17px 2px 0; }
+.control-group { display: flex; align-items: center; gap: 11px; }
+.control-icon { min-width: 34px; color: #61e7f4; font: 600 21px "Arial Narrow", sans-serif; text-align: center; }
+.thrust-icon { color: #ffbd67; }
+.control-group b, .control-group small { display: block; }
+.control-group b { margin-bottom: 4px; color: #c1d7db; font: 600 10px "Arial Narrow", sans-serif; letter-spacing: .12em; }
+.control-group small { color: #58727c; font-size: 8px; letter-spacing: .04em; white-space: nowrap; }
+.control-note { color: #465861; font-size: 9px; text-align: right; }
+
+@media (max-width: 640px) {
+  .flight-app { width: min(100% - 20px, 1040px); padding-top: 16px; }
+  .controls { align-items: flex-start; flex-wrap: wrap; gap: 14px 22px; }
+  .control-group { gap: 6px; }
+  .control-icon { min-width: 24px; }
+  .control-group small { font-size: 7px; }
+  .control-note { width: 100%; text-align: left; }
+  .hud { left: 10px; right: 10px; }
+  .hud-top { top: 9px; }
+  .hud-bottom { bottom: 9px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; }
+}

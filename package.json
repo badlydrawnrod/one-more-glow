@@ -8,10 +8,14 @@
   ],
   "scripts": {
     "dev": "npm run build --workspace=one-more-glow && npm run dev --workspace=diagnostics",
-    "check": "npm run build --workspace=one-more-glow && npm run check --workspace=diagnostics",
-    "build": "npm run build --workspace=one-more-glow && npm run build --workspace=diagnostics",
+    "dev:asteroids": "npm run build --workspace=one-more-glow && npm run dev --workspace=asteroids-demo",
+    "check": "npm run build --workspace=one-more-glow && npm run check --workspace=diagnostics && npm run check --workspace=asteroids-demo",
+    "check:asteroids": "npm run build --workspace=one-more-glow && npm run check --workspace=asteroids-demo",
+    "build": "npm run build --workspace=one-more-glow && npm run build --workspace=diagnostics && npm run build --workspace=asteroids-demo",
+    "build:asteroids": "npm run build --workspace=one-more-glow && npm run build --workspace=asteroids-demo",
     "test": "npm run test --workspace=one-more-glow",
-    "preview": "npm run preview --workspace=diagnostics"
+    "preview": "npm run preview --workspace=diagnostics",
+    "preview:asteroids": "npm run preview --workspace=asteroids-demo"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
