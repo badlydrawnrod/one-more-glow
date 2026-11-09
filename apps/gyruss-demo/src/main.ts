@@ -53,13 +53,26 @@ interface Input {
   connected: boolean;
 }
 
+interface Particle {
+  x: number;
+  y: number;
+  velocityX: number;
+  velocityY: number;
+  age: number;
+  lifetime: number;
+  color: Color;
+  streak: number;
+}
+
 const player = { angle: 3 * Math.PI / 2 };
 const bullets: Bullet[] = [];
 const enemies: Enemy[] = [];
+const particles: Particle[] = [];
 const game = {
   score: 0,
   lives: 3,
   gameOver: false,
+  respawnTimer: 0,
   fireCooldown: 0,
   spawnTimer: 0.55,
   waveNumber: 1,
@@ -223,12 +236,30 @@ function drawEnemy(enemy: Enemy, time: number): void {
   drawing.lineTo(...trailEnd);
 }
 
+function drawParticles(): void {
+  for (const particle of particles) {
+    const remaining = 1 - particle.age / particle.lifetime;
+    drawing.setColor(particle.color);
+    drawing.setIntensity(remaining * remaining);
+    if (particle.streak === 0) {
+      drawing.point(particle.x, particle.y);
+    } else {
+      drawing.moveTo(particle.x, particle.y);
+      drawing.lineTo(
+        particle.x - particle.velocityX * particle.streak * remaining,
+        particle.y - particle.velocityY * particle.streak * remaining,
+      );
+    }
+  }
+}
+
 function drawFrame(time: number): void {
   drawing.beginFrame();
   drawTunnel(time);
   for (const bullet of bullets) drawBullet(bullet);
   for (const enemy of enemies) drawEnemy(enemy, time);
-  drawShip();
+  if (!game.gameOver && game.respawnTimer <= 0) drawShip();
+  drawParticles();
   drawing.endFrame();
 }
 
@@ -264,12 +295,48 @@ function spawnEnemy(): void {
   });
 }
 
+function explode(x: number, y: number, size: number, playerShip: boolean): void {
+  const colors = playerShip ? [cyan, paleBlue, amber] : [pink, amber, paleBlue];
+  const count = playerShip ? 48 : 24;
+  for (let index = 0; index < count; index += 1) {
+    const angle = (index + Math.random()) * tau / count;
+    const speed = (45 + Math.random() * 145) * size;
+    particles.push({
+      x, y,
+      velocityX: Math.cos(angle) * speed,
+      velocityY: Math.sin(angle) * speed,
+      age: 0,
+      lifetime: 0.35 + Math.random() * 0.65,
+      color: colors[index % colors.length],
+      streak: index % 3 === 0 ? 0 : 0.055 + Math.random() * 0.035,
+    });
+  }
+}
+
+function updateParticles(deltaSeconds: number): void {
+  const drag = Math.exp(-1.8 * deltaSeconds);
+  for (let index = particles.length - 1; index >= 0; index -= 1) {
+    const particle = particles[index];
+    particle.age += deltaSeconds;
+    if (particle.age >= particle.lifetime) {
+      particles.splice(index, 1);
+      continue;
+    }
+    particle.x += particle.velocityX * deltaSeconds;
+    particle.y += particle.velocityY * deltaSeconds;
+    particle.velocityX *= drag;
+    particle.velocityY *= drag;
+  }
+}
+
 function update(deltaSeconds: number, input: Input): void {
+  updateParticles(deltaSeconds);
+  game.respawnTimer = Math.max(0, game.respawnTimer - deltaSeconds);
   if (game.gameOver) return;
 
   player.angle = wrapAngle(player.angle + input.turn * 2.8 * deltaSeconds);
   game.fireCooldown = Math.max(0, game.fireCooldown - deltaSeconds);
-  if (input.fire && game.fireCooldown === 0) {
+  if (input.fire && game.fireCooldown === 0 && game.respawnTimer === 0) {
     bullets.push({ angle: player.angle, radius: orbitRadius - 28 });
     game.fireCooldown = 0.16;
   }
@@ -306,6 +373,9 @@ function update(deltaSeconds: number, input: Input): void {
       ) < enemy.size * depthScale(enemy.radius) + 8 * depthScale(bullets[bulletIndex].radius);
     });
     if (enemyIndex >= 0) {
+      const enemy = enemies[enemyIndex];
+      const [x, y] = polar(enemy.angle, enemy.radius);
+      explode(x, y, depthScale(enemy.radius), false);
       enemies.splice(enemyIndex, 1);
       bullets.splice(bulletIndex, 1);
       game.score += 100;
@@ -315,15 +385,18 @@ function update(deltaSeconds: number, input: Input): void {
   const playerPosition = polar(player.angle, orbitRadius);
   for (let index = enemies.length - 1; index >= 0; index -= 1) {
     const enemy = enemies[index];
-    if (enemy.radius >= orbitRadius - 17) {
+    if (game.respawnTimer === 0 && enemy.radius >= orbitRadius - 17) {
       const enemyPosition = polar(enemy.angle, enemy.radius);
       const distance = Math.hypot(
         playerPosition[0] - enemyPosition[0],
         playerPosition[1] - enemyPosition[1],
       );
       if (distance < enemy.size * depthScale(enemy.radius) + 11) {
+        explode(enemyPosition[0], enemyPosition[1], depthScale(enemy.radius), false);
+        explode(playerPosition[0], playerPosition[1], 1, true);
         enemies.splice(index, 1);
         game.lives -= 1;
+        game.respawnTimer = 0.9;
         if (game.lives <= 0) {
           game.gameOver = true;
           break;
@@ -346,7 +419,7 @@ function updateHud(input: Input): void {
   if (inputStatus.textContent !== inputText) inputStatus.textContent = inputText;
   const connected = inputStatus.parentElement?.classList.contains("connected") ?? false;
   if (connected !== input.connected) inputStatus.parentElement?.classList.toggle("connected", input.connected);
-  const shouldHideOverlay = !game.gameOver;
+  const shouldHideOverlay = !game.gameOver || game.respawnTimer > 0;
   if (gameOverOverlay.hidden !== shouldHideOverlay) gameOverOverlay.hidden = shouldHideOverlay;
 }
 
@@ -354,9 +427,11 @@ function restartGame(): void {
   player.angle = 3 * Math.PI / 2;
   bullets.length = 0;
   enemies.length = 0;
+  particles.length = 0;
   game.score = 0;
   game.lives = 3;
   game.gameOver = false;
+  game.respawnTimer = 0;
   game.fireCooldown = 0;
   game.spawnTimer = 0.55;
   game.waveNumber = 1;
