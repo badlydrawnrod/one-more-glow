@@ -1,0 +1,91 @@
+:root {
+  color-scheme: dark;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  color: #d9faff;
+  background: #080711;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background:
+    radial-gradient(ellipse at 50% 44%, rgb(35 17 52 / 45%), transparent 65%),
+    #080711;
+}
+
+.game-app {
+  width: min(100% - 36px, 1040px);
+  margin: 0 auto;
+  padding: clamp(18px, 4vh, 42px) 0 24px;
+}
+
+.topbar, .controls, .hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.topbar { margin: 0 auto 16px; letter-spacing: .12em; }
+.wordmark { color: #d9faff; text-decoration: none; font-size: 12px; font-weight: 600; }
+.wordmark span { color: #70546f; }
+.live-status { display: flex; align-items: center; gap: 9px; color: #a18aa7; font-size: 10px; letter-spacing: .12em; }
+.status-light { width: 6px; height: 6px; border-radius: 50%; background: #e976ff; box-shadow: 0 0 9px #e976ff; }
+.live-status.connected .status-light { background: #aaff85; box-shadow: 0 0 9px #aaff85; }
+
+.game-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  border: 1px solid #49304f;
+  background: #080711;
+  box-shadow: 0 0 0 1px rgb(114 60 130 / 20%), 0 20px 80px rgb(0 0 0 / 45%);
+}
+
+canvas { display: block; width: 100%; height: 100%; }
+.screen-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse, transparent 48%, rgb(4 3 11 / 58%) 100%); }
+.hud { position: absolute; left: 18px; right: 18px; color: #8c6591; font-size: clamp(8px, 1.15vw, 11px); letter-spacing: .1em; pointer-events: none; }
+.hud-top { top: 15px; }
+.hud-bottom { bottom: 15px; color: #698b8c; }
+.controls { gap: 16px; padding: 17px 2px 0; }
+.control-group { display: flex; align-items: center; gap: 11px; }
+.control-icon { min-width: 34px; color: #67e8f4; font: 600 21px "Arial Narrow", sans-serif; text-align: center; }
+.fire-icon { color: #ff82d5; }
+.control-group b, .control-group small { display: block; }
+.control-group b { margin-bottom: 4px; color: #d0c2d5; font: 600 10px "Arial Narrow", sans-serif; letter-spacing: .12em; }
+.control-group small { color: #806c84; font-size: 8px; letter-spacing: .04em; white-space: nowrap; }
+.control-note { color: #685970; font-size: 9px; text-align: right; }
+
+.overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 12px;
+  background: rgb(8 7 17 / 78%);
+  text-align: center;
+}
+.overlay[hidden] { display: none; }
+.overlay h1 { margin: 0; color: #ff82d5; font-size: clamp(22px, 5vw, 42px); letter-spacing: .18em; text-shadow: 0 0 18px rgb(255 100 208 / 60%); }
+.overlay p { margin: 0 0 8px; color: #b49fb9; font-size: 11px; }
+.overlay button { border: 1px solid #e976ff; padding: 10px 16px; color: #f5d9ff; background: #24132a; font: inherit; font-size: 10px; letter-spacing: .16em; cursor: pointer; }
+.overlay button:hover, .overlay button:focus-visible { background: #482553; outline: 1px solid #f4b7ff; }
+
+@media (max-width: 640px) {
+  .game-app { width: min(100% - 20px, 1040px); padding-top: 16px; }
+  .controls { align-items: flex-start; flex-wrap: wrap; gap: 14px 22px; }
+  .control-group { gap: 6px; }
+  .control-icon { min-width: 24px; }
+  .control-group small { font-size: 7px; }
+  .control-note { width: 100%; text-align: left; }
+  .hud { left: 10px; right: 10px; }
+  .hud-top { top: 9px; }
+  .hud-bottom { bottom: 9px; }
+}

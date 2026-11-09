@@ -1,0 +1,14 @@
+{
+  "name": "gyruss-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "one-more-glow": "0.0.0"
+  }
+}

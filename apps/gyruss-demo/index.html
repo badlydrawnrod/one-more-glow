@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#080711" />
+    <title>Orbital Assault — One More Glow</title>
+  </head>
+  <body>
+    <main class="game-app">
+      <header class="topbar">
+        <a class="wordmark" href="/" aria-label="One More Glow home">OMG<span> / </span>ORBITAL ASSAULT</a>
+        <div class="live-status"><span class="status-light"></span><span id="input-status">KEYBOARD READY</span></div>
+      </header>
+
+      <section class="game-shell" aria-label="Gyruss style orbital shooter">
+        <canvas id="screen" width="1024" height="768" aria-label="Ship orbiting a neon tunnel and firing at incoming enemies"></canvas>
+        <div class="screen-vignette" aria-hidden="true"></div>
+        <div class="hud hud-top"><span id="score-readout">SCORE 000000</span><span id="wave-readout">WAVE 01</span></div>
+        <div class="hud hud-bottom"><span id="lives-readout">SHIPS ◆ ◆ ◆</span><span>EARTH: 1 SECTOR</span></div>
+        <div id="game-over" class="overlay" hidden>
+          <h1>SHIP LOST</h1>
+          <p>Press R or select the button to launch again.</p>
+          <button id="restart" type="button">RESTART</button>
+        </div>
+      </section>
+
+      <footer class="controls">
+        <div class="control-group"><span class="control-icon">↶ ↷</span><span><b>ORBIT</b><small>← → &nbsp; / &nbsp; A D &nbsp; / &nbsp; STICK</small></span></div>
+        <div class="control-group"><span class="control-icon fire-icon">✦</span><span><b>FIRE INWARD</b><small>SPACE &nbsp; / &nbsp; A BUTTON</small></span></div>
+        <div class="control-note">Track the rim. Clear the tunnel.</div>
+      </footer>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
