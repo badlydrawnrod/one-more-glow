@@ -22,6 +22,10 @@ exports. Packages must not depend on apps. Code specific to one app should
 remain in that app. Create a shared package when a concrete reusable boundary
 emerges, rather than in anticipation of hypothetical reuse.
 
+App-specific specifications and practical documentation live with the app, in
+`SPEC.md` and `README.md` when needed. App-specific active plans live under the
+app's `plans/active/`; shared and cross-app plans live under the root `plans/`.
+
 The root `package.json` declares npm workspaces and the commands documented in
 the root README. Each workspace owns its package manifest and local build
 configuration. The root package remains private; each library package is the

@@ -7,7 +7,8 @@ One More Glow is a small TypeScript library for retro-inspired vector graphics. 
 - Read `docs/engineering.md` for engineering conventions and the specification lifecycle.
 - Read `docs/architecture.md` when a change touches module boundaries, dependencies or repository layout.
 - Read only the relevant files in `docs/specs/` for accepted behavior and unresolved decisions.
-- For substantial work, follow `plans/README.md` and inspect relevant plans under `plans/active/`.
+- When working on an app, read its `SPEC.md` if present.
+- For substantial work, follow `plans/README.md` and inspect relevant root and app-local active plans.
 - Use `README.md` for workspace commands.
 
 Do not implement proposed or deferred capabilities as if they were accepted requirements.

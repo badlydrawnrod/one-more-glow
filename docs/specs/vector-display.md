@@ -194,7 +194,7 @@ Display effects should not require consumers to submit additional geometry to si
 
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic uses WebGL2 and defaults to a static game-like scene combining a sparse neon grid and geometric enemies with a transformed side-on craft, terrain, fuel pod and tractor beam. Add `?animate=1` to rotate the craft continuously in the game scene. Use `?scene=testcard` to inspect the focused geometry, transform and intensity examples: open paths and closed outlines in colour-coded ladders, a row of locally defined crafts at different positions, rotations and scales, a central line/triangle/point study, line and point samples, circles, ellipses, circular and elliptical arcs, and nested rectangles.
+The Vite diagnostic uses WebGL2; its current scenes and controls are described in the [diagnostic app documentation](../../apps/diagnostics/SPEC.md).
 
 The WebGL2 shader combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. The numeric profile remains adjustable if later visual feedback warrants it. Future backends should implement the same accepted appearance without requiring pixel-identical output.
 

@@ -8,10 +8,10 @@ renderer.
 
 - `packages/one-more-glow/` — reusable library package, including its public
   entry point and tests.
-- `apps/diagnostics/` — Vite consumer app for checking rendering with a test
+- [`apps/diagnostics/`](apps/diagnostics/README.md) — Vite consumer app for checking rendering with a test
   card and sample scene.
-- `apps/asteroids-demo/` — keyboard and gamepad controlled vector flight demo.
-- `apps/gyruss-demo/` — keyboard and gamepad controlled orbital shooter demo.
+- [`apps/asteroids-demo/`](apps/asteroids-demo/README.md) — keyboard and gamepad controlled vector flight demo.
+- [`apps/gyruss-demo/`](apps/gyruss-demo/README.md) — keyboard and gamepad controlled orbital shooter demo.
 - `docs/specs/` — durable behavior requirements.
 
 All consumer apps depend on the library by package name. Keep game or app

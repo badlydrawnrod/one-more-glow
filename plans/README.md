@@ -4,7 +4,9 @@ Plans are temporary, resumable records of implementation work.
 
 They describe **how work is progressing**, not the durable requirements of the software.
 
-Authoritative requirements belong in `docs/specs/`. Architectural rules belong in `docs/architecture.md` and `docs/engineering.md`.
+Shared library requirements belong in `docs/specs/`; app-specific specifications belong with the app. Architectural rules belong in `docs/architecture.md` and `docs/engineering.md`.
+
+Keep plans for work confined to one app in `apps/<app>/plans/active/`. Keep library and cross-app plans in `plans/active/`. Create the relevant directory when needed.
 
 ## When to create a plan
 
@@ -18,7 +20,7 @@ Do not require plans for trivial fixes or small, self-contained changes.
 
 ## Creating a plan
 
-1. Copy `plans/template.md` to `plans/active/<descriptive-name>.md`.
+1. Copy `plans/template.md` to the appropriate active directory as `<descriptive-name>.md`.
 2. Link relevant durable specifications.
 3. Record the objective, scope and initial steps.
 4. Identify the first concrete action.
@@ -46,7 +48,7 @@ Before resuming, verify the plan against the actual state of the repository. The
 When work is finished:
 
 1. Verify the completion criteria.
-2. Transfer durable decisions and requirements into the appropriate documents under `docs/`.
+2. Transfer durable decisions and requirements into the appropriate shared or app-local documents.
 3. Run relevant checks, including tests when observable behavior changes.
 4. Delete the completed plan.
 
