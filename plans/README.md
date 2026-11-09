@@ -47,7 +47,7 @@ When work is finished:
 
 1. Verify the completion criteria.
 2. Transfer durable decisions and requirements into the appropriate documents under `docs/`.
-3. Ensure executable tests capture the intended behaviour.
+3. Run relevant checks, including tests when observable behavior changes.
 4. Delete the completed plan.
 
 Completed plans are not authoritative documentation. Keep them only when there is a specific historical reason.

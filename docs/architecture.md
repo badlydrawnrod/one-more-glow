@@ -95,20 +95,8 @@ implement that contract independently and must not depend on other renderer
 implementations. Sharing an interface does not imply sharing implementation
 machinery.
 
-## Architectural constraints
-
-1. The graphics contract must remain independent of browser graphics APIs and renderer implementations.
-2. Renderer implementations must not depend on one another.
-3. Application-specific behavior must not enter reusable library packages.
-4. Renderer-specific resources and optimizations belong inside their implementations.
-5. The public API must not expose renderer-specific implementation details beyond deliberate renderer construction APIs.
-6. Apps consume packages through declared dependencies and public exports.
-7. New packages should represent meaningful reusable boundaries, not just shorter source files.
-
 ## Evolution
 
-Keep the repository layout small while the codebase remains small. Add workspace
-packages when a real library or application boundary appears. Avoid creating a
-general-purpose game engine, task orchestrator, or shared package speculatively.
-
-Architectural changes should be deliberate and reflected in this document.
+Keep the repository layout small. Add packages when a real reusable boundary
+appears; do not create a shared package or general-purpose framework
+speculatively. Record deliberate architectural changes here.

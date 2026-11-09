@@ -65,8 +65,6 @@ This section must remain current so another developer or agent can resume withou
 
 ## Completion criteria
 
-- [ ] Intended behaviour is implemented.
-- [ ] Relevant tests pass.
-- [ ] Type checking and build pass.
-- [ ] Durable documentation reflects any lasting decisions.
+- [ ] The agreed scope is complete and lasting decisions are documented.
+- [ ] Relevant checks are run and their results are recorded.
 - [ ] No unresolved work remains within the agreed scope.
