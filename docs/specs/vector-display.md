@@ -139,6 +139,8 @@ The default profile uses a 1.5-pixel line core with rounded ends and circular po
 
 Display effects determine how beam illumination appears on screen. They are conceptually separate from drawing commands and game state.
 
+Ideas for possible CRT-inspired effects are collected separately in [CRT-inspired display effects](crt-inspired-effects.md). Those ideas are proposals for consideration and do not change the decisions in this specification.
+
 #### Global display-profile options
 
 **Status: Accepted**
