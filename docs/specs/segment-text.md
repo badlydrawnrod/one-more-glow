@@ -1,83 +1,132 @@
-# Segment text proposal
+# Segment text specification
 
-**Status: Proposed — not an instruction to implement.**
+**Status: Accepted.** The diagnostic app contains visual experiments; the
+library does not yet provide text helpers. The open details identified below
+remain to be resolved as the design is implemented.
 
-## Intent
+## Purpose and fonts
 
-Provide legible, retro-inspired text for scores, HUDs and other short messages,
-drawn with the same luminous vector treatment as the rest of One More Glow.
-Both 16- and 22-segment character cells are being evaluated. The current
-16-segment diagnostic was well received and should remain available while the
-22-segment study develops. These are visual designs for the imaginary console,
-not attempts to reproduce physical hardware.
+Provide retro-inspired vector text for scores, HUDs and other short messages.
+The intended library API will offer both the 16- and 22-segment designs shown
+in the diagnostic. These are designs for the imaginary console, not attempts
+to emulate display hardware.
 
-## Candidate character cell
+**Agreed initial coverage:** the 22-segment font supports printable ASCII
+(`U+0020`–`U+007E`). The 16-segment font supports uppercase Latin letters,
+digits, space and `. , : ! ? + - /`; ASCII lowercase maps to uppercase. Both
+fonts need a recognisable `?` replacement glyph; the current 16-segment study
+does not yet provide one. Glyph shapes and spacing details remain to be refined.
 
-Use a fixed grid of independently selected straight strokes. A glyph selects
-some strokes from the same grid; it does not draw the unselected strokes. The
-following is a concrete candidate for review, not a final glyph design:
-
-- A rectangular cell has horizontal positions left, centre and right, and
-  vertical positions at the top, three-quarter height, middle, one-quarter
-  height and baseline.
-- At each of the five heights, two horizontal segments join left to centre and
-  centre to right: **10 segments**.
-- Each outer side has an upper and lower vertical segment: **4 segments**.
-- The centre vertical is divided into four segments, one between each
-  neighbouring pair of heights: **4 segments**.
-- Four diagonal segments join each corner to the centre of the cell:
-  **4 segments**.
-
-That is 22 line segments. Intersections do not automatically turn other
-segments on. A glyph design may use continuous adjoining strokes rather than
-visibly separated LED-like bars; evaluate the result with the renderer's glow.
-Punctuation dots, if used, are additional marks and are not included in the
-22-stroke count. Their geometry and placement are open.
-
-The extra subdivisions and crossbars may improve some glyphs, but may also
-make the design busy or expensive to draw. Compare an actual alphabet and
-common HUD strings with a 16-segment alternative before choosing the layout.
-Neither the grid nor the exact segment count is accepted yet.
-
-## Proposed first use
-
-- Draw single-line, left-to-right text in fixed-width cells, using a caller's
-  position and requested character height in logical coordinates. Leave exact
-  proportions, spacing and origin convention for visual review.
-- Start with uppercase Latin letters, digits, space and common HUD punctuation.
-  The 22-segment study also explores lowercase; lowercase coverage, the exact
-  punctuation and unsupported-character behavior remain open. This does not
-  imply general Unicode or localization support.
-- Use a renderer-independent helper that submits existing line and point
-  operations through `DrawingContext`, as the derived-geometry helpers do.
-  No new renderer-specific text primitive or method on `DrawingContext` is
-  proposed.
-- Text inherits current colour, intensity, transforms, drawing order and beam
-  appearance. Scaling text geometry does not scale the screen-space beam
-  profile. Rendering may use normal backend batching.
-
-The public function signature, measurement API, character mappings, handling
-of multiline text and pen position after drawing are not decided. Alignment,
-wrapping and general text layout are also open; a single-line starting point
-does not rule them in or out later.
-
-## Evaluation
-
-Before accepting an API or committing to a glyph set, make a visual study in
-the diagnostics app showing the proposed alphabet, digits and representative
-game HUD strings at several sizes and intensities. Compare 16 and 22 segments
-for readability, character and cost, including crowded intersections and halo
-overlap. Check that text remains legible in landscape and portrait views.
-
-The diagnostic also explores the DL-3422 character set using vector line
-centres adapted from Stewart C. Russell's
+The 22-segment diagnostic adapts Stewart C. Russell's
 [ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based on
-the [Litronix character chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85).
-It includes punctuation dots and descenders and is a separate candidate from
-the grid above; it is not a hardware or ROM emulation. The final layout remains
-open.
+the [Litronix DL-3422 character chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85).
+The source font's licence and attribution must accompany any adaptation used
+in the library; see the diagnostic's
+[licence notice](../../apps/diagnostics/THREEFOURTWOTWO-OFL.txt).
 
-Any eventual implementation should test observable glyph selection, spacing,
-fallback behavior and transformation semantics, rather than relying on exact
-renderer internals. Visual review remains important because legibility and
-appearance are not established by geometry tests alone.
+## Public API
+
+Provide renderer-independent helpers, exported through the public library entry
+point, rather than adding methods to `DrawingContext`:
+
+```ts
+interface TextOptions {
+  font: "segment16" | "segment22";
+  height: number;
+  spacing?: "fixed" | "kerned";
+}
+
+interface TextMetrics {
+  width: number;
+  ascent: number;
+  descent: number;
+}
+
+function drawText(
+  drawing: DrawingContext,
+  text: string,
+  x: number,
+  y: number,
+  options: TextOptions,
+): void;
+
+function measureText(text: string, options: TextOptions): TextMetrics;
+```
+
+Both helpers use the same font, size, character substitution and spacing
+rules. The default is fixed spacing.
+
+**Agreed invalid-input behavior:** a zero, negative or non-finite height makes
+`drawText` a no-op and makes `measureText` return zero for width, ascent and
+descent. A non-finite `x` or `y` makes `drawText` a no-op. These cases do not
+throw; a drawing no-op leaves the pen and drawing state unchanged.
+
+## Layout and metrics
+
+Text is a single line progressing left to right. The supplied `(x, y)` is the
+start of its baseline in local logical coordinates. `height` is uppercase
+height in logical units; lowercase descenders can extend below the baseline.
+
+`measureText` returns these values in local logical units, before any drawing
+transform:
+
+- `width` is the horizontal advance from the start to the position for a next
+  character. It includes spaces and applicable spacing adjustments. It is not
+  necessarily the bounds of the visible strokes.
+- `ascent` and `descent` are non-negative, font-wide distances above and below
+  the baseline. Their sum is the nominal full height, independent of which
+  characters appear in the string and excluding the screen-space beam and halo.
+
+An empty string has zero width; a normal space is a supported blank with
+advance. Trailing spaces contribute to the advance. The diagnostic's current
+22-segment descenders extend 0.35 times the uppercase height below the
+baseline; final font metrics are still to be agreed.
+
+Fixed spacing uses equal character advances. Kerned spacing uses proportional
+advances and pair adjustments. **Agreed:** kerning applies only within a single
+call; no state or pair adjustment carries across separate drawing calls. Text
+split across calls can consequently look slightly different from the same text
+drawn in one call.
+
+**Agreed starting proportions:** for both fonts, use a full-width cell of 0.58
+times uppercase height and a fixed advance of 0.82 times uppercase height. For
+kerned spacing, start with a small gap between characters and font-specific pair
+adjustments. Refine the exact spacing and adjustments through visual review.
+
+## Characters and fallback
+
+**Agreed:** the 16-segment font maps ASCII lowercase to uppercase before checking
+coverage. For either font, each unsupported Unicode code point is replaced by
+one visible `?`, including unsupported controls and line breaks. The helpers
+use code points rather than UTF-16 code units; they do not provide Unicode
+normalisation, grapheme shaping or general text layout. Thus a precomposed
+character and a sequence with a combining mark can produce different results.
+
+Measurement uses the same replacement glyph and advance as drawing. No strict
+mode or configurable replacement is proposed for the initial API.
+
+## Drawing state and pen
+
+Text uses the active colour, intensity, transform and drawing order through
+normal line and point operations. Glyph geometry is transformed like other
+drawing commands; scaling geometry does not scale the screen-space beam
+profile. The helper does not change colour, intensity or the transform stack.
+
+**Agreed:** after drawing, the current pen position is on the baseline at the
+start position plus the measured horizontal advance, transformed by the active
+transform. This is the position for a next character without a cross-call
+kerning adjustment. With valid inputs, an empty string therefore leaves the pen
+at the supplied start position. Callers may use `lineTo` from that position.
+
+## Scope and verification
+
+Wrapping, multiline layout, alignment options, ink bounds and general-purpose
+typography remain open; they are not requirements for this first design. A
+caller can use the measured advance to position a line. Detailed glyph
+definitions and spacing values remain open to refinement.
+
+Verify observable glyph selection, spacing, fallback, metrics, invalid-input
+behavior, pen position and transformation semantics without depending on
+renderer internals. Use the diagnostics for visual review at different sizes,
+intensities and display orientations; geometry tests alone cannot establish
+legibility.

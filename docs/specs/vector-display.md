@@ -211,9 +211,9 @@ The WebGL2 shader combines inner and outer falloff, uses separate line and point
 
 The intended result is a distinctive, consistent vector-display aesthetic, not a general-purpose graphics effects framework.
 
-## Deferred and proposed capabilities
+## Additional capabilities
 
-These capabilities are not part of the current accepted drawing contract. Their inclusion, API shape and detailed behavior remain open unless stated otherwise.
+The status of each capability is recorded below; some details remain open.
 
 ### Derived geometry
 
@@ -257,13 +257,12 @@ Map the selected logical space to the physical canvas with uniform scaling, pres
 
 ### Vector text
 
-**Status: Deferred**
+**Status: Accepted; library implementation pending**
 
-Vector text may be useful, potentially through a small stroke font composed from normal drawing operations and without browser font rendering.
-
-Such text would inherit the same colour, intensity and display characteristics as other vector geometry.
-
-The [segment text proposal](segment-text.md) explores a 22-segment design and a 16-segment alternative. It is not accepted for implementation. Font coverage, alignment and other text behavior are undecided. Text is not part of the current contract.
+The [segment text specification](segment-text.md) defines renderer-independent
+helpers for 16- and 22-segment text. They use normal drawing operations and
+inherit the display characteristics of other vector geometry. Text helpers are
+not yet implemented by the library.
 
 ## Non-goals
 
