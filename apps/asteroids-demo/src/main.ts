@@ -17,7 +17,7 @@ const drawing: DrawingContext = createWebGL2Renderer(gl);
 const cyan: Color = [0.24, 0.91, 1];
 const paleBlue: Color = [0.53, 0.89, 1];
 const amber: Color = [1, 0.63, 0.29];
-const dimBlue: Color = [0.12, 0.4, 0.49];
+const dimBlue: Color = [0.25, 0.68, 0.82];
 const world = { halfWidth: 512, halfHeight: 384 };
 const pressedKeys = new Set<string>();
 type Point = readonly [number, number];
@@ -141,7 +141,7 @@ function drawRockAt(rock: Rock, x: number, y: number): void {
   drawing.translate(x, y);
   drawing.rotate(rock.angle);
   drawing.setColor(dimBlue);
-  drawing.setIntensity(0.8);
+  drawing.setIntensity(0.9);
   drawPolygonOutline(drawing, rock.shape);
   drawing.popTransform();
 }
@@ -184,7 +184,7 @@ function drawShipAt(x: number, y: number, thrusting: boolean, flicker: number): 
 function drawHud(thrusting: boolean, connected: boolean): void {
   const textOptions = { font: "segment16", height: 16, spacing: "kerned" } as const;
   drawing.setColor(dimBlue);
-  drawing.setIntensity(0.9);
+  drawing.setIntensity(1);
   drawText(drawing, "SECTOR 07", -480, 340, textOptions);
   drawText(drawing, `VELOCITY ${Math.round(Math.hypot(ship.velocityX, ship.velocityY)).toString().padStart(3, "0")}`, 235, 340, textOptions);
   drawing.setColor(connected ? paleBlue : dimBlue);

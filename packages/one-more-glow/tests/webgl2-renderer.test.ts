@@ -88,12 +88,20 @@ test("WebGL2 renderer snapshots normalized colour and clamped intensity per comm
   const [x, y] = createViewport(320, 200, 320, 200, "landscape").mapPoint(7, 8);
 
   display.setColor([-1, 0.5, 2]);
-  display.setIntensity(2);
+  display.setIntensity(1.5);
+  display.point(7, 8);
+  display.setIntensity(3);
+  display.point(7, 8);
+  display.setIntensity(-1);
   display.point(7, 8);
   display.endFrame();
 
   const upload = calls.find(([name]) => name === "bufferData")?.[2] as Float32Array;
-  assert.deepEqual([...upload], [...new Float32Array([x, y, x, y, 0, 0.5, 1, 1, 1])]);
+  assert.deepEqual([...upload], [...new Float32Array([
+    x, y, x, y, 0, 0.5, 1, 1.5, 1,
+    x, y, x, y, 0, 0.5, 1, 2, 1,
+    x, y, x, y, 0, 0.5, 1, 0, 1,
+  ])]);
 });
 
 test("WebGL2 transforms geometry in local space and restores the parent transform", () => {
@@ -172,5 +180,6 @@ test("WebGL2 shader includes a bounded halo around the beam core", () => {
   assert.ok(fragment?.includes("mix(0.35, 1.0, smoothstep("));
   assert.ok(fragment?.includes("const float LINE_END_FADE_START_PIXELS = -4.0"));
   assert.ok(fragment?.includes("const float LINE_END_FADE_END_PIXELS = 10.0"));
-  assert.ok(fragment?.includes("mix(beamColor, vec3(1.0), 0.2 + 0.65 * beamIntensity)"));
+  assert.ok(fragment?.includes("float normalIntensity = min(beamIntensity, 1.0)"));
+  assert.ok(fragment?.includes("0.85 * smoothstep(1.0, 2.0, beamIntensity)"));
 });

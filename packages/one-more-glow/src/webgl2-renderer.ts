@@ -107,14 +107,14 @@ void main() {
       endDistance));
   }
 
-  // Intensity controls emitted brightness. The core moves toward white while
-  // the halo keeps the command colour; alpha compositing remains the backend's
-  // current presentation technique.
-  float baseAlpha = beamIntensity
+  // Normal intensity controls brightness; overdrive whitens only the core.
+  float normalIntensity = min(beamIntensity, 1.0);
+  float baseAlpha = normalIntensity
     * (coreCoverage + halo * (1.0 - coreCoverage));
-  float coreAlpha = beamIntensity * coreCoverage;
+  float coreAlpha = normalIntensity * coreCoverage;
   float alpha = coreAlpha + baseAlpha * (1.0 - coreAlpha);
-  vec3 coreColor = mix(beamColor, vec3(1.0), 0.2 + 0.65 * beamIntensity);
+  float whitening = 0.85 * smoothstep(1.0, 2.0, beamIntensity);
+  vec3 coreColor = mix(beamColor, vec3(1.0), whitening);
   vec3 premultiplied = coreColor * coreAlpha
     + beamColor * baseAlpha * (1.0 - coreAlpha);
   outputColor = vec4(premultiplied / max(alpha, 0.0001), alpha);
@@ -272,7 +272,7 @@ export function createWebGL2Renderer(
       ];
     },
     setIntensity(value) {
-      intensity = Math.max(0, Math.min(1, value));
+      intensity = Math.max(0, Math.min(2, value));
     },
     pushTransform() {
       transforms.push();

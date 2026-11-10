@@ -6,6 +6,7 @@ import {
   drawEllipseArc,
   drawPolygonOutline,
   drawPolyline,
+  drawText,
   type Color,
   type DisplayOrientation,
   type DrawingContext,
@@ -79,6 +80,9 @@ function point(x: number, y: number): void {
 
 function drawTestCard(): void {
   renderer.beginFrame();
+  renderer.pushTransform();
+  renderer.translate(...project(0, 115));
+  renderer.scale(0.65, 0.65);
 
   // A dim frame gives the samples a shared boundary without competing with them.
   renderer.setColor(cyan);
@@ -165,6 +169,27 @@ function drawTestCard(): void {
       [210 + inset, -310 + inset],
     ].map(([x, y]) => project(x, y)));
   }
+
+  renderer.popTransform();
+
+  // Keep geometry and colours constant to make the overdrive response visible.
+  const intensities = [0.5, 1, 1.25, 1.5, 2];
+  intensities.forEach((intensity, index) => {
+    const x = -440 + index * 180;
+    renderer.setColor([0.75, 0.8, 0.85]);
+    renderer.setIntensity(0.8);
+    const [labelX, labelY] = project(x, -150);
+    drawText(renderer, intensity.toFixed(intensity === 1.25 ? 2 : 1), labelX, labelY, {
+      font: "segment16", height: 20,
+    });
+    for (const [color, y] of [[cyan, -190], [magenta, -260]] as const) {
+      renderer.setColor(color);
+      renderer.setIntensity(intensity);
+      move(x, y);
+      line(x + 100, y);
+      point(x + 130, y);
+    }
+  });
 
   renderer.endFrame();
 }
@@ -327,7 +352,7 @@ function closeMenu(): void {
   menuToggle.focus();
 }
 
-menuToggle.addEventListener("click", () => setMenuOpen(menu.hidden));
+menuToggle.addEventListener("click", () => setMenuOpen(menu.hasAttribute("hidden")));
 menu.addEventListener("click", (event: MouseEvent) => {
   const target = event.target;
   if (!(target instanceof HTMLButtonElement)) return;

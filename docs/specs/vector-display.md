@@ -42,7 +42,7 @@ The accepted fundamental operations are:
 | `lineTo(x, y)` | Draw from the current position and advance it |
 | `point(x, y)` | Draw a point without changing the current position |
 
-`Color` is RGB with each component in the range 0–1. Intensity is also in the range 0–1. Values outside those ranges are clamped.
+`Color` is RGB with each component in the range 0–1. Intensity is in the range 0–2, including the overdrive range described below. Values outside those ranges are clamped.
 
 Colour and intensity are separate drawing state. Colour selects chromatic properties, while intensity controls relative brightness.
 
@@ -90,16 +90,16 @@ These characteristics establish the intended aesthetic. They do not require ever
 
 ### Beam characteristics
 
-**Status: Colour, intensity, beam width, bright core and halo accepted and implemented; global display-profile configuration accepted, API pending; light accumulation deferred**
+**Status: Colour, intensity, overdrive, beam width, bright core and halo accepted and implemented; global display-profile configuration accepted, API pending; light accumulation deferred**
 
 A beam is the conceptual source of illumination for vector geometry.
 
 | Characteristic | Intended behaviour | Status |
 |---|---|---|
 | Colour | Illuminate geometry using its specified RGB colour. | Implemented |
-| Intensity | Control relative illumination independently of colour. | Implemented |
+| Intensity | Control relative illumination independently of colour, with overdrive above 1. | Implemented |
 | Beam width | Control the apparent thickness of the luminous core. | Accepted and implemented |
-| Bright core | Give lines and points a sharply defined, bright centre that moves toward white as intensity rises. | Accepted and implemented |
+| Bright core | Give lines and points a sharply defined centre that retains the selected colour at normal intensity and moves toward white in overdrive. | Accepted and implemented |
 | Halo / bloom | Produce a broad, soft coloured glow surrounding illuminated geometry. | Accepted and implemented |
 | Light accumulation | Allow overlapping illumination to appear brighter, subject to defined compositing semantics. | Deferred |
 
@@ -109,7 +109,17 @@ Colour and intensity belong to drawing descriptions. Beam width and display effe
 
 A bright core and its surrounding halo are aspects of the same illuminated geometry. Consumers should not need to submit additional decorative geometry to reproduce these effects.
 
-The bright core and halo are one presentation treatment. Higher intensity moves the core toward white while preserving the selected colour in the surrounding halo. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The current renderer uses a fixed internal profile rather than public controls. Its dimensions and falloff values are adjustable later if visual feedback warrants it; they are starting settings, not permanent limits.
+The bright core and halo are one presentation treatment. The core retains the selected colour through normal intensity and moves toward white in overdrive; the surrounding halo retains the selected colour. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The current renderer uses a fixed internal profile rather than public controls. Its dimensions and falloff values are adjustable later if visual feedback warrants it; they are starting settings, not permanent limits.
+
+### Intensity and overdrive
+
+**Status: Accepted; implemented in WebGL2**
+
+- Intensity 0 produces no visible illumination. From 0 to 1, increasing intensity increases relative illumination while the core retains the submitted colour. Intensity 1 is full normal intensity.
+- Intensities above 1 and up to 2 are overdrive. The core shifts smoothly from the submitted colour toward white, with no abrupt change at 1. As an initial profile, use a smooth transition reaching an 85% mix with white at intensity 2. The exact response is subject to visual evaluation.
+- The halo retains the submitted colour. Its strength and extent reach their normal maximum at intensity 1 and do not increase in overdrive in the initial profile.
+- Apply the response to both lines and points. Overdrive does not change their geometric core dimensions.
+- Overdrive specifies a display appearance; it does not define additive light accumulation or require a particular blending technique. Renderers must handle the expanded intensity range without passing out-of-range opacity to their compositing operations.
 
 ### Baseline beam
 

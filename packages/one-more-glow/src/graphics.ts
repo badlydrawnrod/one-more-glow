@@ -14,6 +14,7 @@ export interface DrawingContext {
   beginFrame(): void;
   endFrame(): void;
   setColor(color: Color): void;
+  /** Beam intensity from 0 to 2; values above 1 engage overdrive. */
   setIntensity(value: number): void;
   pushTransform(): void;
   popTransform(): void;

@@ -7,7 +7,8 @@ orientation. The animation toggle appears for the game scene only.
 
 URL query parameters are also available for opening a specific view directly:
 
-- `?scene=testcard` shows geometry, transform and intensity samples.
+- `?scene=testcard` shows geometry, transform and intensity samples, including
+  a labelled comparison of normal intensity and overdrive.
 - `?scene=segments` compares the 16-segment design with the complete printable
   22-segment reference character set.
 - `?scene=spacing` compares HUD text in both fonts with fixed and kerned spacing.

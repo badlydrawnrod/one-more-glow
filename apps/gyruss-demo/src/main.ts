@@ -22,9 +22,9 @@ const cyan: Color = [0.3, 0.91, 1];
 const paleBlue: Color = [0.62, 0.83, 1];
 const pink: Color = [1, 0.34, 0.76];
 const amber: Color = [1, 0.68, 0.3];
-const tunnelBlue: Color = [0, 0, 1];
-const dimTunnelBlue: Color = [0, 0, 0.72];
-const outerRailBlue: Color = [0, 0, 0.9];
+const tunnelBlue: Color = [0.08, 0.35, 1];
+const dimTunnelBlue: Color = [0.08, 0.24, 0.8];
+const outerRailBlue: Color = [0.12, 0.42, 1];
 const world = { halfWidth: 512, halfHeight: 384 };
 const orbitRadius = 330;
 const tau = Math.PI * 2;
@@ -141,7 +141,7 @@ const tunnelRings = Array.from({ length: ringCount }, (_, index) => {
   const firstRingRadius = 48;
   const lastRingRadius = orbitRadius * 0.9;
   const radius = firstRingRadius + (lastRingRadius - firstRingRadius) * depth * depth;
-  return { points: circlePoints(radius), intensity: 0.14 + depth * 0.06 };
+  return { points: circlePoints(radius), intensity: 0.25 + depth * 0.1 };
 });
 const innerOrbitRing = circlePoints(orbitRadius - 10);
 const outerOrbitRing = circlePoints(orbitRadius);
@@ -157,7 +157,7 @@ function drawTunnel(time: number): void {
   }
 
   drawing.setColor(dimTunnelBlue);
-  drawing.setIntensity(0.32);
+  drawing.setIntensity(0.4);
   for (const spoke of tunnelSpokes) {
     drawing.moveTo(...spoke.inner);
     drawing.lineTo(...spoke.outer);
@@ -169,10 +169,10 @@ function drawTunnel(time: number): void {
     drawPolygonOutline(drawing, ring.points);
   }
   drawing.setColor(tunnelBlue);
-  drawing.setIntensity(0.28);
+  drawing.setIntensity(0.38);
   drawPolygonOutline(drawing, innerOrbitRing);
   drawing.setColor(outerRailBlue);
-  drawing.setIntensity(0.4);
+  drawing.setIntensity(0.5);
   drawPolygonOutline(drawing, outerOrbitRing);
   drawing.setColor(amber);
   drawing.setIntensity(0.34 + Math.sin(time * 0.002) * 0.1);
@@ -256,7 +256,7 @@ function drawHud(input: Input): void {
   drawing.setIntensity(0.88);
   drawText(drawing, `SCORE ${game.score.toString().padStart(6, "0")}`, -480, 340, options);
   drawText(drawing, `WAVE ${game.waveNumber.toString().padStart(2, "0")}`, 370, 340, options);
-  drawing.setColor(input.connected ? cyan : dimTunnelBlue);
+  drawing.setColor(input.connected ? cyan : paleBlue);
   drawText(drawing, input.connected ? "CONTROLLER CONNECTED" : "KEYBOARD READY", -480, 315, options);
   drawing.setColor(amber);
   drawText(drawing, `SHIPS ${game.lives.toString().padStart(2, "0")}`, -480, -340, options);
