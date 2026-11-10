@@ -34,4 +34,24 @@ renderer and evaluating display characteristics. It currently uses WebGL2.
   window while preserving the selected aspect ratio, uses the device pixel
   ratio for its backing resolution, and updates on window resize.
 - The diagnostic views are static; the animation option only affects the game-like
-  scene. There are no in-page controls: view options are selected in the URL.
+  scene. The in-page menu is the primary way to change views; URL parameters
+  remain available for opening a specific view directly.
+
+## Accepted: in-page controls
+
+The diagnostics app provides a small overlay menu so visitors can change views
+without editing the URL.
+
+- The menu starts closed so the selected diagnostic view remains unobstructed.
+- A persistent menu button over the canvas opens and closes the menu.
+- The menu lets the visitor choose the game scene, test card, segment study or
+  spacing study, and choose landscape or portrait orientation.
+- The menu offers an animation toggle only while the game scene is selected.
+  Animation stops when another scene is selected.
+- Choosing an option updates the displayed view immediately, without a page
+  reload. The menu closes after a scene or orientation is chosen; changing the
+  animation toggle leaves it open.
+- The controls use standard accessible HTML buttons and expose their selected
+  state to assistive technology.
+- Closing the menu leaves the menu button available to reopen it.
+- Pressing Escape closes the menu and returns focus to the menu button.

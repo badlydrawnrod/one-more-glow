@@ -1,9 +1,11 @@
 # Rendering diagnostics
 
 From the repository root, run `npm run dev` and open the local address printed
-by Vite. The default is a static game-like scene in landscape orientation.
+by Vite. The default is a static game-like scene in landscape orientation. Use
+the menu button in the upper-left corner of the display to select a scene or
+orientation. The animation toggle appears for the game scene only.
 
-Use URL query parameters to change the view:
+URL query parameters are also available for opening a specific view directly:
 
 - `?scene=testcard` shows geometry, transform and intensity samples.
 - `?scene=segments` compares the 16-segment design with the complete printable

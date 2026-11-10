@@ -12,26 +12,32 @@ import {
 } from "one-more-glow";
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 
-const canvas = document.querySelector<HTMLCanvasElement>("#screen");
-if (!canvas) throw new Error("Missing #screen canvas");
-const screen: HTMLCanvasElement = canvas;
+let screen = requireElement(document.querySelector<HTMLCanvasElement>("#screen"), "#screen");
+const menuToggle = requireElement(document.querySelector<HTMLButtonElement>("#menu-toggle"), "#menu-toggle");
+const menu = requireElement(document.querySelector<HTMLElement>("#display-menu"), "#display-menu");
+const animationControl = requireElement(document.querySelector<HTMLElement>("#animation-control"), "#animation-control");
+const animationToggle = requireElement(document.querySelector<HTMLInputElement>("#animation-toggle"), "#animation-toggle");
 
 const params = new URLSearchParams(location.search);
-const orientation: DisplayOrientation = params.get("orientation") === "portrait"
+let orientation: DisplayOrientation = params.get("orientation") === "portrait"
   ? "portrait"
   : "landscape";
-const aspectRatio = orientation === "landscape" ? 4 / 3 : 3 / 4;
-const renderOptions = { orientation };
 const requestedScene = params.get("scene");
-const scene = requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing"
+let scene = requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing"
   ? requestedScene
   : "game";
-const animate = params.get("animate") === "1" && scene === "game";
+let animate = params.get("animate") === "1" && scene === "game";
+let renderer: DrawingContext;
+
+function aspectRatio(): number {
+  return orientation === "landscape" ? 4 / 3 : 3 / 4;
+}
 
 function resizeCanvas(): void {
-  const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * aspectRatio);
+  const ratio = aspectRatio();
+  const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * ratio);
   const cssWidth = Math.max(1, Math.min(800, maxWidth));
-  const cssHeight = cssWidth / aspectRatio;
+  const cssHeight = cssWidth / ratio;
   const pixelRatio = window.devicePixelRatio || 1;
 
   screen.style.width = `${cssWidth}px`;
@@ -40,12 +46,15 @@ function resizeCanvas(): void {
   screen.height = Math.round(cssHeight * pixelRatio);
 }
 
-resizeCanvas();
+function createRenderer(canvas: HTMLCanvasElement): DrawingContext {
+  return createWebGL2Renderer(
+    requireContext(canvas.getContext("webgl2", { alpha: true }), "WebGL2"),
+    { orientation },
+  );
+}
 
-const renderer: DrawingContext = createWebGL2Renderer(
-  requireContext(screen.getContext("webgl2", { alpha: true }), "WebGL2"),
-  renderOptions,
-);
+resizeCanvas();
+renderer = createRenderer(screen);
 
 const cyan: Color = [0, 0.9, 1];
 const amber: Color = [1, 0.55, 0.12];
@@ -273,21 +282,111 @@ function drawDiagnostic(): void {
   else drawGameScene();
 }
 
-function animateGame(time: number): void {
-  if (!animate) return;
-  drawGameScene((time * 0.03) % 360);
-  requestAnimationFrame(animateGame);
+let animationFrame: number | undefined;
+
+function stopAnimation(): void {
+  if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
+  animationFrame = undefined;
 }
+
+function animateGame(time: number): void {
+  if (!animate || scene !== "game") return;
+  drawGameScene((time * 0.03) % 360);
+  animationFrame = requestAnimationFrame(animateGame);
+}
+
+function renderCurrentScene(): void {
+  stopAnimation();
+  if (animate && scene === "game") {
+    animationFrame = requestAnimationFrame(animateGame);
+  } else {
+    drawDiagnostic();
+  }
+}
+
+function syncControls(): void {
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-scene]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.scene === scene));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orientation]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.orientation === orientation));
+  }
+  animationControl.hidden = scene !== "game";
+  animationToggle.checked = animate;
+}
+
+function setMenuOpen(open: boolean): void {
+  menu.hidden = !open;
+  menuToggle.setAttribute("aria-expanded", String(open));
+  const label = menuToggle.querySelector<HTMLElement>(".visually-hidden");
+  if (label) label.textContent = open ? "Close display menu" : "Open display menu";
+}
+
+function closeMenu(): void {
+  setMenuOpen(false);
+  menuToggle.focus();
+}
+
+menuToggle.addEventListener("click", () => setMenuOpen(menu.hidden));
+menu.addEventListener("click", (event: MouseEvent) => {
+  const target = event.target;
+  if (!(target instanceof HTMLButtonElement)) return;
+
+  const selectedScene = target.dataset.scene;
+  if (selectedScene === "game" || selectedScene === "testcard" || selectedScene === "segments" || selectedScene === "spacing") {
+    scene = selectedScene;
+    if (scene !== "game") animate = false;
+    syncControls();
+    renderCurrentScene();
+    closeMenu();
+    return;
+  }
+
+  const selectedOrientation = target.dataset.orientation;
+  if (selectedOrientation === "landscape" || selectedOrientation === "portrait") {
+    if (orientation !== selectedOrientation) {
+      orientation = selectedOrientation;
+      stopAnimation();
+      const replacement = document.createElement("canvas");
+      replacement.id = "screen";
+      replacement.setAttribute("aria-label", "Rendering diagnostic display");
+      screen.replaceWith(replacement);
+      screen = replacement;
+      resizeCanvas();
+      renderer = createRenderer(screen);
+      renderCurrentScene();
+    }
+    syncControls();
+    closeMenu();
+  }
+});
+
+animationToggle.addEventListener("change", () => {
+  animate = animationToggle.checked && scene === "game";
+  syncControls();
+  renderCurrentScene();
+});
+
+window.addEventListener("keydown", (event: KeyboardEvent) => {
+  if (event.key === "Escape" && !menu.hidden) {
+    closeMenu();
+  }
+});
 
 window.addEventListener("resize", () => {
   resizeCanvas();
   if (!animate) drawDiagnostic();
 });
 
-if (animate) requestAnimationFrame(animateGame);
-else drawDiagnostic();
+syncControls();
+renderCurrentScene();
 
 function requireContext<T>(context: T | null, name: string): T {
   if (!context) throw new Error(`${name} is unavailable`);
   return context;
+}
+
+function requireElement<T extends Element>(element: T | null, name: string): T {
+  if (!element) throw new Error(`Missing ${name}`);
+  return element;
 }
