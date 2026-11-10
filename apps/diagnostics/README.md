@@ -6,9 +6,14 @@ by Vite. The default is a static game-like scene in landscape orientation.
 Use URL query parameters to change the view:
 
 - `?scene=testcard` shows geometry, transform and intensity samples.
+- `?scene=segments` compares the 16-segment design with the complete printable
+  22-segment reference character set.
 - `?orientation=portrait` selects portrait orientation.
 - `?animate=1` rotates the craft in the game-like scene; it has no effect on
-  the test card.
+  the static diagnostic views.
 
 Parameters can be combined, for example `?scene=testcard&orientation=portrait`.
 See [SPEC.md](SPEC.md) for the current diagnostic behavior.
+
+The 22-segment study adapts Stewart C. Russell's ThreeFourTwoTwo font to vector
+strokes. See [THREEFOURTWOTWO-OFL.txt](THREEFOURTWOTWO-OFL.txt) for its licence.

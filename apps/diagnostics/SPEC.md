@@ -17,8 +17,20 @@ renderer and evaluating display characteristics. It currently uses WebGL2.
   a central line, triangle and point, transformed craft, line and point
   samples, circles, ellipses, arcs and nested rectangles. These examples make
   geometry, transformations, intensity and halo appearance easier to inspect.
+- An experimental segment-text view compares the 16-segment alphabet, digits
+  and HUD sample with the 22-segment printable character set, a HUD sample and
+  a kerned mixed-case sentence. Its
+  glyphs are a visual study, not an accepted library text API or font.
+  The 16-segment candidate joins its top and bottom halves and adds two
+  diagonals for V. The 22-segment study adapts Stewart C. Russell's
+  [ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based
+  on the [Litronix DL-3422 chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85),
+  into vector line centres. The adaptation retains the source font's licence;
+  see [THREEFOURTWOTWO-OFL.txt](THREEFOURTWOTWO-OFL.txt).
+- The 22-segment interpretation includes dots and strokes below the baseline
+  for descenders. It is not a hardware or ROM emulation.
 - Both views support landscape and portrait orientations. The canvas fits the
   window while preserving the selected aspect ratio, uses the device pixel
   ratio for its backing resolution, and updates on window resize.
-- The test card is static; the animation option only affects the game-like
+- The diagnostic views are static; the animation option only affects the game-like
   scene. There are no in-page controls: view options are selected in the URL.

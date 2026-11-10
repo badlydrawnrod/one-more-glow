@@ -263,7 +263,7 @@ Vector text may be useful, potentially through a small stroke font composed from
 
 Such text would inherit the same colour, intensity and display characteristics as other vector geometry.
 
-Font coverage, alignment and other text behavior are undecided. Text is not part of the current contract.
+The [segment text proposal](segment-text.md) explores a 22-segment design and a 16-segment alternative. It is not accepted for implementation. Font coverage, alignment and other text behavior are undecided. Text is not part of the current contract.
 
 ## Non-goals
 
