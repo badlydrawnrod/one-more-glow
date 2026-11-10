@@ -56,3 +56,22 @@ Run these from the repository root:
 Each workspace has its own manifest and configuration. The root is private;
 the library package is the independent package boundary. Library builds emit
 JavaScript and TypeScript declarations into its ignored `dist/` directory.
+
+## Segment text
+
+Use the renderer-independent text helpers with an existing drawing context:
+
+```ts
+import { drawText, measureText } from "one-more-glow";
+
+const options = { font: "segment22", height: 24, spacing: "kerned" } as const;
+const metrics = measureText("Player 1", options);
+drawText(drawing, "Player 1", 0, 0, options);
+```
+
+The position is the start of the baseline in logical coordinates. `height` is
+uppercase height; `metrics.ascent + metrics.descent` gives the full nominal
+font height. `metrics.width` is the advance to the next character, including
+trailing spaces. Choose `segment16` for the uppercase design; ASCII lowercase
+is converted automatically. Fixed spacing is the default. See the
+[segment text specification](docs/specs/segment-text.md) for coverage and behavior.

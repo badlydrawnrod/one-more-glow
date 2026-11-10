@@ -59,6 +59,13 @@ Maps accepted logical display coordinates to output coordinates and derives
 the backing-store scale for CSS-pixel beam dimensions. It is renderer
 independent and must not use browser graphics APIs.
 
+### Segment text
+
+`packages/one-more-glow/src/segment-text.ts`
+
+Provides text layout, measurement and drawing helpers using the shared drawing
+contract. Font data and layout do not depend on a renderer or application.
+
 ### WebGL2 renderer
 
 `packages/one-more-glow/src/webgl2-renderer.ts`

@@ -257,12 +257,11 @@ Map the selected logical space to the physical canvas with uniform scaling, pres
 
 ### Vector text
 
-**Status: Accepted; library implementation pending**
+**Status: Accepted and implemented**
 
 The [segment text specification](segment-text.md) defines renderer-independent
 helpers for 16- and 22-segment text. They use normal drawing operations and
-inherit the display characteristics of other vector geometry. Text helpers are
-not yet implemented by the library.
+inherit the display characteristics of other vector geometry.
 
 ## Non-goals
 

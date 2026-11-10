@@ -15,5 +15,5 @@ Use URL query parameters to change the view:
 Parameters can be combined, for example `?scene=testcard&orientation=portrait`.
 See [SPEC.md](SPEC.md) for the current diagnostic behavior.
 
-The 22-segment study adapts Stewart C. Russell's ThreeFourTwoTwo font to vector
-strokes. See [THREEFOURTWOTWO-OFL.txt](THREEFOURTWOTWO-OFL.txt) for its licence.
+The library’s 22-segment font adapts Stewart C. Russell’s ThreeFourTwoTwo font
+to vector strokes. See its [licence notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).

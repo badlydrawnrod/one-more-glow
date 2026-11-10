@@ -1,28 +1,27 @@
 # Segment text specification
 
-**Status: Accepted.** The diagnostic app contains visual experiments; the
-library does not yet provide text helpers. The open details identified below
-remain to be resolved as the design is implemented.
+**Status: Accepted and implemented.** Glyphs and spacing can be refined through
+visual review.
 
 ## Purpose and fonts
 
 Provide retro-inspired vector text for scores, HUDs and other short messages.
-The intended library API will offer both the 16- and 22-segment designs shown
+The library API offers both the 16- and 22-segment designs shown
 in the diagnostic. These are designs for the imaginary console, not attempts
 to emulate display hardware.
 
 **Agreed initial coverage:** the 22-segment font supports printable ASCII
 (`U+0020`–`U+007E`). The 16-segment font supports uppercase Latin letters,
 digits, space and `. , : ! ? + - /`; ASCII lowercase maps to uppercase. Both
-fonts need a recognisable `?` replacement glyph; the current 16-segment study
-does not yet provide one. Glyph shapes and spacing details remain to be refined.
+fonts provide a recognisable `?` replacement glyph. Glyph shapes and spacing
+can be refined through visual review.
 
 The 22-segment diagnostic adapts Stewart C. Russell's
 [ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based on
 the [Litronix DL-3422 character chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85).
 The source font's licence and attribution must accompany any adaptation used
-in the library; see the diagnostic's
-[licence notice](../../apps/diagnostics/THREEFOURTWOTWO-OFL.txt).
+in the library; see the library's
+[licence notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
 
 ## Public API
 
@@ -78,9 +77,9 @@ transform:
   characters appear in the string and excluding the screen-space beam and halo.
 
 An empty string has zero width; a normal space is a supported blank with
-advance. Trailing spaces contribute to the advance. The diagnostic's current
-22-segment descenders extend 0.35 times the uppercase height below the
-baseline; final font metrics are still to be agreed.
+advance. Trailing spaces contribute to the advance. The 16-segment descent is
+0.25 times uppercase height, accounting for the comma; the 22-segment descent
+is 0.35 times uppercase height.
 
 Fixed spacing uses equal character advances. Kerned spacing uses proportional
 advances and pair adjustments. **Agreed:** kerning applies only within a single
@@ -89,9 +88,9 @@ split across calls can consequently look slightly different from the same text
 drawn in one call.
 
 **Agreed starting proportions:** for both fonts, use a full-width cell of 0.58
-times uppercase height and a fixed advance of 0.82 times uppercase height. For
-kerned spacing, start with a small gap between characters and font-specific pair
-adjustments. Refine the exact spacing and adjustments through visual review.
+times uppercase height and a fixed advance of 0.82 times uppercase height.
+Kerned spacing uses a gap of 0.16 times height, a space advance of 0.32 times
+height and font-specific pair adjustments. Refine these values through visual review.
 
 ## Characters and fallback
 
