@@ -1,5 +1,6 @@
 import {
   createWebGL2Renderer,
+  DEFAULT_DISPLAY_PROFILE,
   drawArc,
   drawCircle,
   drawEllipse,
@@ -9,7 +10,8 @@ import {
   drawText,
   type Color,
   type DisplayOrientation,
-  type DrawingContext,
+  type DisplayProfile,
+  type DisplayRenderer,
 } from "one-more-glow";
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 
@@ -18,17 +20,20 @@ const menuToggle = requireElement(document.querySelector<HTMLButtonElement>("#me
 const menu = requireElement(document.querySelector<HTMLElement>("#display-menu"), "#display-menu");
 const animationControl = requireElement(document.querySelector<HTMLElement>("#animation-control"), "#animation-control");
 const animationToggle = requireElement(document.querySelector<HTMLInputElement>("#animation-toggle"), "#animation-toggle");
+const profileControls = requireElement(document.querySelector<HTMLElement>("#profile-controls"), "#profile-controls");
+const profileReset = requireElement(document.querySelector<HTMLButtonElement>("#profile-reset"), "#profile-reset");
+let profile: DisplayProfile = { ...DEFAULT_DISPLAY_PROFILE };
 
 const params = new URLSearchParams(location.search);
 let orientation: DisplayOrientation = params.get("orientation") === "portrait"
   ? "portrait"
   : "landscape";
 const requestedScene = params.get("scene");
-let scene = requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing"
+let scene = requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing" || requestedScene === "profile"
   ? requestedScene
   : "game";
 let animate = params.get("animate") === "1" && scene === "game";
-let renderer: DrawingContext;
+let renderer: DisplayRenderer;
 
 function aspectRatio(): number {
   return orientation === "landscape" ? 4 / 3 : 3 / 4;
@@ -47,10 +52,10 @@ function resizeCanvas(): void {
   screen.height = Math.round(cssHeight * pixelRatio);
 }
 
-function createRenderer(canvas: HTMLCanvasElement): DrawingContext {
+function createRenderer(canvas: HTMLCanvasElement): DisplayRenderer {
   return createWebGL2Renderer(
     requireContext(canvas.getContext("webgl2", { alpha: true }), "WebGL2"),
-    { orientation },
+    { orientation, profile },
   );
 }
 
@@ -304,7 +309,65 @@ function drawDiagnostic(): void {
   if (scene === "testcard") drawTestCard();
   else if (scene === "segments") drawSegmentStudy(renderer, orientation === "portrait");
   else if (scene === "spacing") drawSpacingStudy(renderer, orientation === "portrait");
+  else if (scene === "profile") drawProfileStudy();
   else drawGameScene();
+}
+
+function drawProfileStudy(): void {
+  const width = orientation === "portrait" ? 768 : 1024;
+  const height = orientation === "portrait" ? 1024 : 768;
+  const x = -width * 0.35;
+  const right = width * 0.35;
+  const textHeight = width * 0.024;
+  const rows = [
+    { label: "BEAM WIDTH", key: "lineWidth", min: 0.5, max: 4, y: 0.25 },
+    { label: "POINT RADIUS", key: "pointRadius", min: 0.5, max: 4, y: 0.38 },
+    { label: "GLOW STRENGTH", key: "glowStrength", min: 0, max: 2, y: 0.51 },
+    { label: "GLOW SPREAD", key: "glowSpread", min: 0.5, max: 2, y: 0.64 },
+  ] as const;
+  const atY = (fraction: number): number => (0.5 - fraction) * height;
+
+  renderer.beginFrame();
+  renderer.setColor(cyan);
+  renderer.setIntensity(1);
+  drawText(renderer, "DISPLAY PROFILE", x, atY(0.12), { font: "segment16", height: textHeight * 1.25 });
+  for (const row of rows) {
+    const y = atY(row.y);
+    renderer.setColor(amber);
+    renderer.setIntensity(1);
+    drawText(renderer, `${row.label} ${profile[row.key].toFixed(1)}`, x, atY(row.y - 0.045), { font: "segment16", height: textHeight });
+    renderer.setColor(cyan);
+    renderer.setIntensity(0.7);
+    renderer.moveTo(x, y);
+    renderer.lineTo(right, y);
+    const knob = x + (right - x) * (profile[row.key] - row.min) / (row.max - row.min);
+    renderer.setIntensity(1.5);
+    renderer.moveTo(knob, y - textHeight * 0.45);
+    renderer.lineTo(knob, y + textHeight * 0.45);
+  }
+  renderer.setColor(amber);
+  renderer.setIntensity(1);
+  drawText(renderer, "RESET", x, atY(0.76), { font: "segment16", height: textHeight });
+  [1, 1.5, 2].forEach((intensity, index) => {
+    const sampleX = x + index * width * 0.23;
+    renderer.setColor(amber);
+    renderer.setIntensity(1);
+    drawText(renderer, intensity.toFixed(1), sampleX, atY(0.81), { font: "segment16", height: textHeight });
+    renderer.setColor(cyan);
+    renderer.setIntensity(intensity);
+    renderer.moveTo(sampleX, atY(0.85));
+    renderer.lineTo(sampleX + width * 0.12, atY(0.85));
+    renderer.moveTo(sampleX + width * 0.04, atY(0.84));
+    renderer.lineTo(sampleX + width * 0.08, atY(0.86));
+    renderer.point(sampleX + width * 0.16, atY(0.85));
+    renderer.setColor(magenta);
+    renderer.moveTo(sampleX, atY(0.93));
+    renderer.lineTo(sampleX + width * 0.12, atY(0.93));
+    renderer.moveTo(sampleX + width * 0.04, atY(0.92));
+    renderer.lineTo(sampleX + width * 0.08, atY(0.94));
+    renderer.point(sampleX + width * 0.16, atY(0.93));
+  });
+  renderer.endFrame();
 }
 
 let animationFrame: number | undefined;
@@ -338,6 +401,13 @@ function syncControls(): void {
   }
   animationControl.hidden = scene !== "game";
   animationToggle.checked = animate;
+  profileControls.hidden = scene !== "profile";
+  for (const input of profileControls.querySelectorAll<HTMLInputElement>("input[data-profile]")) {
+    const key = input.dataset.profile;
+    if (key === "lineWidth" || key === "pointRadius" || key === "glowStrength" || key === "glowSpread") {
+      input.value = String(profile[key]);
+    }
+  }
 }
 
 function setMenuOpen(open: boolean): void {
@@ -358,7 +428,7 @@ menu.addEventListener("click", (event: MouseEvent) => {
   if (!(target instanceof HTMLButtonElement)) return;
 
   const selectedScene = target.dataset.scene;
-  if (selectedScene === "game" || selectedScene === "testcard" || selectedScene === "segments" || selectedScene === "spacing") {
+  if (selectedScene === "game" || selectedScene === "testcard" || selectedScene === "segments" || selectedScene === "spacing" || selectedScene === "profile") {
     scene = selectedScene;
     if (scene !== "game") animate = false;
     syncControls();
@@ -388,6 +458,23 @@ menu.addEventListener("click", (event: MouseEvent) => {
 
 animationToggle.addEventListener("change", () => {
   animate = animationToggle.checked && scene === "game";
+  syncControls();
+  renderCurrentScene();
+});
+
+profileControls.addEventListener("input", (event: Event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  const key = target.dataset.profile;
+  if (key !== "lineWidth" && key !== "pointRadius" && key !== "glowStrength" && key !== "glowSpread") return;
+  profile = { ...profile, [key]: Number(target.value) };
+  renderer.setDisplayProfile(profile);
+  renderCurrentScene();
+});
+
+profileReset.addEventListener("click", () => {
+  profile = { ...DEFAULT_DISPLAY_PROFILE };
+  renderer.setDisplayProfile(profile);
   syncControls();
   renderCurrentScene();
 });

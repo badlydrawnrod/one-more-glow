@@ -4,9 +4,30 @@ export type Color = readonly [red: number, green: number, blue: number];
 /** Physical orientation of the imaginary console display. */
 export type DisplayOrientation = "landscape" | "portrait";
 
+/** Global presentation settings, with dimensions measured in CSS pixels. */
+export interface DisplayProfile {
+  lineWidth: number;
+  pointRadius: number;
+  glowStrength: number;
+  glowSpread: number;
+}
+
+export const DEFAULT_DISPLAY_PROFILE: Readonly<DisplayProfile> = Object.freeze({
+  lineWidth: 1.5,
+  pointRadius: 1.5,
+  glowStrength: 1,
+  glowSpread: 1,
+});
+
 /** Display configuration shared by renderer implementations. */
 export interface RendererOptions {
   orientation?: DisplayOrientation;
+  profile?: Readonly<DisplayProfile>;
+}
+
+/** Renderer configuration, separate from per-command drawing state. */
+export interface DisplayRenderer extends DrawingContext {
+  setDisplayProfile(profile: Readonly<DisplayProfile>): void;
 }
 
 /** Immediate-mode drawing operations shared by display renderers. */

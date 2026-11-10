@@ -90,7 +90,7 @@ These characteristics establish the intended aesthetic. They do not require ever
 
 ### Beam characteristics
 
-**Status: Colour, intensity, overdrive, beam width, bright core and halo accepted and implemented; global display-profile configuration accepted, API pending; light accumulation deferred**
+**Status: Colour, intensity, overdrive, beam width, bright core, halo and global display-profile configuration accepted and implemented; light accumulation deferred**
 
 A beam is the conceptual source of illumination for vector geometry.
 
@@ -105,11 +105,11 @@ A beam is the conceptual source of illumination for vector geometry.
 
 Beam width and intensity are distinct concepts. Increasing intensity should not implicitly change geometric line width. An apparent widening caused by brighter bloom is a display effect rather than a change in geometry.
 
-Colour and intensity belong to drawing descriptions. Beam width and display effects such as bloom are global display-profile settings, not per-command drawing state. The current renderer uses a fixed profile; public configuration is not implemented yet.
+Colour and intensity belong to drawing descriptions. Beam width and display effects such as bloom are global display-profile settings, not per-command drawing state.
 
 A bright core and its surrounding halo are aspects of the same illuminated geometry. Consumers should not need to submit additional decorative geometry to reproduce these effects.
 
-The bright core and halo are one presentation treatment. The core retains the selected colour through normal intensity and moves toward white in overdrive; the surrounding halo retains the selected colour. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The current renderer uses a fixed internal profile rather than public controls. Its dimensions and falloff values are adjustable later if visual feedback warrants it; they are starting settings, not permanent limits.
+The bright core and halo are one presentation treatment. The core retains the selected colour through normal intensity and moves toward white in overdrive; the surrounding halo retains the selected colour. Line endpoints retain some halo without prominent flares; points have a more restrained halo than lines. The profile controls their dimensions and halo appearance.
 
 ### Intensity and overdrive
 
@@ -131,22 +131,31 @@ The bright core and halo are one presentation treatment. The core retains the se
 - Corners and endpoints should not exhibit unintended gaps or obvious rendering artefacts.
 - Colour and intensity produce perceptibly distinct results without relying on bloom.
 
-The accepted baseline uses a 1.5-pixel line core with rounded ends and circular points with a 1.5-pixel radius. These dimensions are the current fixed renderer profile and may be adjusted later if visual feedback indicates a need.
+The default profile uses a 1.5-pixel line core with rounded ends and circular points with a 1.5-pixel radius.
 
 ### Display effects
 
-**Status: Bloom accepted and implemented; global configuration of the display profile accepted, API pending; other effects deferred**
+**Status: Bloom and global configuration of the display profile accepted and implemented; other effects deferred**
 
 Display effects determine how beam illumination appears on screen. They are conceptually separate from drawing commands and game state.
 
 #### Global display-profile options
 
 **Status: Accepted**
-**Implementation: The renderer uses a fixed internal profile; public options are not implemented.**
+**Implementation: The WebGL2 renderer implements the profile described below.**
 
 The renderer should accept global display-profile options that apply consistently to all drawing commands. Beam width and bloom/glow are accepted examples of configurable characteristics. A consumer may expose these settings as player-facing controls; the library provides the configuration, not the user interface.
 
-These options belong to renderer or display configuration, not to `DrawingContext` drawing state. Exact option names, units, ranges, defaults, which additional characteristics are configurable, and whether settings can be changed after renderer creation remain open decisions.
+These options belong to renderer or display configuration, not to `DrawingContext` drawing state. The renderer exposes a `DisplayProfile` value and a `setDisplayProfile` operation independently of drawing commands. An optional initial profile may be supplied at renderer creation; omitting it uses `DEFAULT_DISPLAY_PROFILE`. The renderer copies the supplied profile, validates every value as finite and within its range, and throws `RangeError` for an invalid profile without changing the current one. An update takes effect at the next `beginFrame`, so a frame uses one profile throughout. Resetting means supplying the default profile again.
+
+| Field | Meaning | Range | Default |
+|---|---|---|---|
+| `lineWidth` | Line core width in CSS pixels | 0.5–4 | 1.5 |
+| `pointRadius` | Point core radius in CSS pixels | 0.5–4 | 1.5 |
+| `glowStrength` | Halo strength multiplier; zero disables the halo | 0–2 | 1 |
+| `glowSpread` | Halo distance multiplier | 0.5–2 | 1 |
+
+The default reproduces the existing display profile. Glow strength and spread do not alter core dimensions or the meaning of intensity and overdrive. The profile affects all drawing in a frame; consumers own their interface and preferences. Global brightness and persistence are not specified as profile controls yet.
 
 #### Bloom
 
@@ -154,7 +163,7 @@ Bloom produces a broad, soft coloured halo around illuminated geometry, paired w
 
 The result should retain a recognisable, sharply defined core rather than simply blurring the entire image.
 
-The current profile is fixed inside the WebGL2 renderer and preserves the submitted colour in the halo. Consumers do not configure bloom yet. The implementation may be tuned later without changing the accepted visual intent.
+The WebGL2 renderer preserves the submitted colour in the halo; the profile controls its strength and spread.
 
 #### Light accumulation
 

@@ -1,4 +1,4 @@
-import type { Color, DrawingContext, RendererOptions } from "./graphics.ts";
+import { DEFAULT_DISPLAY_PROFILE, type Color, type DisplayProfile, type DisplayRenderer, type RendererOptions } from "./graphics.ts";
 import { createViewport, type Viewport } from "./viewport.ts";
 import { createTransformStack } from "./transform.ts";
 
@@ -11,6 +11,9 @@ in float intensity;
 in float primitiveKind;
 uniform vec2 resolution;
 uniform float pixelScale;
+uniform float lineWidth;
+uniform float pointRadius;
+uniform float glowSpread;
 out vec3 beamColor;
 out float beamIntensity;
 out vec2 edgePosition;
@@ -37,7 +40,7 @@ void main() {
     vec2 tangent = delta / max(beamLength, 0.0001);
     vec2 normal = vec2(-tangent.y, tangent.x);
     // Expand the line quad past both ends and sides to contain its halo.
-    float haloExtent = HALO_EXTENT_PIXELS * pixelScale;
+    float haloExtent = (HALO_EXTENT_PIXELS * glowSpread + max(lineWidth * 0.5, pointRadius)) * pixelScale;
     float along = corner.x * (beamLength * 0.5 + haloExtent);
     float across = corner.y * haloExtent;
     position = (startPoint + endPoint) * 0.5 + tangent * along + normal * across;
@@ -45,7 +48,7 @@ void main() {
   } else {
     beamLength = 0.0;
     // Points use a square quad; the fragment shader clips it to a circle.
-    edgePosition = corner * (HALO_EXTENT_PIXELS * pixelScale);
+    edgePosition = corner * ((HALO_EXTENT_PIXELS * glowSpread + max(lineWidth * 0.5, pointRadius)) * pixelScale);
     position = startPoint + edgePosition;
   }
   vec2 clip = (position / resolution) * 2.0 - 1.0;
@@ -60,12 +63,14 @@ in vec2 edgePosition;
 flat in float beamLength;
 flat in float beamKind;
 uniform float pixelScale;
+uniform float lineWidth;
+uniform float pointRadius;
+uniform float glowStrength;
+uniform float glowSpread;
 out vec4 outputColor;
 
 // Beam dimensions and falloff distances are in output pixels, then scaled to
 // backing-store pixels by pixelScale.
-const float LINE_CORE_RADIUS_PIXELS = 0.75;
-const float POINT_CORE_RADIUS_PIXELS = 1.5;
 const float BROAD_HALO_WEIGHT = 0.12;
 const float BROAD_HALO_FALLOFF_SQUARED = 250.0;
 const float INNER_HALO_WEIGHT = 0.07;
@@ -80,16 +85,16 @@ void main() {
   if (beamKind < 0.5) {
     float along = clamp(edgePosition.x, -beamLength * 0.5, beamLength * 0.5);
     // Clamping to the segment endpoints makes the line core a rounded capsule.
-    signedDistance = length(edgePosition - vec2(along, 0.0)) - LINE_CORE_RADIUS_PIXELS * pixelScale;
+    signedDistance = length(edgePosition - vec2(along, 0.0)) - lineWidth * 0.5 * pixelScale;
   } else {
     // Distance from the point centre gives a circular core.
-    signedDistance = length(edgePosition) - POINT_CORE_RADIUS_PIXELS * pixelScale;
+    signedDistance = length(edgePosition) - pointRadius * pixelScale;
   }
 
   // Keep the core crisp with a narrow antialiased edge. Outside it, combine
   // two Gaussian bands into a coloured halo with a finite cutoff.
   float coreCoverage = 1.0 - smoothstep(-0.5, 0.5, signedDistance);
-  float haloDistance = max(signedDistance, 0.0);
+  float haloDistance = max(signedDistance, 0.0) / glowSpread;
   float halo = (BROAD_HALO_WEIGHT * exp(-haloDistance * haloDistance
       / (BROAD_HALO_FALLOFF_SQUARED * pixelScale * pixelScale))
     + INNER_HALO_WEIGHT * exp(-haloDistance * haloDistance
@@ -97,7 +102,7 @@ void main() {
     * (1.0 - smoothstep(HALO_FADE_START_PIXELS * pixelScale,
       HALO_CUTOFF_PIXELS * pixelScale, haloDistance));
   float primitiveHalo = beamKind < 0.5 ? 1.0 : 0.45;
-  halo *= primitiveHalo;
+  halo *= primitiveHalo * glowStrength;
   if (beamKind < 0.5) {
     // Reduce halo strength near line ends to avoid prominent endpoint flares.
     float endDistance = beamLength * 0.5 - abs(edgePosition.x);
@@ -144,7 +149,14 @@ function compileShader(
 export function createWebGL2Renderer(
   gl: WebGL2RenderingContext,
   options: RendererOptions = {},
-): DrawingContext {
+): DisplayRenderer {
+  function validateProfile(value: Readonly<DisplayProfile>): DisplayProfile {
+    for (const [key, min, max] of [["lineWidth", 0.5, 4], ["pointRadius", 0.5, 4], ["glowStrength", 0, 2], ["glowSpread", 0.5, 2]] as const) {
+      if (!Number.isFinite(value[key]) || value[key] < min || value[key] > max) throw new RangeError(`Invalid display profile ${key}`);
+    }
+    return { ...value };
+  }
+  let profile = validateProfile(options.profile ?? DEFAULT_DISPLAY_PROFILE);
   const vertexShader = compileShader(gl, gl.VERTEX_SHADER, vertexSource);
   const fragmentShader = compileShader(gl, gl.FRAGMENT_SHADER, fragmentSource);
   const program = gl.createProgram();
@@ -172,6 +184,10 @@ export function createWebGL2Renderer(
   const kindLocation = gl.getAttribLocation(program, "primitiveKind");
   const resolutionLocation = gl.getUniformLocation(program, "resolution");
   const pixelScaleLocation = gl.getUniformLocation(program, "pixelScale");
+  const lineWidthLocation = gl.getUniformLocation(program, "lineWidth");
+  const pointRadiusLocation = gl.getUniformLocation(program, "pointRadius");
+  const glowStrengthLocation = gl.getUniformLocation(program, "glowStrength");
+  const glowSpreadLocation = gl.getUniformLocation(program, "glowSpread");
 
   function viewport(): Viewport {
     const cssSize = "clientWidth" in gl.canvas
@@ -241,11 +257,18 @@ export function createWebGL2Renderer(
   }
 
   return {
+    setDisplayProfile(nextProfile) {
+      profile = validateProfile(nextProfile);
+    },
     beginFrame() {
       gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
       gl.uniform2f(resolutionLocation, gl.canvas.width, gl.canvas.height);
       currentViewport = viewport();
       gl.uniform1f(pixelScaleLocation, currentViewport.pixelScale);
+      gl.uniform1f(lineWidthLocation, profile.lineWidth);
+      gl.uniform1f(pointRadiusLocation, profile.pointRadius);
+      gl.uniform1f(glowStrengthLocation, profile.glowStrength);
+      gl.uniform1f(glowSpreadLocation, profile.glowSpread);
       gl.clearColor(0, 0, 0, 0);
       gl.clear(gl.COLOR_BUFFER_BIT);
       position = undefined;

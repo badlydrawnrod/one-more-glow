@@ -26,6 +26,17 @@
       }
 
       .display { position: relative; }
+      .profile-controls { position: absolute; inset: 0; pointer-events: none; }
+      .profile-controls[hidden] { display: none; }
+      .profile-controls input, .profile-controls button {
+        position: absolute;
+        pointer-events: auto;
+        opacity: 0.001;
+        cursor: pointer;
+      }
+      .profile-controls input { left: 15%; width: 70%; height: 30px; transform: translateY(-50%); }
+      .profile-controls input:focus-visible, .profile-controls button:focus-visible { opacity: 0.35; }
+      .profile-controls button { left: 10%; top: 71%; width: 28%; height: 8%; }
 
       #screen {
         display: block;
@@ -33,6 +44,7 @@
       }
 
       .menu-toggle {
+        z-index: 3;
         position: absolute;
         top: 12px;
         left: 12px;
@@ -49,6 +61,7 @@
       }
 
       .display-menu {
+        z-index: 2;
         position: absolute;
         top: 62px;
         left: 12px;
@@ -110,6 +123,13 @@
   <body>
     <main class="display" aria-label="Rendering diagnostics">
       <canvas id="screen" width="800" height="600" aria-label="Rendering diagnostic display"></canvas>
+      <div id="profile-controls" class="profile-controls" aria-label="Display profile" hidden>
+        <input type="range" aria-label="Beam width in CSS pixels" data-profile="lineWidth" min="0.5" max="4" step="0.1" style="top: 25%" />
+        <input type="range" aria-label="Point radius in CSS pixels" data-profile="pointRadius" min="0.5" max="4" step="0.1" style="top: 38%" />
+        <input type="range" aria-label="Glow strength" data-profile="glowStrength" min="0" max="2" step="0.1" style="top: 51%" />
+        <input type="range" aria-label="Glow spread" data-profile="glowSpread" min="0.5" max="2" step="0.1" style="top: 64%" />
+        <button id="profile-reset" type="button" aria-label="Reset display profile">Reset</button>
+      </div>
       <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="display-menu">
         <span class="menu-icon" aria-hidden="true">☰</span>
         <span class="visually-hidden">Open display menu</span>
@@ -122,6 +142,7 @@
           <button type="button" data-scene="testcard" aria-pressed="false">Test card</button>
           <button type="button" data-scene="segments" aria-pressed="false">Segments</button>
           <button type="button" data-scene="spacing" aria-pressed="false">Spacing</button>
+          <button type="button" data-scene="profile" aria-pressed="false">Profile</button>
         </div>
         <div class="control-group" role="group" aria-label="Orientation">
           <span class="control-label">Orientation</span>

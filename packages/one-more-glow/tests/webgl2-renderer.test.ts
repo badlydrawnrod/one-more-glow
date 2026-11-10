@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createWebGL2Renderer } from "../src/webgl2-renderer.ts";
 import { createViewport } from "../src/viewport.ts";
+import { DEFAULT_DISPLAY_PROFILE } from "../src/graphics.ts";
 
 function fakeContext() {
   const calls: Array<[string, ...unknown[]]> = [];
@@ -102,6 +103,30 @@ test("WebGL2 renderer snapshots normalized colour and clamped intensity per comm
     x, y, x, y, 0, 0.5, 1, 2, 1,
     x, y, x, y, 0, 0.5, 1, 0, 1,
   ])]);
+});
+
+test("display profiles are validated, copied and applied at the next frame", () => {
+  const { calls, gl } = fakeContext();
+  const display = createWebGL2Renderer(gl);
+  display.beginFrame();
+  const profile = { lineWidth: 3, pointRadius: 2, glowStrength: 0, glowSpread: 1.5 };
+  display.setDisplayProfile(profile);
+  profile.lineWidth = 4;
+  assert.throws(() => display.setDisplayProfile({ ...profile, glowSpread: NaN }), RangeError);
+  assert.throws(() => display.setDisplayProfile({ ...profile, glowStrength: 3 }), RangeError);
+  display.endFrame();
+  assert.deepEqual(calls.filter(([name, location]) => name === "uniform1f" && location === "lineWidth"), [
+    ["uniform1f", "lineWidth", DEFAULT_DISPLAY_PROFILE.lineWidth],
+  ]);
+  display.beginFrame();
+  assert.deepEqual(calls.filter(([name, location]) => name === "uniform1f" && location === "lineWidth"), [
+    ["uniform1f", "lineWidth", DEFAULT_DISPLAY_PROFILE.lineWidth],
+    ["uniform1f", "lineWidth", 3],
+  ]);
+  assert.deepEqual(calls.filter(([name, location]) => name === "uniform1f" && location === "glowStrength").at(-1), ["uniform1f", "glowStrength", 0]);
+  display.setDisplayProfile(DEFAULT_DISPLAY_PROFILE);
+  display.beginFrame();
+  assert.deepEqual(calls.filter(([name, location]) => name === "uniform1f" && location === "lineWidth").at(-1), ["uniform1f", "lineWidth", 1.5]);
 });
 
 test("WebGL2 transforms geometry in local space and restores the parent transform", () => {

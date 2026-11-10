@@ -57,6 +57,22 @@ Each workspace has its own manifest and configuration. The root is private;
 the library package is the independent package boundary. Library builds emit
 JavaScript and TypeScript declarations into its ignored `dist/` directory.
 
+## Display profile
+
+The renderer exposes a global profile separately from drawing commands. Supply
+a complete profile to change it for the next frame:
+
+```ts
+import { createWebGL2Renderer, DEFAULT_DISPLAY_PROFILE } from "one-more-glow";
+
+const renderer = createWebGL2Renderer(webglContext);
+renderer.setDisplayProfile({ ...DEFAULT_DISPLAY_PROFILE, glowStrength: 0.5 });
+```
+
+The profile controls line width, point radius, glow strength and glow spread.
+See the [display specification](docs/specs/vector-display.md) for ranges and
+update semantics. The diagnostics app's Profile view allows live adjustment.
+
 ## Segment text
 
 Use the renderer-independent text helpers with an existing drawing context:

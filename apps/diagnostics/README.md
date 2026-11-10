@@ -4,6 +4,10 @@ From the repository root, run `npm run dev` and open the local address printed
 by Vite. The default is a static game-like scene in landscape orientation. Use
 the menu button in the upper-left corner of the display to select a scene or
 orientation. The animation toggle appears for the game scene only.
+Select **Profile** to adjust beam width, point radius, glow strength and glow
+spread live. Drag the vector sliders or focus them with Tab and use the arrow
+keys; Reset restores the default profile. Changes apply to every view for the
+current session.
 
 URL query parameters are also available for opening a specific view directly:
 
@@ -12,6 +16,7 @@ URL query parameters are also available for opening a specific view directly:
 - `?scene=segments` compares the 16-segment design with the complete printable
   22-segment reference character set.
 - `?scene=spacing` compares HUD text in both fonts with fixed and kerned spacing.
+- `?scene=profile` opens the display profile study.
 - `?orientation=portrait` selects portrait orientation.
 - `?animate=1` rotates the craft in the game-like scene; it has no effect on
   the static diagnostic views.
