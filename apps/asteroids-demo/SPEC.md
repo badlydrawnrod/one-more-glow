@@ -17,7 +17,11 @@ for how to run and control it.
 - Five irregular asteroids drift and rotate in a stationary star field. The
   ship, asteroids and stars use glowing vector geometry; a flickering flame
   appears while thrust is engaged.
-- The HUD shows speed, thrust state and input connection status.
+- The in-screen HUD uses the library's segmented vector text for its sector
+  label, speed, thrust state, input connection status and flight label. Speed
+  is shown as a three-digit rounded magnitude; thrust reads `THRUST ENGAGED`
+  or `THRUST OFF`; input status reads `CONTROLLER CONNECTED` when a connected
+  gamepad is detected and `KEYBOARD READY` otherwise.
 
 This is currently a flight demonstration: it has no firing, collision effects,
 score, lives or game-over state. Whether and how to add gameplay is an open

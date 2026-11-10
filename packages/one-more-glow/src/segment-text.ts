@@ -67,10 +67,12 @@ function layout(
       previous = "";
       continue;
     }
-    if (kerned) advance += (pairs[previous + supported] ?? 0) * height;
+    const digit = supported >= "0" && supported <= "9";
+    const previousDigit = previous >= "0" && previous <= "9";
+    if (kerned && !digit && !previousDigit) advance += (pairs[previous + supported] ?? 0) * height;
     const offset = kerned ? -glyph.left * height * 0.58 : 0;
     if (glyph.elements.length) visit?.(glyph, advance + offset);
-    advance += kerned ? ((glyph.right - glyph.left) * 0.58 + 0.16) * height : 0.82 * height;
+    advance += kerned && !digit ? ((glyph.right - glyph.left) * 0.58 + 0.16) * height : 0.82 * height;
     previous = supported;
   }
   return advance;

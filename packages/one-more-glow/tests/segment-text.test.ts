@@ -70,7 +70,20 @@ test("metrics describe font-wide dimensions and advances, including empty and tr
     assert.equal(measureText("", options).width, 0);
     near(measureText(" ", options).width, 82);
     near(measureText("   ", opts(font, "kerned")).width, 96);
-    assert.ok(measureText("1", opts(font, "kerned")).width < measureText("W", opts(font, "kerned")).width);
+    near(measureText("0123456789", opts(font, "kerned")).width, 820);
+  }
+});
+
+test("kerned digits keep fixed advances while letters retain proportional spacing and kerning", () => {
+  for (const font of fonts) {
+    const options = opts(font, "kerned");
+    near(measureText("111", options).width, 246);
+    near(measureText("888", options).width, 246);
+  }
+  for (const [font, pair] of [["segment16", "AV"], ["segment22", "Th"]] as const) {
+    const options = opts(font, "kerned");
+    assert.ok(measureText(pair, options).width <
+      measureText(pair[0], options).width + measureText(pair[1], options).width);
   }
 });
 

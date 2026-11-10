@@ -1,6 +1,7 @@
 import {
   createWebGL2Renderer,
   drawPolygonOutline,
+  drawText,
   type Color,
   type DrawingContext,
 } from "one-more-glow";
@@ -9,9 +10,6 @@ import "./style.css";
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing #screen canvas");
 const screen: HTMLCanvasElement = canvas;
-const inputStatus = requireElement("#input-status");
-const speedReadout = requireElement("#speed-readout");
-const thrustReadout = requireElement("#thrust-readout");
 const gl = canvas.getContext("webgl2", { alpha: true });
 if (!gl) throw new Error("WebGL2 is unavailable in this browser");
 
@@ -85,12 +83,6 @@ function makeRock(
 
 function fract(value: number): number {
   return value - Math.floor(value);
-}
-
-function requireElement(selector: string): HTMLElement {
-  const element = document.querySelector<HTMLElement>(selector);
-  if (!element) throw new Error(`Missing ${selector}`);
-  return element;
 }
 
 function resizeCanvas(): void {
@@ -189,7 +181,21 @@ function drawShipAt(x: number, y: number, thrusting: boolean, flicker: number): 
   drawing.popTransform();
 }
 
-function drawArena(thrusting: boolean, time: number): void {
+function drawHud(thrusting: boolean, connected: boolean): void {
+  const textOptions = { font: "segment16", height: 16, spacing: "kerned" } as const;
+  drawing.setColor(dimBlue);
+  drawing.setIntensity(0.9);
+  drawText(drawing, "SECTOR 07", -480, 340, textOptions);
+  drawText(drawing, `VELOCITY ${Math.round(Math.hypot(ship.velocityX, ship.velocityY)).toString().padStart(3, "0")}`, 235, 340, textOptions);
+  drawing.setColor(connected ? paleBlue : dimBlue);
+  drawText(drawing, connected ? "CONTROLLER CONNECTED" : "KEYBOARD READY", -480, -340, textOptions);
+  drawing.setColor(amber);
+  drawText(drawing, thrusting ? "THRUST ENGAGED" : "THRUST OFF", -480, -365, textOptions);
+  drawing.setColor(dimBlue);
+  drawText(drawing, "FREE FLIGHT", 365, -340, textOptions);
+}
+
+function drawArena(thrusting: boolean, connected: boolean, time: number): void {
   drawing.beginFrame();
   drawing.setColor(cyan);
   for (const star of stars) {
@@ -198,6 +204,7 @@ function drawArena(thrusting: boolean, time: number): void {
   }
   for (const rock of rocks) drawRock(rock);
   drawShip(thrusting, time);
+  drawHud(thrusting, connected);
   drawing.endFrame();
 }
 
@@ -252,14 +259,6 @@ function update(deltaSeconds: number, input: ReturnType<typeof readInput>): void
   }
 }
 
-function updateHud(input: ReturnType<typeof readInput>): void {
-  const speed = Math.round(Math.hypot(ship.velocityX, ship.velocityY));
-  speedReadout.textContent = `VELOCITY ${speed.toString().padStart(3, "0")}`;
-  thrustReadout.textContent = input.thrust ? "THRUST ENGAGED" : "THRUST OFF";
-  inputStatus.textContent = input.connected ? "CONTROLLER CONNECTED" : "KEYBOARD READY";
-  inputStatus.parentElement?.classList.toggle("connected", input.connected);
-}
-
 const handledKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "a", "d", "w"]);
 window.addEventListener("keydown", (event) => {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
@@ -274,12 +273,6 @@ window.addEventListener("keyup", (event) => {
 });
 window.addEventListener("blur", () => pressedKeys.clear());
 window.addEventListener("resize", resizeCanvas);
-window.addEventListener("gamepadconnected", () => {
-  inputStatus.textContent = "CONTROLLER CONNECTED";
-});
-window.addEventListener("gamepaddisconnected", () => {
-  inputStatus.textContent = "KEYBOARD READY";
-});
 resizeCanvas();
 
 let lastTime = 0;
@@ -288,8 +281,7 @@ function frame(time: number): void {
   lastTime = time;
   const input = readInput();
   update(deltaSeconds, input);
-  updateHud(input);
-  drawArena(input.thrust, time);
+  drawArena(input.thrust, input.connected, time);
   requestAnimationFrame(frame);
 }
 

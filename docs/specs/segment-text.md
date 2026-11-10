@@ -82,10 +82,11 @@ advance. Trailing spaces contribute to the advance. The 16-segment descent is
 is 0.35 times uppercase height.
 
 Fixed spacing uses equal character advances. Kerned spacing uses proportional
-advances and pair adjustments. **Agreed:** kerning applies only within a single
-call; no state or pair adjustment carries across separate drawing calls. Text
-split across calls can consequently look slightly different from the same text
-drawn in one call.
+advances and pair adjustments for letters; digits keep the fixed-spacing
+advance so numeric readouts remain aligned as their values change. **Agreed:**
+kerning applies only within a single call; no state or pair adjustment carries
+across separate drawing calls. Text split across calls can consequently look
+slightly different from the same text drawn in one call.
 
 **Agreed starting proportions:** for both fonts, use a full-width cell of 0.58
 times uppercase height and a fixed advance of 0.82 times uppercase height.
