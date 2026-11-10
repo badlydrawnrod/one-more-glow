@@ -42,6 +42,33 @@ export function drawSegmentStudy(drawing: DrawingContext, portrait: boolean): vo
   const sample = "The quick brown fox jumps over the lazy dog.";
   const options = { font: "segment22", height: 24, spacing: "kerned" } as const;
   const width = measureText(sample, options).width;
-  drawText(drawing, sample, -(width - 24 * 0.16) / 2, top - row * 13 - 24, options);
+  drawText(drawing, sample, -(width - 24 * 0.22) / 2, top - row * 13 - 24, options);
+  drawing.endFrame();
+}
+
+/** Compare HUD text in each font and spacing mode at two sizes. */
+export function drawSpacingStudy(drawing: DrawingContext, portrait: boolean): void {
+  const left = portrait ? -320 : -460;
+  const top = portrait ? 455 : 335;
+  const groupHeight = portrait ? 205 : 160;
+  const groups = [
+    { font: "segment16", spacing: "fixed", label: "16 FIXED" },
+    { font: "segment16", spacing: "kerned", label: "16 KERNED" },
+    { font: "segment22", spacing: "fixed", label: "22 FIXED" },
+    { font: "segment22", spacing: "kerned", label: "22 KERNED" },
+  ] as const;
+
+  drawing.beginFrame();
+  groups.forEach(({ font, spacing, label }, index) => {
+    const y = top - index * groupHeight;
+    drawing.setColor([1, 0.55, 0.12]);
+    drawing.setIntensity(0.65);
+    drawText(drawing, label, left, y, { font: "segment16", height: 18 });
+    drawing.setColor([0, 0.9, 1]);
+    drawing.setIntensity(0.65);
+    drawText(drawing, "SHIPS 03  EARTH: 1 SECTOR", left, y - 32, { font, spacing, height: 14 });
+    drawText(drawing, "SCORE 001200  WAVE 11", left, y - 56, { font, spacing, height: 14 });
+    drawText(drawing, "VELOCITY 000  0123456789", left, y - 84, { font, spacing, height: 20 });
+  });
   drawing.endFrame();
 }

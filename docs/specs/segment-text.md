@@ -88,9 +88,16 @@ kerning applies only within a single call; no state or pair adjustment carries
 across separate drawing calls. Text split across calls can consequently look
 slightly different from the same text drawn in one call.
 
+Both fonts should produce legible, visually balanced spacing among letters,
+digits, punctuation and spaces, including short HUD labels at small sizes and
+with glow. Equal advances alone do not guarantee even apparent spacing. In
+kerned text, centre digit strokes within their equal-width advances as a
+starting point; optical adjustments can be made after visual review. Preserve
+the characteristic glyph designs while refining spacing.
+
 **Agreed starting proportions:** for both fonts, use a full-width cell of 0.58
 times uppercase height and a fixed advance of 0.82 times uppercase height.
-Kerned spacing uses a gap of 0.16 times height, a space advance of 0.32 times
+Kerned spacing uses a gap of 0.22 times height, a space advance of 0.40 times
 height and font-specific pair adjustments. Refine these values through visual review.
 
 ## Characters and fallback
@@ -127,6 +134,7 @@ definitions and spacing values remain open to refinement.
 
 Verify observable glyph selection, spacing, fallback, metrics, invalid-input
 behavior, pen position and transformation semantics without depending on
-renderer internals. Use the diagnostics for visual review at different sizes,
-intensities and display orientations; geometry tests alone cannot establish
-legibility.
+renderer internals. Use the diagnostics for visual review of both fonts and
+spacing modes at different sizes, intensities and display orientations,
+including representative game HUD labels, numbers and punctuation; geometry
+tests alone cannot establish legibility.

@@ -11,6 +11,8 @@ export const elements22: readonly Element[] = [
   [0, 0.5, 0, 0], [0, 1, 0.5, 0.5], [0.4, 0.92],
   [1, 1, 1, 0.5], [0.5, -0.35, 1, -0.35], [0, -0.35, 0.5, -0.35],
   [0, 0.5, 0.25, 0.25], [0.25, 0.25, 0.5, 0],
+  // Colon dots sit within the uppercase height, away from ascenders and descenders.
+  [0.5, 0.7], [0.5, 0.25],
 ];
 
 // Printable ASCII, in code-point order from space through tilde. Each letter
@@ -42,7 +44,7 @@ export const masks22: readonly string[] = [
   "laf", //  55 7
   "dcplafh", //  56 8
   "clafh", //  57 9
-  "rb", //  58 :
+  "xy", //  58 :
   "rbi", //  59 ;
   "md", //  60 <
   "degh", //  61 =

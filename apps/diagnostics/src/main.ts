@@ -10,7 +10,7 @@ import {
   type DisplayOrientation,
   type DrawingContext,
 } from "one-more-glow";
-import { drawSegmentStudy } from "./segment-study.ts";
+import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing #screen canvas");
@@ -23,7 +23,7 @@ const orientation: DisplayOrientation = params.get("orientation") === "portrait"
 const aspectRatio = orientation === "landscape" ? 4 / 3 : 3 / 4;
 const renderOptions = { orientation };
 const requestedScene = params.get("scene");
-const scene = requestedScene === "testcard" || requestedScene === "segments"
+const scene = requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing"
   ? requestedScene
   : "game";
 const animate = params.get("animate") === "1" && scene === "game";
@@ -269,6 +269,7 @@ function drawGameScene(shipAngle = -12): void {
 function drawDiagnostic(): void {
   if (scene === "testcard") drawTestCard();
   else if (scene === "segments") drawSegmentStudy(renderer, orientation === "portrait");
+  else if (scene === "spacing") drawSpacingStudy(renderer, orientation === "portrait");
   else drawGameScene();
 }
 

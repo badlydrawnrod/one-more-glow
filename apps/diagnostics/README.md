@@ -8,6 +8,7 @@ Use URL query parameters to change the view:
 - `?scene=testcard` shows geometry, transform and intensity samples.
 - `?scene=segments` compares the 16-segment design with the complete printable
   22-segment reference character set.
+- `?scene=spacing` compares HUD text in both fonts with fixed and kerned spacing.
 - `?orientation=portrait` selects portrait orientation.
 - `?animate=1` rotates the craft in the game-like scene; it has no effect on
   the static diagnostic views.

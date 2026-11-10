@@ -63,16 +63,20 @@ function layout(
     const supported = glyphs.has(character) ? character : "?";
     const glyph = glyphs.get(supported)!;
     if (kerned && supported === " ") {
-      advance += 0.32 * height;
+      advance += 0.40 * height;
       previous = "";
       continue;
     }
     const digit = supported >= "0" && supported <= "9";
     const previousDigit = previous >= "0" && previous <= "9";
     if (kerned && !digit && !previousDigit) advance += (pairs[previous + supported] ?? 0) * height;
-    const offset = kerned ? -glyph.left * height * 0.58 : 0;
+    const inkWidth = (glyph.right - glyph.left) * 0.58;
+    const punctuationBearing = kerned && font === "segment22" && supported === ":" ? 0.06 : 0;
+    const offset = kerned
+      ? ((digit ? (0.82 - inkWidth) / 2 : punctuationBearing) - glyph.left * 0.58) * height
+      : 0;
     if (glyph.elements.length) visit?.(glyph, advance + offset);
-    advance += kerned && !digit ? ((glyph.right - glyph.left) * 0.58 + 0.16) * height : 0.82 * height;
+    advance += kerned && !digit ? (inkWidth + 0.22 + 2 * punctuationBearing) * height : 0.82 * height;
     previous = supported;
   }
   return advance;

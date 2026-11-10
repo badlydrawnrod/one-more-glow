@@ -1,6 +1,7 @@
 import {
   createWebGL2Renderer,
   drawPolygonOutline,
+  drawText,
   type Color,
   type DrawingContext,
 } from "one-more-glow";
@@ -9,10 +10,6 @@ import "./style.css";
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing #screen canvas");
 const screen: HTMLCanvasElement = canvas;
-const inputStatus = requireElement("#input-status");
-const scoreReadout = requireElement("#score-readout");
-const waveReadout = requireElement("#wave-readout");
-const livesReadout = requireElement("#lives-readout");
 const gameOverOverlay = requireElement("#game-over");
 const restartButton = document.querySelector<HTMLButtonElement>("#restart");
 if (!restartButton) throw new Error("Missing #restart button");
@@ -253,13 +250,28 @@ function drawParticles(): void {
   }
 }
 
-function drawFrame(time: number): void {
+function drawHud(input: Input): void {
+  const options = { font: "segment22", height: 14, spacing: "kerned" } as const;
+  drawing.setColor(paleBlue);
+  drawing.setIntensity(0.88);
+  drawText(drawing, `SCORE ${game.score.toString().padStart(6, "0")}`, -480, 340, options);
+  drawText(drawing, `WAVE ${game.waveNumber.toString().padStart(2, "0")}`, 370, 340, options);
+  drawing.setColor(input.connected ? cyan : dimTunnelBlue);
+  drawText(drawing, input.connected ? "CONTROLLER CONNECTED" : "KEYBOARD READY", -480, 315, options);
+  drawing.setColor(amber);
+  drawText(drawing, `SHIPS ${game.lives.toString().padStart(2, "0")}`, -480, -340, options);
+  drawing.setColor(paleBlue);
+  drawText(drawing, "EARTH: 1 SECTOR", 260, -340, options);
+}
+
+function drawFrame(time: number, input: Input): void {
   drawing.beginFrame();
   drawTunnel(time);
   for (const bullet of bullets) drawBullet(bullet);
   for (const enemy of enemies) drawEnemy(enemy, time);
   if (!game.gameOver && game.respawnTimer <= 0) drawShip();
   drawParticles();
+  drawHud(input);
   drawing.endFrame();
 }
 
@@ -408,17 +420,7 @@ function update(deltaSeconds: number, input: Input): void {
   }
 }
 
-function updateHud(input: Input): void {
-  const scoreText = `SCORE ${game.score.toString().padStart(6, "0")}`;
-  const waveText = `WAVE ${game.waveNumber.toString().padStart(2, "0")}`;
-  const livesText = `SHIPS ${"◆ ".repeat(game.lives).trim() || "—"}`;
-  const inputText = input.connected ? "CONTROLLER CONNECTED" : "KEYBOARD READY";
-  if (scoreReadout.textContent !== scoreText) scoreReadout.textContent = scoreText;
-  if (waveReadout.textContent !== waveText) waveReadout.textContent = waveText;
-  if (livesReadout.textContent !== livesText) livesReadout.textContent = livesText;
-  if (inputStatus.textContent !== inputText) inputStatus.textContent = inputText;
-  const connected = inputStatus.parentElement?.classList.contains("connected") ?? false;
-  if (connected !== input.connected) inputStatus.parentElement?.classList.toggle("connected", input.connected);
+function updateHud(): void {
   const shouldHideOverlay = !game.gameOver || game.respawnTimer > 0;
   if (gameOverOverlay.hidden !== shouldHideOverlay) gameOverOverlay.hidden = shouldHideOverlay;
 }
@@ -467,8 +469,8 @@ function frame(time: number): void {
   lastTime = time;
   const input = readInput();
   update(deltaSeconds, input);
-  updateHud(input);
-  drawFrame(time);
+  updateHud();
+  drawFrame(time, input);
   requestAnimationFrame(frame);
 }
 

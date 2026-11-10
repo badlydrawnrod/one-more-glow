@@ -10,14 +10,11 @@
     <main class="game-app">
       <header class="topbar">
         <a class="wordmark" href="/" aria-label="One More Glow home">OMG<span> / </span>ORBITAL ASSAULT</a>
-        <div class="live-status"><span class="status-light"></span><span id="input-status">KEYBOARD READY</span></div>
       </header>
 
       <section class="game-shell" aria-label="Gyruss style orbital shooter">
         <canvas id="screen" width="1024" height="768" aria-label="Ship orbiting a neon tunnel and firing at incoming enemies"></canvas>
         <div class="screen-vignette" aria-hidden="true"></div>
-        <div class="hud hud-top"><span id="score-readout">SCORE 000000</span><span id="wave-readout">WAVE 01</span></div>
-        <div class="hud hud-bottom"><span id="lives-readout">SHIPS ◆ ◆ ◆</span><span>EARTH: 1 SECTOR</span></div>
         <div id="game-over" class="overlay" hidden>
           <h1>SHIP LOST</h1>
           <p>Press R or select the button to launch again.</p>

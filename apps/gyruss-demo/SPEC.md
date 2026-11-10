@@ -13,9 +13,10 @@ run and control it.
   every enemy from the previous wave to be destroyed.
 - A bullet destroys one enemy and awards 100 points. A collision with an enemy
   removes that enemy and costs the player one ship.
-- A game starts with three ships and no points. The HUD shows the score, wave,
-  remaining ships and input connection status. After the last ship is lost,
-  the game ends; restarting resets the game.
+- A game starts with three ships and no points. The in-screen HUD uses the
+  library's 22-segment vector text for score, wave, remaining ships, input
+  connection status and sector label. After the last ship is lost, the game
+  ends; restarting resets the game.
 - The scene uses glowing vector geometry, with a star field, tunnel, ships and
   projectiles. Enemies and projectiles appear smaller toward the tunnel centre.
 

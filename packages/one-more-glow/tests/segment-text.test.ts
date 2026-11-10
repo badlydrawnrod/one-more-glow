@@ -69,7 +69,7 @@ test("metrics describe font-wide dimensions and advances, including empty and tr
     assert.equal(metrics.descent, font === "segment16" ? 25 : 35);
     assert.equal(measureText("", options).width, 0);
     near(measureText(" ", options).width, 82);
-    near(measureText("   ", opts(font, "kerned")).width, 96);
+    near(measureText("   ", opts(font, "kerned")).width, 120);
     near(measureText("0123456789", opts(font, "kerned")).width, 820);
   }
 });
@@ -84,6 +84,39 @@ test("kerned digits keep fixed advances while letters retain proportional spacin
     const options = opts(font, "kerned");
     assert.ok(measureText(pair, options).width <
       measureText(pair[0], options).width + measureText(pair[1], options).width);
+  }
+});
+
+test("kerned digit strokes are centred in their equal-width advances", () => {
+  for (const font of fonts) {
+    const options = opts(font, "kerned");
+    for (const digit of "0123456789") {
+      const xs = image(digit, options).flatMap((op) => op[0] === "line" ? [op[1], op[3]!] : [op[1]]);
+      near((Math.min(...xs) + Math.max(...xs)) / 2, measureText(digit, options).width / 2);
+    }
+  }
+});
+
+test("kerned HUD labels retain space between letters, punctuation and words", () => {
+  for (const font of fonts) {
+    const options = opts(font, "kerned");
+    // H and S span the whole cell; the advance includes a readable gap.
+    near(measureText("HH", options).width, 160);
+    near(measureText("SHIPS 03", options).width,
+      measureText("SHIPS", options).width + measureText(" ", options).width + measureText("03", options).width);
+    assert.ok(measureText("H:H", options).width > measureText("HH", options).width);
+  }
+});
+
+test("22-segment colon has aligned dots inside the uppercase height in both spacing modes", () => {
+  for (const spacing of ["fixed", "kerned"] as const) {
+    const points = image(":", opts("segment22", spacing));
+    assert.equal(points.length, 2);
+    assert.equal(points[0][0], "point");
+    assert.equal(points[1][0], "point");
+    near(points[0][1], points[1][1]);
+    assert.ok(points.every((point) => point[2] > 0 && point[2] < 100));
+    assert.ok(Math.abs(points[0][2] - points[1][2]) > 20);
   }
 });
 

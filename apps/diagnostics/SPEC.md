@@ -26,6 +26,8 @@ renderer and evaluating display characteristics. It currently uses WebGL2.
   on the [Litronix DL-3422 chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85),
   into vector line centres. The adaptation retains the source font's licence;
   see the [library notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
+- A segment-spacing view compares both fonts and spacing modes using game HUD
+  labels, digits and punctuation at small and larger sizes.
 - The 22-segment interpretation includes dots and strokes below the baseline
   for descenders. It is not a hardware or ROM emulation.
 - All views support landscape and portrait orientations. The canvas fits the
