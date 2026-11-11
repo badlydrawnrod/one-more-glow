@@ -233,7 +233,7 @@ function updatePlayer(game: Game, dt: number, input: InputFrame): void {
     ship.hyperspaceCooldown = Math.max(0, ship.hyperspaceCooldown - dt);
     ship.fireCooldown = Math.max(0, ship.fireCooldown - dt);
     game.thrusting = input.thrust;
-    if (input.hyperspacePressed && ship.hyperspaceCooldown <= 0) {
+    if (input.hyperspacePressed && ship.hyperspaceCooldown <= 0 && ship.invulnerable <= 0) {
       ship.x = game.random() * WORLD.halfWidth * 2 - WORLD.halfWidth;
       ship.y = game.random() * WORLD.halfHeight * 2 - WORLD.halfHeight;
       ship.velocityX = 0;

@@ -209,6 +209,25 @@ test("hyperspace checks collisions at the random destination immediately", () =>
   assert.equal(game.lives, 2);
 });
 
+test("hyperspace is unavailable during invulnerability and works after it expires", () => {
+  const game = makeGame();
+  game.asteroids = [asteroid(game, 300, 200)];
+  game.ship.x = 20;
+  game.ship.y = 30;
+  game.ship.velocityX = 10;
+  game.ship.invulnerable = 1;
+  updateGame(game, 0, { ...idle, hyperspacePressed: true });
+  assert.equal(game.ship.x, 20);
+  assert.equal(game.ship.y, 30);
+  assert.equal(game.ship.velocityX, 10);
+  assert.equal(game.ship.hyperspaceCooldown, 0);
+
+  game.ship.invulnerable = 0;
+  updateGame(game, 0, { ...idle, hyperspacePressed: true });
+  assert.equal(game.ship.velocityX, 0);
+  assert.equal(game.ship.hyperspaceCooldown, 5);
+});
+
 test("held fire respects its rate and four-shot limit", () => {
   const game = makeGame();
   game.asteroids = [asteroid(game, 300, 200)];
