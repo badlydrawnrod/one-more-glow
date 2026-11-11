@@ -220,10 +220,9 @@ world or HUD behind the settings controls. Prioritize clear, usable controls and
 a visible preview within the existing canvas.
 
 The visible sliders, current values, reset action and close action are drawn in
-the canvas. Pointer hit areas operate those controls directly. Keep labelled
-HTML range inputs and buttons synchronized as visually hidden semantic controls
-for keyboard focus, assistive technology and gamepad interaction; show focus in
-the canvas beside the corresponding control.
+the canvas. Pointer hit areas operate those controls directly, and the app owns
+the selected control and its input handling. Highlight the selected control in
+the canvas.
 
 While settings are open, freeze gameplay and its timers. Keep rendering a
 representative preview without advancing the simulation. Adjustments apply to
@@ -255,12 +254,10 @@ the accepted profile.
 
 Settings must be operable by pointer and keyboard, with Up and Down selecting
 controls and Left and Right adjusting values. Tab and Shift+Tab cycle through
-the settings controls while settings are open; Escape closes them. Provide labelled controls,
-visible focus and values available to assistive technology. Support navigating,
+the settings controls while settings are open; Escape closes them. Show labels,
+values and the selected control. Support navigating,
 adjusting, resetting and closing settings with a standard gamepad as well, so
-players can use either of the game's supported input methods. Opening settings
-moves focus to its controls; closing it returns focus to the invoking control
-where applicable. While settings are open, inputs used to interact with them
+players can use either of the game's supported input methods. Opening settings selects its first control; closing it returns to the game screen. While settings are open, inputs used to interact with them
 must not also start, restart, resume or control the game. Clear or consume held
 and discrete inputs at transitions so closing settings cannot trigger an
 unintended game action; a fresh press is required for subsequent actions.
@@ -290,7 +287,7 @@ to gameplay rules are required.
   the chosen appearance persists across game screens and reload. Reset restores
   the four defaults immediately and after reload.
 - Use pointer, keyboard and gamepad to adjust, reset and close settings. Check
-  labels, numeric values and focus, and confirm settings input does not leak
+  labels, numeric values and selection, and confirm settings input does not leak
   into gameplay or cause an unintended restart or resume.
 - Lose focus while settings are open and return; the run remains paused until
   explicitly resumed. Verify play and session-only tuning still work with

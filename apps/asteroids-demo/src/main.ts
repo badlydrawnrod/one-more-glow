@@ -35,51 +35,50 @@ const sliderTrack = { left: -420, right: 40 } as const;
 let profile: DisplayProfile = readDisplayProfile(() => window.localStorage);
 renderer.setDisplayProfile(profile);
 function saveProfile(): void { writeDisplayProfile(() => window.localStorage, profile); }
-const settingsPanel = document.querySelector<HTMLElement>("#settings-panel")!;
-const settingsCloseButton = document.querySelector<HTMLButtonElement>("#settings-close")!;
-const settingsResetButton = document.querySelector<HTMLButtonElement>("#settings-reset")!;
-const settingInputs = profileFields.map((field) => document.querySelector<HTMLInputElement>(`#${field.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`)!);
+const profileRanges = [[0.5, 4], [0.5, 4], [0, 2], [0.5, 2]] as const;
 let settingsOpen = false;
+let selectedSetting = 0;
 let gamepadButtons = new Set<number>();
 let gamepadNavAt = 0;
 function canOpenSettings(): boolean { return game.screen === "title" || game.screen === "paused"; }
-function displayProfile(): void {
-  settingInputs.forEach((control, index) => {
-    const field = profileFields[index];
-    control.value = String(profile[field]);
-    document.querySelector<HTMLOutputElement>(`#${control.id}-value`)!.value = profile[field].toFixed(1);
-  });
-  renderer.setDisplayProfile(profile);
-}
+function displayProfile(): void { renderer.setDisplayProfile(profile); }
 function openSettings(): void {
   if (settingsOpen || !canOpenSettings()) return;
   settingsOpen = true;
+  selectedSetting = 0;
   input.clearKeyboard();
   input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
-  settingsPanel.setAttribute("aria-hidden", "false");
-  settingsPanel.inert = false;
-  displayProfile();
-  settingInputs[0].focus();
+  screen.focus();
 }
 function closeSettings(): void {
   if (!settingsOpen) return;
   input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
   settingsOpen = false;
-  settingsPanel.setAttribute("aria-hidden", "true");
-  settingsPanel.inert = true;
   input.clearKeyboard();
   screen.focus();
 }
 function setProfileField(index: number, value: number): void {
+  const [minimum, maximum] = profileRanges[index];
   const field = profileFields[index];
-  profile = { ...profile, [field]: value };
+  profile = { ...profile, [field]: Math.max(minimum, Math.min(maximum, Math.round(value * 10) / 10)) };
   displayProfile();
   saveProfile();
 }
+function adjustSelected(direction: number): void {
+  if (selectedSetting < profileFields.length) setProfileField(selectedSetting, profile[profileFields[selectedSetting]] + direction * 0.1);
+}
+function resetProfile(): void {
+  profile = { ...ASTEROIDS_DEFAULT_DISPLAY_PROFILE };
+  displayProfile();
+  saveProfile();
+}
+function activateSelected(): void {
+  if (selectedSetting === 4) resetProfile();
+  else if (selectedSetting === 5) closeSettings();
+  else adjustSelected(1);
+}
+function moveSelection(direction: number): void { selectedSetting = (selectedSetting + direction + 6) % 6; }
 displayProfile();
-settingsCloseButton.addEventListener("click", closeSettings);
-settingsResetButton.addEventListener("click", () => { profile = { ...ASTEROIDS_DEFAULT_DISPLAY_PROFILE }; displayProfile(); saveProfile(); });
-settingInputs.forEach((control, index) => control.addEventListener("input", () => setProfileField(index, Number(control.value))));
 
 const cyan: Color = [0.24, 0.91, 1];
 const paleBlue: Color = [0.65, 0.92, 1];
@@ -325,10 +324,6 @@ function drawOutline(points: readonly Point[], color: Color = dimBlue, intensity
   drawPolygonOutline(drawing, points);
 }
 
-function settingRange(field: typeof profileFields[number]): readonly [number, number] {
-  const control = settingInputs[profileFields.indexOf(field)];
-  return [Number(control.min), Number(control.max)];
-}
 
 function drawSettings(): void {
   settingLabel("DISPLAY SETTINGS", -448, 315, cyan, 1.2, 29);
@@ -336,12 +331,11 @@ function drawSettings(): void {
 
   const labels = ["LINE WIDTH", "POINT RADIUS", "GLOW STRENGTH", "GLOW SPREAD"];
   for (let index = 0; index < profileFields.length; index += 1) {
-    const control = settingInputs[index];
     const rowY = sliderRows[index];
     const trackY = rowY - 28;
-    const [minimum, maximum] = settingRange(profileFields[index]);
+    const [minimum, maximum] = profileRanges[index];
     const value = profile[profileFields[index]];
-    const focused = document.activeElement === control;
+    const focused = selectedSetting === index;
     if (focused) drawOutline([[-454, rowY - 49], [70, rowY - 49], [70, rowY + 35], [-454, rowY + 35], [-454, rowY - 49]], amber, 1);
     settingLabel(labels[index], -420, rowY + 4, focused ? amber : paleBlue, 1, 20);
     settingLabel(value.toFixed(1), 8, rowY + 4, focused ? amber : cyan, 1, 20);
@@ -367,8 +361,8 @@ function drawSettings(): void {
   drawing.setColor(dimBlue); drawing.setIntensity(0.7);
   for (const [x, y] of [[150, -85], [210, -45], [365, 120], [416, 45], [318, 135]] as const) drawing.point(x, y);
 
-  const resetFocused = document.activeElement === settingsResetButton;
-  const closeFocused = document.activeElement === settingsCloseButton;
+  const resetFocused = selectedSetting === 4;
+  const closeFocused = selectedSetting === 5;
   if (resetFocused) drawOutline([[-454, -232], [-205, -232], [-205, -188], [-454, -188], [-454, -232]], amber, 1);
   if (closeFocused) drawOutline([[-180, -232], [-20, -232], [-20, -188], [-180, -188], [-180, -232]], amber, 1);
   settingLabel("RESET DEFAULTS", -432, -218, resetFocused ? amber : paleBlue, 1, 17);
@@ -384,12 +378,11 @@ function logicalPointerPosition(event: PointerEvent): Point {
 }
 
 function updateSliderFromPointer(index: number, x: number): void {
-  const [minimum, maximum] = settingRange(profileFields[index]);
+  const [minimum, maximum] = profileRanges[index];
   const ratio = Math.max(0, Math.min(1, (x - sliderTrack.left) / (sliderTrack.right - sliderTrack.left)));
   const value = Math.round((minimum + ratio * (maximum - minimum)) * 10) / 10;
-  settingInputs[index].focus();
-  settingInputs[index].value = String(value);
-  settingInputs[index].dispatchEvent(new Event("input", { bubbles: true }));
+  selectedSetting = index;
+  setProfileField(index, value);
 }
 
 screen.addEventListener("pointerdown", (event) => {
@@ -398,15 +391,15 @@ screen.addEventListener("pointerdown", (event) => {
   if (x >= -180 && x <= -20 && y >= -232 && y <= -188) { event.preventDefault(); closeSettings(); return; }
   if (x >= -454 && x <= -205 && y >= -232 && y <= -188) {
     event.preventDefault();
-    settingsResetButton.focus();
-    settingsResetButton.click();
+    selectedSetting = 4;
+    resetProfile();
     return;
   }
   const row = sliderRows.findIndex((rowY) => y >= rowY - 58 && y <= rowY + 26);
   if (row >= 0 && x >= -454 && x <= 70) {
     event.preventDefault();
     if (y <= sliderRows[row] - 14 && x >= sliderTrack.left - 20 && x <= sliderTrack.right + 20) updateSliderFromPointer(row, x);
-    else settingInputs[row].focus();
+    else selectedSetting = row;
   }
 });
 
@@ -435,12 +428,17 @@ window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") { event.preventDefault(); closeSettings(); }
     else if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Tab") {
       event.preventDefault();
-      const controls = [...settingInputs, settingsResetButton, settingsCloseButton];
-      const index = controls.indexOf(document.activeElement as HTMLInputElement);
+      input.blockKey(event.key);
       const backwards = event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey);
-      const next = index < 0 ? (backwards ? controls.length - 1 : 0)
-        : (index + (backwards ? -1 : 1) + controls.length) % controls.length;
-      controls[next].focus();
+      moveSelection(backwards ? -1 : 1);
+    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
+      event.preventDefault();
+      input.blockKey(event.key);
+      adjustSelected(event.key === "ArrowLeft" ? -1 : 1);
+    } else if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      input.blockKey(event.key);
+      if (!event.repeat) activateSelected();
     } else {
       input.blockKey(event.key);
       if (["p", "P", "w", "W", "a", "A", "d", "D", "Shift"].includes(event.key)) event.preventDefault();
@@ -474,28 +472,18 @@ function frame(now: number): void {
   if (!settingsOpen && canOpenSettings() && down(8) && !gamepadButtons.has(8)) openSettings();
   if (settingsOpen) {
     input.suppressWhileModal(pads);
-    const current = document.activeElement;
-    const activeIndex = settingInputs.indexOf(current as HTMLInputElement);
     if (down(1) && !gamepadButtons.has(1)) closeSettings();
-    else if (down(0) && !gamepadButtons.has(0)) {
-      if (activeIndex < 0) settingInputs[0].focus();
-      else settingInputs[activeIndex].stepUp();
-      settingInputs[activeIndex < 0 ? 0 : activeIndex].dispatchEvent(new Event("input", { bubbles: true }));
-    }
+    else if (down(0) && !gamepadButtons.has(0)) activateSelected();
     const vertical = pad?.buttons[13]?.pressed ? 1 : pad?.buttons[12]?.pressed ? -1 : 0;
-    if (vertical && now >= gamepadNavAt) {
-      const next = activeIndex < 0 ? 0 : (activeIndex + vertical + settingInputs.length) % settingInputs.length;
-      settingInputs[next].focus(); gamepadNavAt = now + 220;
+    if (settingsOpen && vertical && now >= gamepadNavAt) {
+      moveSelection(vertical); gamepadNavAt = now + 220;
     }
     const horizontal = pad?.buttons[15]?.pressed ? 1 : pad?.buttons[14]?.pressed ? -1
       : Math.abs(pad?.axes[0] ?? 0) > 0.45 ? Math.sign(pad!.axes[0]) : 0;
-    if (horizontal && activeIndex >= 0 && now >= gamepadNavAt) {
-      const control = settingInputs[activeIndex];
-      if (horizontal > 0) control.stepUp(); else control.stepDown();
-      control.dispatchEvent(new Event("input", { bubbles: true }));
-      gamepadNavAt = now + 160;
+    if (settingsOpen && horizontal && now >= gamepadNavAt) {
+      adjustSelected(horizontal); gamepadNavAt = now + 160;
     }
-    if (down(3) && !gamepadButtons.has(3)) { profile = { ...ASTEROIDS_DEFAULT_DISPLAY_PROFILE }; displayProfile(); saveProfile(); }
+    if (settingsOpen && down(3) && !gamepadButtons.has(3)) resetProfile();
   } else {
     updateGame(game, dt, input.read(game.screen, pads));
   }
