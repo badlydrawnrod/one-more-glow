@@ -18,6 +18,9 @@ Fire can be held. Hyperspace and start/pause activate on a fresh press. The
 spacecraft carries momentum, and the playfield wraps around its edges. Clearing
 an asteroid wave advances to a faster wave; saucers enter periodically.
 
+After game over, press Enter or gamepad Start to restart, or Escape or gamepad
+B to return to the title screen. The title returns automatically after ten seconds.
+
 Open **Settings** with S or gamepad Back/Select on the title or pause screen.
 Pause the game first to adjust settings during a run. Controls appear inside
 the canvas in the vector style beside a live sample scene. Use

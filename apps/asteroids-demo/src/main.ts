@@ -311,6 +311,7 @@ function drawMessage(gameState: Game, now: number): void {
     center(`FINAL SCORE ${String(gameState.score).padStart(6, "0")}`, 24);
     center(`HIGH SCORE ${String(gameState.highScore).padStart(6, "0")}`, -18, dimBlue);
     center("ENTER OR GAMEPAD START: RESTART", -74, paleBlue);
+    center("ESC OR GAMEPAD B: MAIN MENU", -112, dimBlue);
   } else if (gameState.screen === "intermission") {
     center("WAVE CLEAR", 230, cyan, 1.2);
   } else if (gameState.waveBanner > 0) {

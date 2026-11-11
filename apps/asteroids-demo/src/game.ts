@@ -10,6 +10,7 @@ export interface InputFrame {
   hyperspacePressed: boolean;
   startPressed: boolean;
   pausePressed: boolean;
+  titlePressed: boolean;
   connected: boolean;
 }
 
@@ -43,7 +44,7 @@ export interface Game {
   pausedFrom: "playing" | "intermission";
   ship: Ship; asteroids: Asteroid[]; projectiles: Projectile[];
   saucer: Saucer | null; saucerSpawnIn: number; intermission: number;
-  waveBanner: number; explosions: Explosion[]; thrusting: boolean;
+  waveBanner: number; gameOverRemaining: number; explosions: Explosion[]; thrusting: boolean;
   inputConnected: boolean; nextId: number; random: () => number;
 }
 
@@ -67,7 +68,7 @@ export function createGame(random: () => number = Math.random): Game {
   return {
     screen: "title", wave: 0, score: 0, highScore: 0, lives: 0, pausedFrom: "playing",
     ship: makeShip(), asteroids: [], projectiles: [], saucer: null,
-    saucerSpawnIn: 0, intermission: 0, waveBanner: 0, explosions: [],
+    saucerSpawnIn: 0, intermission: 0, waveBanner: 0, gameOverRemaining: 0, explosions: [],
     thrusting: false, inputConnected: false, nextId: 1, random,
   };
 }
@@ -157,6 +158,13 @@ export function updateGame(game: Game, dt: number, input: InputFrame): void {
   }
   if (game.screen === "gameover") {
     if (input.startPressed) startRun(game);
+    else {
+      game.gameOverRemaining -= step;
+      if (input.titlePressed || game.gameOverRemaining <= 0) {
+        game.screen = "title";
+        game.asteroids = []; game.projectiles = []; game.saucer = null; game.explosions = [];
+      }
+    }
     return;
   }
   if (input.pausePressed && (game.screen === "playing" || game.screen === "intermission")) {
@@ -241,6 +249,7 @@ function updatePlayer(game: Game, dt: number, input: InputFrame): void {
     ship.respawnDelay -= dt;
     if (ship.deathRemaining <= 0 && game.lives <= 0) {
       game.screen = "gameover";
+      game.gameOverRemaining = 10;
       return;
     }
     if (ship.deathRemaining <= 0 && ship.respawnDelay <= 0) {

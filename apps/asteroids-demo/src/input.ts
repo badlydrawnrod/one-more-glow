@@ -1,7 +1,7 @@
 import type { InputFrame, Screen } from "./game.ts";
 
 const continuousKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "a", "d", "w", " ", "Shift"]);
-const discreteKeys = new Set(["Enter", "p", "Shift"]);
+const discreteKeys = new Set(["Enter", "p", "Shift", "Escape"]);
 
 export function normalizeKey(key: string): string {
   return key.length === 1 ? key.toLowerCase() : key;
@@ -61,7 +61,7 @@ export class InputController {
     for (let index = 0; index < pad.buttons.length; index += 1) {
       const pressed = pad.buttons[index]?.pressed ?? false;
       if (pressed) this.blockedPadButtons.add(index);
-      if (index === 2 || index === 9) this.previousPadButtons.set(index, pressed);
+      if (index === 1 || index === 2 || index === 9) this.previousPadButtons.set(index, pressed);
     }
     if (Math.abs(pad.axes[0] ?? 0) > 0.16) this.blockedPadAxes.add(0);
     if ((pad.axes[1] ?? 0) < -0.35) this.blockedPadAxes.add(1);
@@ -93,6 +93,7 @@ export class InputController {
     const stickTurn = Math.abs(stick) > 0.16 ? stick : 0;
     const dpadTurn = Number(buttonPressed(15)) - Number(buttonPressed(14));
     const gamepadStart = buttonEdge(9);
+    const gamepadBack = buttonEdge(1);
     const enter = this.takeKeyEdge("Enter");
     const p = this.takeKeyEdge("p");
     return {
@@ -103,6 +104,7 @@ export class InputController {
       hyperspacePressed: this.takeKeyEdge("Shift") || (pad !== null && buttonEdge(2)),
       startPressed: enter || ((screen === "title" || screen === "gameover") && gamepadStart),
       pausePressed: p || ((screen !== "title" && screen !== "gameover") && gamepadStart),
+      titlePressed: this.takeKeyEdge("Escape") || (screen === "gameover" && gamepadBack),
       connected: pad !== null,
     };
   }

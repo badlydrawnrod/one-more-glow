@@ -50,6 +50,8 @@ indefinitely; the run ends when the last life is lost.
   when the next wave starts.
 - After the final death, show game over, final score and a restart prompt. A
   fresh press is required; holding start through the transition cannot restart.
+  Return to the title screen after ten seconds, or sooner on a fresh Escape or
+  gamepad B press. A fresh Enter or gamepad Start press restarts immediately.
 - Pause freezes gameplay and gameplay timers. Browser focus loss also pauses
   and clears held keyboard input; resuming requires an explicit action. Title
   and game-over screens remain usable.

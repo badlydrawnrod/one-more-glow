@@ -16,7 +16,7 @@ import {
 
 const idle = {
   turn: 0, thrust: false, fire: false, hyperspacePressed: false,
-  startPressed: false, pausePressed: false, connected: false,
+  startPressed: false, pausePressed: false, titlePressed: false, connected: false,
 };
 
 function makeGame() {
@@ -227,6 +227,26 @@ test("the last life enters game over after the explosion", () => {
   assert.equal(game.screen, "gameover");
 });
 
+test("game over returns to title after ten seconds or a menu press, while restart takes priority", () => {
+  const game = makeGame();
+  game.screen = "gameover";
+  game.gameOverRemaining = 10;
+  game.highScore = 400;
+  advance(game, 9.9);
+  assert.equal(game.screen, "gameover");
+  advance(game, 0.2);
+  assert.equal(game.screen, "title");
+  assert.equal(game.highScore, 400);
+  assert.equal(game.asteroids.length, 0);
+  game.screen = "gameover"; game.gameOverRemaining = 10;
+  updateGame(game, 0.01, { ...idle, titlePressed: true });
+  assert.equal(game.screen, "title");
+  game.screen = "gameover"; game.gameOverRemaining = 0;
+  updateGame(game, 0.01, { ...idle, startPressed: true });
+  assert.equal(game.screen, "playing");
+  assert.equal(game.highScore, 400);
+});
+
 test("saucer appearance and firing follow their gameplay timers", () => {
   const game = makeGame();
   game.saucerSpawnIn = 0;
@@ -296,6 +316,23 @@ test("standard gamepad maps steering, thrust, fire, hyperspace and start edges",
   controller.read("playing", [pad]);
   buttons[9].pressed = true;
   assert.equal(controller.read("playing", [pad]).pausePressed, true);
+});
+
+test("return to title requires a fresh Escape or gamepad B press", () => {
+  const controller = new InputController();
+  const buttons = Array.from({ length: 16 }, () => ({ pressed: false }));
+  const pad = { connected: true, axes: [0, 0], buttons };
+  buttons[1].pressed = true;
+  controller.read("playing", [pad]);
+  assert.equal(controller.read("gameover", [pad]).titlePressed, false);
+  buttons[1].pressed = false;
+  controller.read("gameover", [pad]);
+  buttons[1].pressed = true;
+  assert.equal(controller.read("gameover", [pad]).titlePressed, true);
+  controller.keyDown("Escape", false);
+  assert.equal(controller.read("gameover", [pad]).titlePressed, true);
+  controller.keyDown("Escape", true);
+  assert.equal(controller.read("gameover", [pad]).titlePressed, false);
 });
 
 test("gamepad inputs held in settings stay blocked until release", () => {
