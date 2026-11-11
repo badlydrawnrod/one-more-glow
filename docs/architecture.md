@@ -8,7 +8,7 @@ coordinate packages, but the root itself is not a publishable package.
 ```text
 apps/
   diagnostics/              # Vite app for checking library rendering
-  asteroids-demo/           # Vite app for keyboard/gamepad spacecraft flight
+  asteroids-demo/           # Vite app for keyboard/gamepad Asteroids gameplay
   gyruss-demo/              # Vite app for a keyboard/gamepad orbital shooter
 packages/
   one-more-glow/            # reusable drawing library
@@ -95,8 +95,8 @@ from library source or renderer internals.
 
 `apps/asteroids-demo/`
 
-An independent consumer of the library package. It demonstrates a simple
-Asteroids-style flight model with keyboard and browser Gamepad API input. Input
+An independent consumer of the library package. It implements a single-player
+Asteroids-style arcade game with keyboard and browser Gamepad API input. Input
 handling and game state belong to this app; it must use the public package
 entry point rather than library internals.
 

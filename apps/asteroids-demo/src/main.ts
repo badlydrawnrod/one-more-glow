@@ -1,288 +1,510 @@
 import {
   createWebGL2Renderer,
+  drawCircle,
   drawPolygonOutline,
   drawText,
+  measureText,
   type Color,
+  type DisplayProfile,
   type DrawingContext,
 } from "one-more-glow";
+import {
+  createGame,
+  respawnIsWaiting,
+  updateGame,
+  WORLD,
+  type Asteroid,
+  type Game,
+} from "./game.ts";
+import { InputController } from "./input.ts";
+import { readHighScore, writeHighScore } from "./high-score.ts";
+import { ASTEROIDS_DEFAULT_DISPLAY_PROFILE, readDisplayProfile, writeDisplayProfile } from "./display-profile.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing #screen canvas");
-const screen: HTMLCanvasElement = canvas;
+const screen = canvas;
 const gl = canvas.getContext("webgl2", { alpha: true });
 if (!gl) throw new Error("WebGL2 is unavailable in this browser");
+const renderer = createWebGL2Renderer(gl);
+const drawing: DrawingContext = renderer;
 
-const drawing: DrawingContext = createWebGL2Renderer(gl);
+const profileFields = ["lineWidth", "pointRadius", "glowStrength", "glowSpread"] as const;
+const sliderRows = [190, 90, -10, -110] as const;
+const sliderTrack = { left: -420, right: 40 } as const;
+let profile: DisplayProfile = readDisplayProfile(() => window.localStorage);
+renderer.setDisplayProfile(profile);
+function saveProfile(): void { writeDisplayProfile(() => window.localStorage, profile); }
+const settingsPanel = document.querySelector<HTMLElement>("#settings-panel")!;
+const settingsCloseButton = document.querySelector<HTMLButtonElement>("#settings-close")!;
+const settingsResetButton = document.querySelector<HTMLButtonElement>("#settings-reset")!;
+const settingInputs = profileFields.map((field) => document.querySelector<HTMLInputElement>(`#${field.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`)!);
+let settingsOpen = false;
+let gamepadButtons = new Set<number>();
+let gamepadNavAt = 0;
+function canOpenSettings(): boolean { return game.screen === "title" || game.screen === "paused"; }
+function displayProfile(): void {
+  settingInputs.forEach((control, index) => {
+    const field = profileFields[index];
+    control.value = String(profile[field]);
+    document.querySelector<HTMLOutputElement>(`#${control.id}-value`)!.value = profile[field].toFixed(1);
+  });
+  renderer.setDisplayProfile(profile);
+}
+function openSettings(): void {
+  if (settingsOpen || !canOpenSettings()) return;
+  settingsOpen = true;
+  input.clearKeyboard();
+  input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
+  settingsPanel.setAttribute("aria-hidden", "false");
+  settingsPanel.inert = false;
+  displayProfile();
+  settingInputs[0].focus();
+}
+function closeSettings(): void {
+  if (!settingsOpen) return;
+  input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
+  settingsOpen = false;
+  settingsPanel.setAttribute("aria-hidden", "true");
+  settingsPanel.inert = true;
+  input.clearKeyboard();
+  screen.focus();
+}
+function setProfileField(index: number, value: number): void {
+  const field = profileFields[index];
+  profile = { ...profile, [field]: value };
+  displayProfile();
+  saveProfile();
+}
+displayProfile();
+settingsCloseButton.addEventListener("click", closeSettings);
+settingsResetButton.addEventListener("click", () => { profile = { ...ASTEROIDS_DEFAULT_DISPLAY_PROFILE }; displayProfile(); saveProfile(); });
+settingInputs.forEach((control, index) => control.addEventListener("input", () => setProfileField(index, Number(control.value))));
+
 const cyan: Color = [0.24, 0.91, 1];
-const paleBlue: Color = [0.53, 0.89, 1];
+const paleBlue: Color = [0.65, 0.92, 1];
 const amber: Color = [1, 0.63, 0.29];
 const dimBlue: Color = [0.25, 0.68, 0.82];
-const world = { halfWidth: 512, halfHeight: 384 };
-const pressedKeys = new Set<string>();
+const input = new InputController();
+const game = createGame();
+const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+game.highScore = readHighScore(() => window.localStorage);
+
 type Point = readonly [number, number];
-
-const shipOutline: readonly Point[] = [[0, 25], [-16, -17], [0, -9], [16, -17]];
+const shipShape: readonly Point[] = [[0, 25], [-16, -17], [0, -9], [16, -17]];
 const shipDetail: readonly Point[] = [[-9, -12], [0, -4], [9, -12]];
-
-interface Ship {
-  x: number;
-  y: number;
-  heading: number;
-  velocityX: number;
-  velocityY: number;
-}
-
-interface Rock {
-  x: number;
-  y: number;
-  radius: number;
-  angle: number;
-  spin: number;
-  speedX: number;
-  speedY: number;
-  shape: readonly (readonly [number, number])[];
-}
-
-const ship: Ship = { x: 0, y: 0, heading: 0, velocityX: 0, velocityY: 0 };
-const rocks: Rock[] = [
-  makeRock(-300, 185, 54, 0.18, 19),
-  makeRock(315, 218, 38, -0.12, 37),
-  makeRock(350, -210, 68, 0.08, 61),
-  makeRock(-270, -245, 32, -0.2, 83),
-  makeRock(70, 305, 25, 0.15, 101),
-];
-const stars = Array.from({ length: 75 }, (_, index) => {
-  const seed = index * 127.1 + 31.7;
+const starfield = Array.from({ length: 95 }, (_, i) => {
+  const seed = i * 127.1 + 31.7;
   return {
-    x: fract(Math.sin(seed) * 43758.5453) * world.halfWidth * 2 - world.halfWidth,
-    y: fract(Math.sin(seed + 17.3) * 24634.6345) * world.halfHeight * 2 - world.halfHeight,
-    intensity: 0.2 + fract(Math.sin(seed + 8.4) * 17431.73) * 0.35,
+    x: fract(Math.sin(seed) * 43758.5453) * WORLD.halfWidth * 2 - WORLD.halfWidth,
+    y: fract(Math.sin(seed + 17.3) * 24634.6345) * WORLD.halfHeight * 2 - WORLD.halfHeight,
+    intensity: 0.18 + fract(Math.sin(seed + 8.4) * 17431.73) * 0.38,
   };
 });
 
-function makeRock(
-  x: number,
-  y: number,
-  radius: number,
-  spin: number,
-  seed: number,
-): Rock {
-  const shape = Array.from({ length: 9 }, (_, index) => {
-    const angle = (index / 9) * Math.PI * 2;
-    const variation = 0.76 + fract(Math.sin(seed + index * 9.17) * 4192.2) * 0.34;
-    return [Math.cos(angle) * radius * variation, Math.sin(angle) * radius * variation] as const;
-  });
-  return {
-    x, y, radius, angle: fract(seed * 0.618) * 360, spin,
-    speedX: Math.sin(seed) * 5,
-    speedY: Math.cos(seed * 1.3) * 4,
-    shape,
-  };
-}
-
-function fract(value: number): number {
-  return value - Math.floor(value);
-}
-
+function fract(value: number): number { return value - Math.floor(value); }
 function resizeCanvas(): void {
   const rect = screen.getBoundingClientRect();
-  const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
-  screen.width = Math.max(1, Math.round(rect.width * pixelRatio));
-  screen.height = Math.max(1, Math.round(rect.height * pixelRatio));
+  const ratio = Math.min(window.devicePixelRatio || 1, 2);
+  screen.width = Math.max(1, Math.round(rect.width * ratio));
+  screen.height = Math.max(1, Math.round(rect.height * ratio));
 }
 
-function wrap(value: number, halfExtent: number): number {
-  const span = halfExtent * 2;
-  return ((value + halfExtent) % span + span) % span - halfExtent;
+function drawWrapped(x: number, y: number, radius: number, drawAt: (x: number, y: number) => void): void {
+  const xs = [0];
+  const ys = [0];
+  if (x - radius < -WORLD.halfWidth) xs.push(WORLD.halfWidth * 2);
+  if (x + radius > WORLD.halfWidth) xs.push(-WORLD.halfWidth * 2);
+  if (y - radius < -WORLD.halfHeight) ys.push(WORLD.halfHeight * 2);
+  if (y + radius > WORLD.halfHeight) ys.push(-WORLD.halfHeight * 2);
+  for (const dx of xs) for (const dy of ys) drawAt(x + dx, y + dy);
 }
 
-function drawWrappedCopies(
-  x: number,
-  y: number,
-  halfWidth: number,
-  halfHeight: number,
-  drawAt: (x: number, y: number) => void,
-): void {
-  const xOffsets = [0];
-  const yOffsets = [0];
-  if (x - halfWidth < -world.halfWidth) xOffsets.push(world.halfWidth * 2);
-  if (x + halfWidth > world.halfWidth) xOffsets.push(-world.halfWidth * 2);
-  if (y - halfHeight < -world.halfHeight) yOffsets.push(world.halfHeight * 2);
-  if (y + halfHeight > world.halfHeight) yOffsets.push(-world.halfHeight * 2);
+function drawVerticalWraps(x: number, y: number, radius: number, drawAt: (x: number, y: number) => void): void {
+  const ys = [0];
+  if (y - radius < -WORLD.halfHeight) ys.push(WORLD.halfHeight * 2);
+  if (y + radius > WORLD.halfHeight) ys.push(-WORLD.halfHeight * 2);
+  for (const dy of ys) drawAt(x, y + dy);
+}
 
-  for (const offsetX of xOffsets) {
-    for (const offsetY of yOffsets) {
-      drawAt(x + offsetX, y + offsetY);
+function drawAsteroid(asteroid: Asteroid): void {
+  drawWrapped(asteroid.x, asteroid.y, asteroid.radius, (x, y) => {
+    drawing.pushTransform();
+    drawing.translate(x, y);
+    drawing.rotate(asteroid.angle * 180 / Math.PI);
+    drawing.setColor(asteroid.size === "small" ? paleBlue : dimBlue);
+    drawing.setIntensity(asteroid.size === "large" ? 0.8 : 0.95);
+    drawPolygonOutline(drawing, asteroid.shape);
+    drawing.popTransform();
+  });
+}
+
+function drawShip(gameState: Game, now: number): void {
+  const ship = gameState.ship;
+  if (gameState.screen === "title" || !ship.alive
+    || (ship.invulnerable > 0 && Math.floor(now / 90) % 2 === 0)) return;
+  const flame = 18 + Math.sin(now * 0.035) * 6;
+  drawWrapped(ship.x, ship.y, 30, (x, y) => {
+    drawing.pushTransform();
+    drawing.translate(x, y);
+    drawing.rotate(-ship.heading * 180 / Math.PI);
+    drawing.setColor(cyan);
+    drawing.setIntensity(1);
+    drawPolygonOutline(drawing, shipShape);
+    drawing.setColor(paleBlue);
+    drawing.setIntensity(0.6);
+    drawing.moveTo(...shipDetail[0]); drawing.lineTo(...shipDetail[1]); drawing.lineTo(...shipDetail[2]);
+    if (gameState.thrusting) {
+      drawing.setColor(amber); drawing.setIntensity(1);
+      drawing.moveTo(-6, -16); drawing.lineTo(0, -flame); drawing.lineTo(6, -16);
+    }
+    if (ship.invulnerable > 0) {
+      drawing.setColor(dimBlue); drawing.setIntensity(0.45);
+      drawCircle(drawing, [0, 0], 31);
+    }
+    drawing.popTransform();
+  });
+}
+
+function drawSaucer(gameState: Game): void {
+  const saucer = gameState.saucer;
+  if (!saucer) return;
+  const radius = saucer.kind === "small" ? 18 : 26;
+  const hull: readonly Point[] = [[-radius, 0], [-radius * 0.55, -5], [-radius * 0.3, -10],
+    [radius * 0.3, -10], [radius * 0.55, -5], [radius, 0], [radius * 0.55, 5],
+    [-radius * 0.55, 5], [-radius, 0]];
+  drawVerticalWraps(saucer.x, saucer.y, radius + 10, (x, y) => {
+    drawing.pushTransform(); drawing.translate(x, y);
+    drawing.setColor(saucer.kind === "small" ? amber : paleBlue); drawing.setIntensity(1);
+    drawPolygonOutline(drawing, hull);
+    drawing.moveTo(-radius * 0.3, -10); drawing.lineTo(0, -16); drawing.lineTo(radius * 0.3, -10);
+    drawing.popTransform();
+  });
+}
+
+function drawShots(gameState: Game): void {
+  for (const shot of gameState.projectiles) {
+    const color = shot.owner === "player" ? cyan : amber;
+    drawing.setColor(color); drawing.setIntensity(shot.owner === "player" ? 1.2 : 1.4);
+    drawWrapped(shot.x, shot.y, 15, (x, y) => {
+      drawing.moveTo(x, y); drawing.lineTo(x - shot.velocityX * 0.025, y - shot.velocityY * 0.025);
+    });
+  }
+}
+
+function drawEffects(gameState: Game): void {
+  for (const effect of gameState.explosions) {
+    const radius = (1 - effect.remaining / 0.8) * 28 + 5;
+    drawing.setColor(amber); drawing.setIntensity(Math.min(1.5, effect.remaining * 2));
+    drawCircle(drawing, [effect.x, effect.y], radius);
+    for (let i = 0; i < 6; i += 1) {
+      const angle = i * Math.PI / 3;
+      drawing.moveTo(effect.x + Math.cos(angle) * radius * 0.55, effect.y + Math.sin(angle) * radius * 0.55);
+      drawing.lineTo(effect.x + Math.cos(angle) * radius, effect.y + Math.sin(angle) * radius);
     }
   }
 }
 
-function rotatedHalfExtents(points: readonly Point[], angleDegrees: number): [number, number] {
-  const angle = angleDegrees * Math.PI / 180;
-  const cosine = Math.cos(angle);
-  const sine = Math.sin(angle);
-  let halfWidth = 0;
-  let halfHeight = 0;
-  for (const [x, y] of points) {
-    halfWidth = Math.max(halfWidth, Math.abs(x * cosine - y * sine));
-    halfHeight = Math.max(halfHeight, Math.abs(x * sine + y * cosine));
+const textOptions = { font: "segment16", height: 18, spacing: "kerned" } as const;
+const settingsTextOptions = { ...textOptions, height: 25 } as const;
+function label(text: string, x: number, y: number, color: Color = paleBlue, intensity = 1): void {
+  drawing.setColor(color); drawing.setIntensity(intensity); drawText(drawing, text, x, y, textOptions);
+}
+function settingLabel(text: string, x: number, y: number, color: Color = paleBlue, intensity = 1, height = 25): void {
+  drawing.setColor(color); drawing.setIntensity(intensity);
+  drawText(drawing, text, x, y, { ...settingsTextOptions, height });
+}
+function centered(text: string, y: number, color: Color = paleBlue, intensity = 1): void {
+  label(text, -measureText(text, textOptions).width / 2, y, color, intensity);
+}
+function titleHeading(text: string, y: number, height: number, color: Color, intensity: number): void {
+  const options = { font: "segment16", height, spacing: "kerned" } as const;
+  drawing.setColor(color); drawing.setIntensity(intensity);
+  drawText(drawing, text, -measureText(text, options).width / 2, y, options);
+}
+function centeredAt(text: string, centerX: number, y: number, color: Color = paleBlue, intensity = 1): void {
+  label(text, centerX - measureText(text, textOptions).width / 2, y, color, intensity);
+}
+
+function drawTitleVignette(now: number): void {
+  const time = reducedMotion.matches ? 0 : now / 1000;
+  const rock: readonly Point[] = [[-26, 2], [-19, 19], [-3, 27], [10, 17], [22, 23], [29, 5], [23, -17], [5, -25], [-16, -20], [-26, 2]];
+  for (const [x, y, scale, speed] of [[-165, 95, 0.75, 0.12], [166, 105, 0.55, -0.16]] as const) {
+    drawing.pushTransform();
+    drawing.translate(x, y + Math.sin(time * 0.5 + x) * 3);
+    drawing.rotate(time * speed * 180 / Math.PI);
+    drawing.scale(scale, scale);
+    drawing.setColor(dimBlue); drawing.setIntensity(0.55);
+    drawPolygonOutline(drawing, rock);
+    drawing.popTransform();
   }
-  return [halfWidth + 1, halfHeight + 1];
-}
-
-function drawRock(rock: Rock): void {
-  const [halfWidth, halfHeight] = rotatedHalfExtents(rock.shape, rock.angle);
-  drawWrappedCopies(rock.x, rock.y, halfWidth, halfHeight, (x, y) => drawRockAt(rock, x, y));
-}
-
-function drawRockAt(rock: Rock, x: number, y: number): void {
   drawing.pushTransform();
-  drawing.translate(x, y);
-  drawing.rotate(rock.angle);
-  drawing.setColor(dimBlue);
-  drawing.setIntensity(0.9);
-  drawPolygonOutline(drawing, rock.shape);
+  drawing.translate(0, 94 + Math.sin(time * 0.7) * 2);
+  drawing.rotate(-35);
+  drawing.setColor(cyan); drawing.setIntensity(0.7);
+  drawPolygonOutline(drawing, shipShape);
   drawing.popTransform();
 }
 
-function drawShip(thrusting: boolean, time: number): void {
-  const flicker = 20 + Math.sin(time * 0.035) * 6;
-  const points = [...shipOutline, ...shipDetail];
-  if (thrusting) points.push([-6, -16], [0, -flicker], [6, -16]);
-  const [halfWidth, halfHeight] = rotatedHalfExtents(points, -ship.heading * 180 / Math.PI);
-  drawWrappedCopies(ship.x, ship.y, halfWidth, halfHeight, (x, y) =>
-    drawShipAt(x, y, thrusting, flicker));
-}
-
-function drawShipAt(x: number, y: number, thrusting: boolean, flicker: number): void {
-  drawing.pushTransform();
-  drawing.translate(x, y);
-  // Flight heading increases clockwise from the ship's forward (+Y) direction;
-  // the drawing API's positive rotation is counter-clockwise.
-  drawing.rotate(-ship.heading * 180 / Math.PI);
-
-  drawing.setColor(cyan);
-  drawing.setIntensity(1);
-  drawPolygonOutline(drawing, shipOutline);
-  drawing.setColor(paleBlue);
-  drawing.setIntensity(0.62);
-  drawing.moveTo(...shipDetail[0]);
-  drawing.lineTo(...shipDetail[1]);
-  drawing.lineTo(...shipDetail[2]);
-
-  if (thrusting) {
-    drawing.setColor(amber);
-    drawing.setIntensity(0.85);
-    drawing.moveTo(-6, -16);
-    drawing.lineTo(0, -flicker);
-    drawing.lineTo(6, -16);
+function drawHud(gameState: Game): void {
+  label(`SCORE ${String(gameState.score).padStart(6, "0")}`, -485, 350, cyan);
+  label(`HI ${String(gameState.highScore).padStart(6, "0")}`, -215, 350, dimBlue);
+  label(`WAVE ${String(gameState.wave).padStart(2, "0")}`, 120, 350);
+  label(`SHIPS ${gameState.lives}`, 350, 350, amber);
+  if (gameState.ship.alive) {
+    label(`SPEED ${String(Math.round(Math.hypot(gameState.ship.velocityX, gameState.ship.velocityY))).padStart(3, "0")}`,
+      -485, -350, dimBlue);
+    label(gameState.ship.hyperspaceCooldown > 0
+      ? `HYPER ${gameState.ship.hyperspaceCooldown.toFixed(1)}` : "HYPER READY", -220, -350, amber);
+    label(gameState.thrusting ? "THRUST ENGAGED" : "THRUST OFF", 75, -350, amber);
+  } else if (respawnIsWaiting(gameState)) {
+    if (settingsOpen) centeredAt("WAITING FOR SAFE AREA", -250, -350, amber);
+    else centered("WAITING FOR SAFE AREA", -350, amber);
+  } else if (gameState.lives > 0) {
+    const text = `RESPAWN ${Math.max(0, gameState.ship.respawnDelay).toFixed(1)}`;
+    if (settingsOpen) centeredAt(text, -250, -350, amber);
+    else centered(text, -350, amber);
   }
-  drawing.popTransform();
+  label(gameState.inputConnected ? "CONTROLLER CONNECTED" : "KEYBOARD READY", -485, -375, dimBlue, 0.8);
 }
 
-function drawHud(thrusting: boolean, connected: boolean): void {
-  const textOptions = { font: "segment16", height: 16, spacing: "kerned" } as const;
-  drawing.setColor(dimBlue);
-  drawing.setIntensity(1);
-  drawText(drawing, "SECTOR 07", -480, 340, textOptions);
-  drawText(drawing, `VELOCITY ${Math.round(Math.hypot(ship.velocityX, ship.velocityY)).toString().padStart(3, "0")}`, 235, 340, textOptions);
-  drawing.setColor(connected ? paleBlue : dimBlue);
-  drawText(drawing, connected ? "CONTROLLER CONNECTED" : "KEYBOARD READY", -480, -340, textOptions);
-  drawing.setColor(amber);
-  drawText(drawing, thrusting ? "THRUST ENGAGED" : "THRUST OFF", -480, -365, textOptions);
-  drawing.setColor(dimBlue);
-  drawText(drawing, "FREE FLIGHT", 365, -340, textOptions);
+function drawMessage(gameState: Game, now: number): void {
+  const center = (text: string, y: number, color: Color = paleBlue, intensity = 1) => {
+    if (settingsOpen) centeredAt(text, -250, y, color, intensity);
+    else centered(text, y, color, intensity);
+  };
+  if (gameState.screen === "title") {
+    const brandOptions = { font: "segment16", height: 27, spacing: "kerned" } as const;
+    const prefix = "ONE MORE ";
+    const brandX = -measureText(`${prefix}GLOW`, brandOptions).width / 2;
+    drawing.setColor(paleBlue); drawing.setIntensity(1);
+    drawText(drawing, prefix, brandX, 240, brandOptions);
+    const pulse = reducedMotion.matches ? 0 : (1 + Math.sin(now * Math.PI * 2 / 3000)) / 2;
+    drawing.setColor([
+      paleBlue[0] + (amber[0] - paleBlue[0]) * pulse,
+      paleBlue[1] + (amber[1] - paleBlue[1]) * pulse,
+      paleBlue[2] + (amber[2] - paleBlue[2]) * pulse,
+    ]);
+    drawing.setIntensity(1 + 0.3 * pulse);
+    drawText(drawing, "GLOW", brandX + measureText(prefix, brandOptions).width, 240, brandOptions);
+    titleHeading("ASTEROIDS", 165, 58, cyan, 1.3);
+    drawTitleVignette(now);
+    label("KEYBOARD", -350, 27, cyan, 0.9);
+    label("GAMEPAD", 70, 27, cyan, 0.9);
+    label("TURN   ARROWS / A D", -350, -7);
+    label("TURN   STICK / D-PAD", 70, -7);
+    label("THRUST UP / W", -350, -37);
+    label("THRUST UP / A", 70, -37);
+    label("FIRE   SPACE", -350, -67);
+    label("FIRE   B", 70, -67);
+    label("HYPER  SHIFT", -350, -97);
+    label("HYPER  X", 70, -97);
+    center("PRESS ENTER OR START", -158, amber, 1.1);
+    center(`HIGH SCORE ${String(gameState.highScore).padStart(6, "0")}`, -205, dimBlue);
+    center("S / BACK/SELECT: SETTINGS", -238, dimBlue);
+  } else if (gameState.screen === "paused") {
+    center("PAUSED", 190, amber, 1.2);
+    center("PRESS P OR GAMEPAD START TO RESUME", 150);
+    center("S / BACK/SELECT: SETTINGS", 110, dimBlue);
+  } else if (gameState.screen === "gameover") {
+    center("GAME OVER", 72, amber, 1.2);
+    center(`FINAL SCORE ${String(gameState.score).padStart(6, "0")}`, 24);
+    center(`HIGH SCORE ${String(gameState.highScore).padStart(6, "0")}`, -18, dimBlue);
+    center("ENTER OR GAMEPAD START: RESTART", -74, paleBlue);
+  } else if (gameState.screen === "intermission") {
+    center("WAVE CLEAR", 230, cyan, 1.2);
+  } else if (gameState.waveBanner > 0) {
+    center(`WAVE ${gameState.wave}`, 230, cyan, 1.1);
+  }
 }
 
-function drawArena(thrusting: boolean, connected: boolean, time: number): void {
+function drawOutline(points: readonly Point[], color: Color = dimBlue, intensity = 0.8): void {
+  drawing.setColor(color);
+  drawing.setIntensity(intensity);
+  drawPolygonOutline(drawing, points);
+}
+
+function settingRange(field: typeof profileFields[number]): readonly [number, number] {
+  const control = settingInputs[profileFields.indexOf(field)];
+  return [Number(control.min), Number(control.max)];
+}
+
+function drawSettings(): void {
+  settingLabel("DISPLAY SETTINGS", -448, 315, cyan, 1.2, 29);
+  settingLabel("TUNE THE VECTOR DISPLAY", -448, 275, dimBlue, 0.9, 16);
+
+  const labels = ["LINE WIDTH", "POINT RADIUS", "GLOW STRENGTH", "GLOW SPREAD"];
+  for (let index = 0; index < profileFields.length; index += 1) {
+    const control = settingInputs[index];
+    const rowY = sliderRows[index];
+    const trackY = rowY - 28;
+    const [minimum, maximum] = settingRange(profileFields[index]);
+    const value = profile[profileFields[index]];
+    const focused = document.activeElement === control;
+    if (focused) drawOutline([[-454, rowY - 49], [70, rowY - 49], [70, rowY + 35], [-454, rowY + 35], [-454, rowY - 49]], amber, 1);
+    settingLabel(labels[index], -420, rowY + 4, focused ? amber : paleBlue, 1, 20);
+    settingLabel(value.toFixed(1), 8, rowY + 4, focused ? amber : cyan, 1, 20);
+    drawing.setColor(dimBlue); drawing.setIntensity(0.8);
+    drawing.moveTo(sliderTrack.left, trackY); drawing.lineTo(sliderTrack.right, trackY);
+    for (let tick = 0; tick <= 4; tick += 1) {
+      const x = sliderTrack.left + ((sliderTrack.right - sliderTrack.left) * tick / 4);
+      drawing.moveTo(x, trackY - 4); drawing.lineTo(x, trackY + 4);
+    }
+    const ratio = (value - minimum) / (maximum - minimum);
+    const handleX = sliderTrack.left + ratio * (sliderTrack.right - sliderTrack.left);
+    drawing.setColor(focused ? amber : cyan); drawing.setIntensity(1.2);
+    drawCircle(drawing, [handleX, trackY], 8);
+  }
+
+  drawOutline([[115, -125], [451, -125], [451, 215], [115, 215], [115, -125]], dimBlue, 0.6);
+  settingLabel("PREVIEW", 135, 175, dimBlue, 0.9, 17);
+  drawing.pushTransform(); drawing.translate(280, 18); drawing.rotate(-25);
+  drawOutline(shipShape, cyan, 1.2); drawing.popTransform();
+  drawOutline([[157, 72], [175, 105], [202, 112], [219, 98], [236, 108], [253, 76], [245, 46], [219, 35], [188, 41], [164, 48], [157, 72]], paleBlue, 1);
+  drawing.setColor(amber); drawing.setIntensity(1.3);
+  drawing.moveTo(330, -55); drawing.lineTo(376, -55); drawing.point(397, -55);
+  drawing.setColor(dimBlue); drawing.setIntensity(0.7);
+  for (const [x, y] of [[150, -85], [210, -45], [365, 120], [416, 45], [318, 135]] as const) drawing.point(x, y);
+
+  const resetFocused = document.activeElement === settingsResetButton;
+  const closeFocused = document.activeElement === settingsCloseButton;
+  if (resetFocused) drawOutline([[-454, -232], [-205, -232], [-205, -188], [-454, -188], [-454, -232]], amber, 1);
+  if (closeFocused) drawOutline([[-180, -232], [-20, -232], [-20, -188], [-180, -188], [-180, -232]], amber, 1);
+  settingLabel("RESET DEFAULTS", -432, -218, resetFocused ? amber : paleBlue, 1, 17);
+  settingLabel("CLOSE", -158, -218, closeFocused ? amber : paleBlue, 1, 17);
+  settingLabel("UP / DOWN SELECT    LEFT / RIGHT ADJUST", -448, -285, dimBlue, 0.9, 16);
+  settingLabel("TAB NAVIGATE   ESC CLOSE   GAMEPAD Y RESET / B CLOSE", -448, -318, dimBlue, 0.9, 13);
+}
+
+function logicalPointerPosition(event: PointerEvent): Point {
+  const rect = screen.getBoundingClientRect();
+  return [((event.clientX - rect.left) / rect.width) * WORLD.halfWidth * 2 - WORLD.halfWidth,
+    WORLD.halfHeight - ((event.clientY - rect.top) / rect.height) * WORLD.halfHeight * 2];
+}
+
+function updateSliderFromPointer(index: number, x: number): void {
+  const [minimum, maximum] = settingRange(profileFields[index]);
+  const ratio = Math.max(0, Math.min(1, (x - sliderTrack.left) / (sliderTrack.right - sliderTrack.left)));
+  const value = Math.round((minimum + ratio * (maximum - minimum)) * 10) / 10;
+  settingInputs[index].focus();
+  settingInputs[index].value = String(value);
+  settingInputs[index].dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+screen.addEventListener("pointerdown", (event) => {
+  const [x, y] = logicalPointerPosition(event);
+  if (!settingsOpen) return;
+  if (x >= -180 && x <= -20 && y >= -232 && y <= -188) { event.preventDefault(); closeSettings(); return; }
+  if (x >= -454 && x <= -205 && y >= -232 && y <= -188) {
+    event.preventDefault();
+    settingsResetButton.focus();
+    settingsResetButton.click();
+    return;
+  }
+  const row = sliderRows.findIndex((rowY) => y >= rowY - 58 && y <= rowY + 26);
+  if (row >= 0 && x >= -454 && x <= 70) {
+    event.preventDefault();
+    if (y <= sliderRows[row] - 14 && x >= sliderTrack.left - 20 && x <= sliderTrack.right + 20) updateSliderFromPointer(row, x);
+    else settingInputs[row].focus();
+  }
+});
+
+function draw(gameState: Game, now: number): void {
   drawing.beginFrame();
-  drawing.setColor(cyan);
-  for (const star of stars) {
-    drawing.setIntensity(star.intensity);
-    drawing.point(star.x, star.y);
+  if (settingsOpen) {
+    drawSettings();
+    drawing.endFrame();
+    return;
   }
-  for (const rock of rocks) drawRock(rock);
-  drawShip(thrusting, time);
-  drawHud(thrusting, connected);
+  for (const star of starfield) { drawing.setColor(dimBlue); drawing.setIntensity(star.intensity); drawing.point(star.x, star.y); }
+  for (const asteroid of gameState.asteroids) drawAsteroid(asteroid);
+  drawSaucer(gameState); drawShots(gameState); drawEffects(gameState); drawShip(gameState, now);
+  if (gameState.screen !== "title") drawHud(gameState);
+  drawMessage(gameState, now);
   drawing.endFrame();
 }
 
-function readInput(): { turn: number; thrust: boolean; connected: boolean } {
-  const keyboardTurn = Number(pressedKeys.has("ArrowRight") || pressedKeys.has("d"))
-    - Number(pressedKeys.has("ArrowLeft") || pressedKeys.has("a"));
-  const keyboardThrust = pressedKeys.has("ArrowUp") || pressedKeys.has("w");
-  const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((pad) => pad?.connected) ?? null;
-  if (!gamepad) {
-    return { turn: keyboardTurn, thrust: keyboardThrust, connected: false };
-  }
-
-  const stickTurn = Math.abs(gamepad.axes[0] ?? 0) > 0.16 ? gamepad.axes[0] ?? 0 : 0;
-  const dpadTurn = Number(gamepad.buttons[15]?.pressed ?? false)
-    - Number(gamepad.buttons[14]?.pressed ?? false);
-  const stickThrust = (gamepad.axes[1] ?? 0) < -0.35;
-  const dpadThrust = gamepad.buttons[12]?.pressed ?? false;
-  const buttonThrust = gamepad.buttons[0]?.pressed ?? false;
-  return {
-    turn: clamp(keyboardTurn + (stickTurn || dpadTurn), -1, 1),
-    thrust: keyboardThrust || stickThrust || dpadThrust || buttonThrust,
-    connected: true,
-  };
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
-}
-
-function update(deltaSeconds: number, input: ReturnType<typeof readInput>): void {
-  ship.heading += input.turn * 3.4 * deltaSeconds;
-  if (input.thrust) {
-    ship.velocityX += Math.sin(ship.heading) * 175 * deltaSeconds;
-    ship.velocityY += Math.cos(ship.heading) * 175 * deltaSeconds;
-  }
-  const drag = Math.pow(0.992, deltaSeconds * 60);
-  ship.velocityX *= drag;
-  ship.velocityY *= drag;
-
-  const speed = Math.hypot(ship.velocityX, ship.velocityY);
-  if (speed > 360) {
-    ship.velocityX = ship.velocityX / speed * 360;
-    ship.velocityY = ship.velocityY / speed * 360;
-  }
-  ship.x = wrap(ship.x + ship.velocityX * deltaSeconds, world.halfWidth);
-  ship.y = wrap(ship.y + ship.velocityY * deltaSeconds, world.halfHeight);
-
-  for (const rock of rocks) {
-    rock.x = wrap(rock.x + rock.speedX * deltaSeconds, world.halfWidth);
-    rock.y = wrap(rock.y + rock.speedY * deltaSeconds, world.halfHeight);
-    rock.angle = (rock.angle + rock.spin * deltaSeconds) % 360;
-  }
-}
-
-const handledKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "a", "d", "w"]);
 window.addEventListener("keydown", (event) => {
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  if (handledKeys.has(key)) {
+  if (event.key.toLowerCase() === "s" && !event.ctrlKey && !event.metaKey && !event.altKey && (settingsOpen || canOpenSettings())) {
     event.preventDefault();
-    pressedKeys.add(key);
+    if (!settingsOpen && !event.repeat) openSettings();
+    return;
   }
+  if (settingsOpen) {
+    if (event.key === "Escape") { event.preventDefault(); closeSettings(); }
+    else if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Tab") {
+      event.preventDefault();
+      const controls = [...settingInputs, settingsResetButton, settingsCloseButton];
+      const index = controls.indexOf(document.activeElement as HTMLInputElement);
+      const backwards = event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey);
+      const next = index < 0 ? (backwards ? controls.length - 1 : 0)
+        : (index + (backwards ? -1 : 1) + controls.length) % controls.length;
+      controls[next].focus();
+    } else {
+      input.blockKey(event.key);
+      if (["p", "P", "w", "W", "a", "A", "d", "D", "Shift"].includes(event.key)) event.preventDefault();
+    }
+    return;
+  }
+  if (input.keyDown(event.key, event.repeat)) event.preventDefault();
 });
-window.addEventListener("keyup", (event) => {
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  pressedKeys.delete(key);
-});
-window.addEventListener("blur", () => pressedKeys.clear());
+window.addEventListener("keyup", (event) => input.keyUp(event.key));
+
+function pauseForBlur(): void {
+  input.clearKeyboard();
+  input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
+  if (game.screen === "playing" || game.screen === "intermission") {
+    game.pausedFrom = game.screen;
+    game.screen = "paused";
+  }
+}
+window.addEventListener("blur", pauseForBlur);
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
 let lastTime = 0;
-function frame(time: number): void {
-  const deltaSeconds = lastTime === 0 ? 0 : Math.min((time - lastTime) / 1000, 0.05);
-  lastTime = time;
-  const input = readInput();
-  update(deltaSeconds, input);
-  drawArena(input.thrust, input.connected, time);
+let storedHighScore = game.highScore;
+function frame(now: number): void {
+  const dt = lastTime === 0 ? 0 : Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+  const pads = Array.from(navigator.getGamepads?.() ?? []);
+  const pad = pads.find((candidate) => candidate?.connected) ?? null;
+  const down = (index: number) => pad?.buttons[index]?.pressed ?? false;
+  if (!settingsOpen && canOpenSettings() && down(8) && !gamepadButtons.has(8)) openSettings();
+  if (settingsOpen) {
+    input.suppressWhileModal(pads);
+    const current = document.activeElement;
+    const activeIndex = settingInputs.indexOf(current as HTMLInputElement);
+    if (down(1) && !gamepadButtons.has(1)) closeSettings();
+    else if (down(0) && !gamepadButtons.has(0)) {
+      if (activeIndex < 0) settingInputs[0].focus();
+      else settingInputs[activeIndex].stepUp();
+      settingInputs[activeIndex < 0 ? 0 : activeIndex].dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    const vertical = pad?.buttons[13]?.pressed ? 1 : pad?.buttons[12]?.pressed ? -1 : 0;
+    if (vertical && now >= gamepadNavAt) {
+      const next = activeIndex < 0 ? 0 : (activeIndex + vertical + settingInputs.length) % settingInputs.length;
+      settingInputs[next].focus(); gamepadNavAt = now + 220;
+    }
+    const horizontal = pad?.buttons[15]?.pressed ? 1 : pad?.buttons[14]?.pressed ? -1
+      : Math.abs(pad?.axes[0] ?? 0) > 0.45 ? Math.sign(pad!.axes[0]) : 0;
+    if (horizontal && activeIndex >= 0 && now >= gamepadNavAt) {
+      const control = settingInputs[activeIndex];
+      if (horizontal > 0) control.stepUp(); else control.stepDown();
+      control.dispatchEvent(new Event("input", { bubbles: true }));
+      gamepadNavAt = now + 160;
+    }
+    if (down(3) && !gamepadButtons.has(3)) { profile = { ...ASTEROIDS_DEFAULT_DISPLAY_PROFILE }; displayProfile(); saveProfile(); }
+  } else {
+    updateGame(game, dt, input.read(game.screen, pads));
+  }
+  gamepadButtons = new Set([0, 1, 3, 8].filter(down));
+  if (game.highScore !== storedHighScore) {
+    storedHighScore = game.highScore;
+    writeHighScore(() => window.localStorage, storedHighScore);
+  }
+  draw(game, now);
   requestAnimationFrame(frame);
 }
-
 requestAnimationFrame(frame);

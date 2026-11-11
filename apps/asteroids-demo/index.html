@@ -4,24 +4,36 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#05070c" />
-    <title>Asteroids Flight — One More Glow</title>
+    <title>Asteroids — One More Glow</title>
   </head>
   <body>
     <main class="flight-app">
       <header class="topbar">
-        <a class="wordmark" href="/" aria-label="One More Glow home">OMG<span> / </span>FLIGHT TEST</a>
+        <a class="wordmark" href="/" aria-label="One More Glow home">OMG<span> / </span>ASTEROIDS</a>
       </header>
 
-      <section class="game-shell" aria-label="Asteroids style spacecraft flight demo">
-        <canvas id="screen" width="800" height="600" aria-label="Vector spacecraft in an asteroid field"></canvas>
+      <section class="game-shell" aria-label="Asteroids arcade game">
+        <canvas id="screen" width="1024" height="768" tabindex="-1" aria-label="Asteroids game and in-game display settings. On the title or pause screen, press S or use gamepad Back or Select to open settings. Press Enter to start, arrows or A and D to rotate, Up or W to thrust, Space to fire, Shift for hyperspace, and P to pause."></canvas>
         <div class="screen-vignette" aria-hidden="true"></div>
-        <div class="crosshair" aria-hidden="true">+</div>
+      </section>
+      <section id="settings-panel" class="visually-hidden" aria-label="Display settings" aria-hidden="true" inert>
+        <h1>Display settings</h1>
+        <p>Changes preview immediately in the sample scene.</p>
+        <div class="setting"><label for="line-width">Line width <output id="line-width-value" for="line-width" aria-live="polite"></output></label><input id="line-width" type="range" min="0.5" max="4" step="0.1"></div>
+        <div class="setting"><label for="point-radius">Point radius <output id="point-radius-value" for="point-radius" aria-live="polite"></output></label><input id="point-radius" type="range" min="0.5" max="4" step="0.1"></div>
+        <div class="setting"><label for="glow-strength">Glow strength <output id="glow-strength-value" for="glow-strength" aria-live="polite"></output></label><input id="glow-strength" type="range" min="0" max="2" step="0.1"></div>
+        <div class="setting"><label for="glow-spread">Glow spread <output id="glow-spread-value" for="glow-spread" aria-live="polite"></output></label><input id="glow-spread" type="range" min="0.5" max="2" step="0.1"></div>
+        <button id="settings-reset" type="button">Reset display settings to Asteroids defaults</button>
+        <button id="settings-close" type="button">Close display settings</button>
+        <p>Gamepad: D-pad navigates and adjusts; A increases; Y resets; B closes.</p>
       </section>
 
-      <footer class="controls">
-        <div class="control-group"><span class="control-icon">↶ ↷</span><span><b>STEER</b><small>← → &nbsp; / &nbsp; A D &nbsp; / &nbsp; STICK</small></span></div>
-        <div class="control-group"><span class="control-icon thrust-icon">↑</span><span><b>THRUST</b><small>↑ &nbsp; / &nbsp; W &nbsp; / &nbsp; A BUTTON</small></span></div>
-        <div class="control-note">Drift carries you. The arena wraps around.</div>
+      <footer class="controls" aria-label="Game controls">
+        <div class="control-group"><span class="control-icon">↶ ↷</span><span><b>ROTATE</b><small>← → / A D / LEFT STICK / D-PAD</small></span></div>
+        <div class="control-group"><span class="control-icon thrust-icon">↑</span><span><b>THRUST</b><small>↑ / W / STICK / D-PAD / A BUTTON</small></span></div>
+        <div class="control-group"><span class="control-icon">✳</span><span><b>FIRE</b><small>SPACE / GAMEPAD B</small></span></div>
+        <div class="control-group"><span class="control-icon thrust-icon">◎</span><span><b>HYPERSPACE</b><small>SHIFT / GAMEPAD X</small></span></div>
+        <div class="control-note">P or gamepad Start pauses. Wrap the field. Stay alive.</div>
       </footer>
     </main>
     <script type="module" src="/src/main.ts"></script>

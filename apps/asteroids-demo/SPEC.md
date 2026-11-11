@@ -1,12 +1,13 @@
-# Asteroids Flight: gameplay
+# Asteroids: gameplay
 
-This is a reverse-engineered baseline of the current Asteroids-style flight
-demo, not a claim that every detail is an accepted design decision. Values and
-mechanics can be reconsidered as the demo develops. See [README.md](README.md)
-for how to run and control it.
+This specification preserves the original Asteroids-style flight baseline and
+records the accepted complete-game refresh. See [README.md](README.md) for how
+to run and control the game.
 
-## Current demo
+## Previous flight baseline
 
+- This describes the prototype before the accepted refresh; it is historical
+  context, not the current implementation target.
 - The player steers a spacecraft and applies forward thrust in a free-flight
   arena. The ship starts at rest in the centre, facing upward.
 - Thrust accelerates the ship in its facing direction. Turning changes its
@@ -23,14 +24,13 @@ for how to run and control it.
   or `THRUST OFF`; input status reads `CONTROLLER CONNECTED` when a connected
   gamepad is detected and `KEYBOARD READY` otherwise.
 
-This is currently a flight demonstration: it has no firing, collision effects,
-score, lives or game-over state. Whether and how to add gameplay is an open
-decision, not an instruction to implement those features.
+The previous prototype had no firing, collision effects, score, lives or
+game-over state. Those mechanics are specified in the accepted refresh below.
 
-## Proposed refresh: complete game
+## Accepted refresh: complete game
 
-The following is a **proposed** design for review, not accepted or implemented
-behavior. The values are starting points for playtesting.
+The following design is **accepted** and is the implementation target. Values
+identified as starting points remain subject to playtesting.
 
 ### Goal and flow
 
@@ -38,12 +38,16 @@ Survive as long as possible and score points by destroying asteroids and enemy
 saucers. Clear all asteroids to advance to the next, harder wave. Waves continue
 indefinitely; the run ends when the last life is lost.
 
-- A title screen names the game, explains the controls and offers start. Start
+- A title screen highlights One More Glow and Asteroids with prominent vector
+  lettering, explains the controls and offers start. Start
   resets the score, lives, wave and transient state. Begin wave 1 with three
   lives, including the ship in play, and briefly display each wave number.
 - When the last asteroid is destroyed, remove the saucer and all shots, then
-  start the next wave after a two-second intermission. The ship retains its
-  position, velocity and remaining lives.
+  start the next wave after a two-second intermission. The ship keeps its
+  position, velocity and remaining lives as the intermission begins, and remains
+  controllable: the player can turn, thrust, fire and use available hyperspace.
+  Intermission shots continue moving and expiring; clear any remaining shots
+  when the next wave starts.
 - After the final death, show game over, final score and a restart prompt. A
   fresh press is required; holding start through the transition cannot restart.
 - Pause freezes gameplay and gameplay timers. Browser focus loss also pauses
@@ -151,7 +155,7 @@ unavailable. Show the high score on the title and game-over screens.
 Difficulty increases with wave number `n`, starting at 1. Cap the settings so an
 indefinitely long run remains playable:
 
-| Parameter | Proposed progression |
+| Parameter | Accepted progression |
 | --- | --- |
 | Large asteroids at wave start | `min(4 + n - 1, 12)` |
 | Starting asteroid speed | Wave 1 baseline multiplied by `min(1 + 0.08 × (n - 1), 2)` |
@@ -164,10 +168,17 @@ the player time to react, and later waves should be more demanding without
 unavoidable spawn collisions. Once all caps are reached, subsequent waves use
 the capped settings. Start the saucer appearance delay at each wave's start.
 
+Initial implementation tuning uses the existing flight model's 3.4 rad/s
+rotation, 175 units/s² thrust, 0.992 per-frame drag at 60 Hz and 360 units/s
+speed limit. Wave 1 large asteroids start at 20–44 units/s; large and small
+saucers start at 48 and 68 units/s. Small-saucer aim varies by up to 0.18
+radians. Treat these as playtest starting values, not new progression rules.
+
 ### Presentation and boundaries
 
 Retain the glowing vector aesthetic, star field, ship thrust flame and segmented
-text. Distinguish asteroid sizes, saucer sizes, player and enemy shots, ship
+text. Give asteroids angular, irregular outlines with a pronounced indentation
+to suggest rocky silhouettes. Distinguish asteroid sizes, saucer sizes, player and enemy shots, ship
 destruction and respawn protection. Keep the HUD readable without obscuring the
 playfield. Adapt the canvas to available space while preserving the playfield
 aspect ratio and consistent gameplay coordinates.
@@ -192,3 +203,98 @@ configurable bindings and online leaderboards are deferred.
   progression reaches its caps and continues. Extra lives work at thresholds.
 - Saucer spawning, firing, departure and cleanup follow their timers, and pause
   freezes those timers. High score survives reload when storage works.
+
+## Accepted: live display settings
+
+**Status: Accepted.** Shared profile semantics and valid values are defined by
+the [vector display specification](../../docs/specs/vector-display.md#global-display-profile-options).
+
+### Experience
+
+Show the S keyboard and gamepad Back/Select shortcuts for Settings on the title
+and pause screens. Settings cannot be opened during active play, intermission,
+or game over; a player can pause a run first. Show the
+settings controls on a dedicated screen inside the game canvas using its vector
+aesthetic, with a representative game-like preview scene. Do not draw the game
+world or HUD behind the settings controls. Prioritize clear, usable controls and
+a visible preview within the existing canvas.
+
+The visible sliders, current values, reset action and close action are drawn in
+the canvas. Pointer hit areas operate those controls directly. Keep labelled
+HTML range inputs and buttons synchronized as visually hidden semantic controls
+for keyboard focus, assistive technology and gamepad interaction; show focus in
+the canvas beside the corresponding control.
+
+While settings are open, freeze gameplay and its timers. Keep rendering a
+representative preview without advancing the simulation. Adjustments apply to
+the next rendered frame immediately and remain in effect when settings are
+closed. Closing settings returns to the
+screen from which it was opened; a paused run stays paused until the player
+explicitly resumes. Focus loss retains the existing pause and input-clearing
+behavior and must not resume a run when focus returns.
+
+Provide labelled controls with a visible numeric value for each of the four
+public display-profile fields:
+
+| Control | Range | Default |
+| --- | --- | --- |
+| Line width (CSS pixels) | 0.5–4 | 1.0 |
+| Point radius (CSS pixels) | 0.5–4 | 1.0 |
+| Glow strength | 0–2 | 0.2 |
+| Glow spread | 0.5–2 | 1 |
+
+Use adjustments fine enough to make visible tuning practical; 0.1 increments
+are the proposed starting point. Provide a reset action that immediately
+restores the Asteroids defaults in the table and updates the controls and preview. The
+profile applies globally to the game's vector drawing, including its HUD and
+text. It does not change gameplay, geometry, colours or per-object intensity.
+Do not expose brightness, persistence or other effects that are not part of
+the accepted profile.
+
+### Input, preferences and boundaries
+
+Settings must be operable by pointer and keyboard, with Up and Down selecting
+controls and Left and Right adjusting values. Tab and Shift+Tab cycle through
+the settings controls while settings are open; Escape closes them. Provide labelled controls,
+visible focus and values available to assistive technology. Support navigating,
+adjusting, resetting and closing settings with a standard gamepad as well, so
+players can use either of the game's supported input methods. Opening settings
+moves focus to its controls; closing it returns focus to the invoking control
+where applicable. While settings are open, inputs used to interact with them
+must not also start, restart, resume or control the game. Clear or consume held
+and discrete inputs at transitions so closing settings cannot trigger an
+unintended game action; a fresh press is required for subsequent actions.
+
+Keep the selected profile across screen changes and reloads on the same browser
+using local storage. Start with the Asteroids defaults in the table when no
+saved preference exists. Treat unavailable storage, malformed data and values
+outside the library's valid ranges as non-fatal: use these defaults for an
+invalid saved profile, and allow tuning and play for the current session even
+if saving fails. Existing valid saved preferences remain in effect. Reset also
+replaces the saved preference when storage is available. These app defaults do
+not change the shared library defaults. This preference is separate from the
+high score.
+
+The app owns the settings interface and preference; configure the renderer
+through the library's public profile API. Continue drawing the game through
+`DrawingContext`, without exposing renderer-specific configuration as drawing
+state or importing renderer internals. No shared settings framework or changes
+to gameplay rules are required.
+
+### Review scenarios
+
+- Open settings from title and pause; the sample scene is visible and a run
+  does not advance. Confirm all entry methods are unavailable during active
+  play, intermission and game over.
+- Change each value and see the result immediately; close settings and confirm
+  the chosen appearance persists across game screens and reload. Reset restores
+  the four defaults immediately and after reload.
+- Use pointer, keyboard and gamepad to adjust, reset and close settings. Check
+  labels, numeric values and focus, and confirm settings input does not leak
+  into gameplay or cause an unintended restart or resume.
+- Lose focus while settings are open and return; the run remains paused until
+  explicitly resumed. Verify play and session-only tuning still work with
+  unavailable storage or an invalid saved profile.
+- Check that settings and a useful preview remain accessible at narrow and
+  wide viewport sizes, and that global profile changes affect the HUD as well
+  as game objects.

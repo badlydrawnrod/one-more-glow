@@ -41,29 +41,48 @@ body {
   overflow: hidden;
   border: 1px solid #1a3945;
   background: #05070c;
-  box-shadow: 0 0 0 1px rgb(31 76 90 / 20%), 0 20px 80px rgb(0 0 0 / 40%);
+  box-shadow: 0 0 0 1px rgb(31 76 90 / 20%), 0 20px 80px rgb(0 0 0 / 40%), 0 0 34px rgb(0 113 141 / 10%);
 }
 
-canvas { display: block; width: 100%; height: 100%; }
-.screen-vignette { position: absolute; inset: 0; pointer-events: none; background: radial-gradient(ellipse, transparent 54%, rgb(1 4 8 / 52%) 100%); }
-.crosshair { position: absolute; left: 50%; top: 50%; color: rgb(101 155 166 / 35%); font-size: 14px; transform: translate(-50%, -50%); pointer-events: none; }
+.visually-hidden {
+  position: fixed !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+button:focus-visible, input:focus-visible { outline: 2px solid #ffbd67; outline-offset: 3px; }
 
-.controls { gap: 16px; padding: 17px 2px 0; }
+canvas { position: relative; z-index: 1; display: block; width: 100%; height: 100%; }
+.screen-vignette { position: absolute; z-index: 2; inset: 0; pointer-events: none; background: radial-gradient(ellipse, transparent 54%, rgb(1 4 8 / 40%) 100%); }
+
+.controls { align-items: flex-start; flex-wrap: wrap; gap: 16px 22px; padding: 17px 2px 0; }
 .control-group { display: flex; align-items: center; gap: 11px; }
 .control-icon { min-width: 34px; color: #61e7f4; font: 600 21px "Arial Narrow", sans-serif; text-align: center; }
 .thrust-icon { color: #ffbd67; }
 .control-group b, .control-group small { display: block; }
 .control-group b { margin-bottom: 4px; color: #c1d7db; font: 600 10px "Arial Narrow", sans-serif; letter-spacing: .12em; }
 .control-group small { color: #58727c; font-size: 8px; letter-spacing: .04em; white-space: nowrap; }
-.control-note { color: #465861; font-size: 9px; text-align: right; }
+.control-note { flex: 1 1 100%; color: #465861; font-size: 9px; text-align: right; }
 
 @media (max-width: 640px) {
   .flight-app { width: min(100% - 20px, 1040px); padding-top: 16px; }
-  .controls { align-items: flex-start; flex-wrap: wrap; gap: 14px 22px; }
+  .controls { align-items: flex-start; gap: 14px 22px; }
   .control-group { gap: 6px; }
   .control-icon { min-width: 24px; }
   .control-group small { font-size: 7px; }
-  .control-note { width: 100%; text-align: left; }
+  .control-note { text-align: left; }
+}
+
+@media (max-height: 760px) {
+  .flight-app { padding-top: 12px; padding-bottom: 12px; }
+  .topbar { margin-bottom: 9px; }
+  .game-shell { width: min(100%, calc((100vh - 220px) * 4 / 3)); }
+  .controls { gap: 10px 18px; padding-top: 10px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
