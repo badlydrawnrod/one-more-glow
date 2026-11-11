@@ -1,0 +1,13 @@
+{
+  "name": "very-angry-robots",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "npm run check && vite build",
+    "test": "node --disable-warning=ExperimentalWarning --experimental-strip-types --test src/*.test.mjs",
+    "preview": "vite preview"
+  },
+  "dependencies": { "one-more-glow": "0.0.0" }
+}

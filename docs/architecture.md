@@ -10,6 +10,7 @@ apps/
   diagnostics/              # Vite app for checking library rendering
   asteroids-demo/           # Vite app for keyboard/gamepad Asteroids gameplay
   gyruss-demo/              # Vite app for a keyboard/gamepad orbital shooter
+  very-angry-robots/        # Vite app for single-room robot combat
 packages/
   one-more-glow/            # reusable drawing library
 docs/
@@ -109,12 +110,17 @@ shooter with keyboard and browser Gamepad API input. Input handling and game
 state belong to this app; it must use the public package entry point rather
 than library internals.
 
+### Very Angry Robots demo
+
+`apps/very-angry-robots/` is an independent vector-game consumer. Its room,
+combat and input belong to the app; it draws through the public library API.
+
 ## Dependency direction
 
 ```text
-apps/diagnostics   apps/asteroids-demo   apps/gyruss-demo
-       |                    |                   |
-       +--------------------+-------------------+
+apps/diagnostics   apps/asteroids-demo   apps/gyruss-demo   apps/very-angry-robots
+       |                    |                   |                    |
+       +--------------------+-------------------+--------------------+
                             v
              one-more-glow public entry point
                             |

@@ -1,0 +1,13 @@
+:root { color-scheme: dark; font-family: ui-monospace, monospace; background: #08090f; color: #d9f9ff; }
+* { box-sizing: border-box; }
+body { margin: 0; background: radial-gradient(ellipse at 50% 40%, #162334 0, #08090f 70%); min-height: 100vh; }
+main { width: min(100% - 32px, 1024px); margin: auto; padding: 20px 0 28px; }
+header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; }
+header span { color: #64c7d8; font-size: 10px; letter-spacing: .15em; }
+h1 { margin: 0; font-size: clamp(15px, 2.5vw, 23px); letter-spacing: .09em; color: #fff2cf; }
+header p { margin: 0 0 0 auto; color: #a56b69; font-size: 10px; }
+.game { aspect-ratio: 4 / 3; border: 1px solid #345263; background: #05080d; box-shadow: 0 0 35px #1c617132; }
+canvas { display: block; width: 100%; height: 100%; }
+footer { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 2px; color: #89a5af; font-size: 10px; letter-spacing: .04em; }
+footer p { margin: 0; } strong { color: #eac886; margin-right: 5px; } .hint { flex-basis: 100%; color: #ed9093; }
+@media (max-width: 600px) { main { width: calc(100% - 16px); padding-top: 10px; } header p { display: none; } footer { font-size: 9px; } }

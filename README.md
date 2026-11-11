@@ -12,6 +12,7 @@ renderer.
   card and sample scene.
 - [`apps/asteroids-demo/`](apps/asteroids-demo/README.md) — keyboard and gamepad controlled Asteroids arcade game.
 - [`apps/gyruss-demo/`](apps/gyruss-demo/README.md) — keyboard and gamepad controlled orbital shooter demo.
+- [`apps/very-angry-robots/`](apps/very-angry-robots/README.md) — single-room vector robot combat.
 - `docs/specs/` — durable behavior requirements.
 
 All consumer apps depend on the library by package name. Keep game or app
@@ -31,6 +32,7 @@ npm run dev
 the rendering test card, `?orientation=portrait` to check the portrait display,
 or `?animate=1` to animate its sample scene. Run `npm run dev:asteroids` to
 play Asteroids or `npm run dev:gyruss` to play the orbital shooter.
+Run `npm run dev:robots` to play Very Angry Robots.
 
 ## Workspace commands
 
@@ -41,17 +43,22 @@ Run these from the repository root:
 | `npm run dev` | Build the library and start the diagnostics app. |
 | `npm run dev:asteroids` | Build the library and start Asteroids. |
 | `npm run dev:gyruss` | Build the library and start the orbital shooter demo. |
+| `npm run dev:robots` | Build the library and start Very Angry Robots. |
 | `npm run check` | Build the library, then type-check all apps against its package API. |
 | `npm run check:asteroids` | Build the library and type-check the Asteroids app. |
 | `npm run check:gyruss` | Build the library and type-check the orbital shooter demo. |
+| `npm run check:robots` | Build the library and type-check Very Angry Robots. |
 | `npm test` | Run the library tests. |
 | `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
+| `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
 | `npm run build` | Build the library and all production apps. |
 | `npm run build:asteroids` | Build the library and production Asteroids app. |
 | `npm run build:gyruss` | Build the library and production orbital shooter demo. |
+| `npm run build:robots` | Build the library and production Very Angry Robots app. |
 | `npm run preview` | Preview the production diagnostics build. |
 | `npm run preview:asteroids` | Preview the production Asteroids app. |
 | `npm run preview:gyruss` | Preview the production orbital shooter. |
+| `npm run preview:robots` | Preview the production Very Angry Robots app. |
 
 Each workspace has its own manifest and configuration. The root is private;
 the library package is the independent package boundary. Library builds emit
