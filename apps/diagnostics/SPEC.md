@@ -40,6 +40,8 @@ renderer and evaluating display characteristics. It currently uses WebGL2.
 
 ## Accepted: in-page controls
 
+**Implementation: Implemented.**
+
 The diagnostics app provides a small overlay menu so visitors can change views
 without editing the URL.
 
@@ -69,5 +71,7 @@ the changes in core colour and halo are easy to compare. The samples remain
 legible in both landscape and portrait orientations.
 
 ## Accepted: display profile study
+
+**Implementation: Implemented.**
 
 The diagnostics offers a profile study with vector-drawn controls for line width, point radius, glow strength and glow spread, plus a reset to defaults. The controls update the renderer profile live and show lines, crossing lines, points and overdrive samples under the same profile. Pointer and keyboard interaction and accessible labels are provided by the app. Profile values remain selected across scene and orientation changes for the current session.

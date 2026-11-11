@@ -22,6 +22,8 @@ run and control it.
 
 ## Experimental explosions
 
+**Implementation: Present as an experiment.**
+
 Ship explosions are an experiment, not an accepted library feature or a settled
 gameplay requirement. Destroyed enemies emit a burst of glowing particles; a
 player collision produces a larger player burst as well. The current experiment

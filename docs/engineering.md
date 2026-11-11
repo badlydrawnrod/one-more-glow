@@ -44,6 +44,11 @@ Use these terms where useful:
 - **Deferred:** Intentionally postponed, potentially with unresolved decisions.
 - **Superseded:** Replaced by another documented decision.
 
-Keep intended behavior distinct from implementation and verification status. Use brief status notes only when they clarify what is settled or implemented.
+Keep intended behavior distinct from implementation and verification status. For
+accepted capabilities, including those in app specs, record whether they are
+implemented, partially implemented or not yet implemented; note meaningful gaps.
+Update that note when implementation changes. Use brief notes at the capability
+or section level, and identify experimental implementations without implying
+their design is accepted.
 
 When changing behavior, check the relevant specification, resolve only decisions needed for the task, and record lasting decisions there. Preserve unrelated open questions. Do not promote proposals or deferred capabilities into requirements. Plans do not override specifications; move lasting decisions from plans into the appropriate durable document.

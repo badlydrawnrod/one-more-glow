@@ -29,8 +29,10 @@ game-over state. Those mechanics are specified in the accepted refresh below.
 
 ## Accepted refresh: complete game
 
-The following design is **accepted** and is the implementation target. Values
-identified as starting points remain subject to playtesting.
+**Implementation: Implemented.** Values identified as starting points remain
+subject to playtesting; the deferred capabilities below are not included.
+
+The following design is **accepted**.
 
 ### Goal and flow
 
@@ -211,6 +213,8 @@ configurable bindings and online leaderboards are deferred.
 **Status: Accepted.** Shared profile semantics and valid values are defined by
 the [vector display specification](../../docs/specs/vector-display.md#global-display-profile-options).
 
+**Implementation: Implemented.**
+
 ### Experience
 
 Show the S keyboard and gamepad Back/Select shortcuts for Settings on the title
@@ -297,3 +301,73 @@ to gameplay rules are required.
 - Check that settings and a useful preview remain accessible at narrow and
   wide viewport sizes, and that global profile changes affect the HUD as well
   as game objects.
+
+## Proposed: retro sound effects
+
+**Status: Provisional proposal; not accepted for implementation.** Audio
+remains deferred in the accepted gameplay specification above. The following
+captures ideas for discussion rather than settled requirements.
+
+A possible direction is a sparse, punchy arcade sound palette that complements
+the vector display without requiring faithful emulation of the original game.
+Candidate cues include a short descending shot, noise bursts that vary with
+asteroid size, a more substantial ship-destruction sound, a continuous thrust
+sound, a distinctive saucer tone, and brief hyperspace and extra-life cues.
+Start with effects rather than music; Gyruss music is a separate, deferred topic.
+
+Possible implementation approaches include synthesizing sounds in the browser
+with Web Audio, designing short effects with sfxr/jsfxr and playing exported
+samples, or combining the two. In particular, a generated thrust sound could
+fade in and out while short effects use samples. Similar-sounding synthesis is
+not necessarily an exact reproduction of a jsfxr preset; if exact reproduction
+matters, evaluate using its generated waveform or synthesis code. No tool,
+dependency, asset format or particular sound has been chosen.
+
+Consider a mute control, balanced volume when effects overlap, stopping or
+fading continuous sounds on pause and focus loss, and browser restrictions on
+starting audio before a user gesture. Playback failure or muted audio should
+not prevent play. Whether sound is enabled by default, how preferences persist,
+and the exact behavior on resume remain open for review. Audio and event
+handling would initially belong to the app, not the drawing renderer; consider
+a shared package only if another consumer demonstrates a concrete need.
+
+## Proposed: fixed simulation timestep and interpolation
+
+**Status: Provisional proposal; not accepted for implementation.** The current
+app uses one variable-duration simulation update per rendered frame, capped at
+50 ms. This section explores an alternative, not a requirement to change it.
+
+Consider advancing gameplay at a fixed rate independently of rendering, using
+an accumulator and retaining the two most recent simulation states. Render
+moving objects between those states using the fraction of the next tick already
+accumulated. A 60 Hz simulation is a possible starting point; compare it with
+120 Hz for responsiveness and cost. Rendering could then remain smooth at
+refresh rates such as 165 Hz without changing the simulation rate. Conventional
+interpolation displays a state roughly one tick behind real time; the effect on
+input feel needs evaluation.
+
+A candidate design should address:
+
+- **Input:** retain discrete presses until a simulation tick consumes them,
+  consume each once, and handle frames with zero or multiple ticks. Preserve
+  continuous controls and the existing pause and focus-loss behavior.
+- **Wrapping:** interpolate along the short path across playfield edges and
+  corners, including wrapped copies, rather than across the middle of the
+  screen. Collision calculations continue to use simulation state.
+- **Discontinuities:** hyperspace and respawn should snap rather than interpolate
+  across the field; initialize or reset interpolation history for teleports and
+  newly spawned objects. Define behavior for destruction and splitting too.
+- **Catch-up:** bound work after slow frames or focus loss to avoid an unbounded
+  backlog. Decide explicitly when accumulated time is discarded and how that
+  affects game timers; avoid silently promising wall-clock timing.
+- **Verification:** compare gameplay at different render rates, including 60,
+  120, 165 and 240 Hz, and exercise frames with zero or several ticks. Try a
+  deliberately low tick rate to make interpolation errors visible; check edge
+  and corner wrapping, hyperspace, respawn, input transitions and pause. A
+  simulation test cannot replace a visual check on a high-refresh display.
+
+The tick rate, catch-up limit, interpolation details and responsiveness
+trade-offs are unresolved. A fixed timestep improves consistency but does not
+by itself guarantee deterministic results or prevent all missed collisions.
+The simulation and interpolation would remain game-owned unless a concrete
+shared game-oriented need emerges; they do not belong in the drawing contract.
