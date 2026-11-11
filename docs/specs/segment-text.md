@@ -16,7 +16,14 @@ digits, space and `. , : ! ? + - /`; ASCII lowercase maps to uppercase. Both
 fonts provide a recognisable `?` replacement glyph. Glyph shapes and spacing
 can be refined through visual review.
 
-The 22-segment diagnostic adapts Stewart C. Russell's
+In both fonts, uppercase `B` and `D` use left-hand stems and chamfered
+diagonal edges. Their outlines are distinct from `8` and `O` respectively.
+These glyph-specific strokes refine the segment-inspired designs; they do not
+require a strict fixed set of physical display segments. The 16-segment font's
+lowercase mapping applies to these letters as well. The 22-segment font retains
+its separate lowercase glyphs.
+
+The 22-segment font adapts Stewart C. Russell's
 [ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based on
 the [Litronix DL-3422 character chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85).
 The source font's licence and attribution must accompany any adaptation used

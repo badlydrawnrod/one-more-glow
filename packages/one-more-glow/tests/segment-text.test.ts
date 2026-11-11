@@ -52,6 +52,14 @@ test("supported glyphs draw, lowercase 16 maps to uppercase, and spaces remain b
   assert.notDeepEqual(image("a", opts("segment22")), image("A", opts("segment22")));
 });
 
+test("B and D use diagonal outlines distinct from 8 and O", () => {
+  for (const font of fonts) for (const [letter, similar] of [["B", "8"], ["D", "O"]] as const) {
+    const strokes = image(letter, opts(font));
+    assert.ok(strokes.some(([kind, x1, y1, x2, y2]) => kind === "line" && x1 !== x2 && y1 !== y2));
+    assert.notDeepEqual(strokes, image(similar, opts(font)));
+  }
+});
+
 test("unsupported code points use a visible question mark, including astral characters and controls", () => {
   for (const font of fonts) for (const spacing of ["fixed", "kerned"] as const) {
     const options = opts(font, spacing);

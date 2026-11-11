@@ -20,6 +20,11 @@ export const segments16: Record<string, Element> = {
   q: [0, 1, 0.5, 0], r: [1, 1, 0.5, 0],
   s: [0.5, 0], t: [0.5, 0.65], u: [0.5, 0, 0.35, -0.25],
   v: [0.5, 1, 0.5, 0.2],
+  // Chamfered right edges give B and D distinct, legible outlines.
+  w: [0, 1, 0.7, 1], x: [0.7, 1, 1, 0.75],
+  y: [1, 0.75, 1, 0.25], z: [1, 0.25, 0.7, 0],
+  A: [0.7, 0, 0, 0], B: [1, 0.75, 0.7, 0.5],
+  C: [0.7, 0.5, 1, 0.25], D: [0, 0.5, 0.7, 0.5],
 };
 
 // Base masks use split top and bottom strokes.
@@ -43,6 +48,8 @@ export const glyphs16: Record<string, string> = Object.fromEntries(
   ]),
 );
 glyphs16.V = "qr";
+glyphs16.B = "ghwxBCzAD";
+glyphs16.D = "ghwxyzA";
 Object.assign(glyphs16, {
   ".": "s", ",": "su", ":": "st", "!": "vs",
   "?": "acijps", "+": "ijop", "/": "ln",

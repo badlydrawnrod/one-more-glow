@@ -15,6 +15,16 @@ export const elements22: readonly Element[] = [
   [0.5, 0.7], [0.5, 0.25],
 ];
 
+// Chamfered capitals retain the font's proportions while distinguishing
+// their left-hand stems and lobes from the centre-stem display forms.
+export const overrides22: Readonly<Record<string, readonly Element[]>> = {
+  B: [[0, 0, 0, 1], [0, 1, 0.7, 1], [0.7, 1, 1, 0.75],
+    [1, 0.75, 0.7, 0.5], [0.7, 0.5, 0, 0.5],
+    [0.7, 0.5, 1, 0.25], [1, 0.25, 0.7, 0], [0.7, 0, 0, 0]],
+  D: [[0, 0, 0, 1], [0, 1, 0.7, 1], [0.7, 1, 1, 0.75],
+    [1, 0.75, 1, 0.25], [1, 0.25, 0.7, 0], [0.7, 0, 0, 0]],
+};
+
 // Printable ASCII, in code-point order from space through tilde. Each letter
 // identifies an element above; the source font leaves space empty.
 export const masks22: readonly string[] = [

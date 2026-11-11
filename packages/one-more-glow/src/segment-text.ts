@@ -1,6 +1,6 @@
 import type { DrawingContext } from "./graphics.ts";
 import { glyphs16, segments16 } from "./segment16.ts";
-import { elements22, masks22, type Element } from "./segment22.ts";
+import { elements22, masks22, overrides22, type Element } from "./segment22.ts";
 
 /** Segment font, uppercase height in logical units, and optional spacing mode. */
 export interface TextOptions {
@@ -35,7 +35,8 @@ function makeGlyph(elements: readonly Element[]): Glyph {
 const font16 = new Map(Object.entries(glyphs16).map(([character, mask]) =>
   [character, makeGlyph([...mask].map((name) => segments16[name]))]));
 const font22 = new Map(masks22.map((mask, index) =>
-  [String.fromCharCode(index + 32), makeGlyph([...mask].map((name) => elements22[name.charCodeAt(0) - 97]))]));
+  [String.fromCharCode(index + 32), makeGlyph(overrides22[String.fromCharCode(index + 32)]
+    ?? [...mask].map((name) => elements22[name.charCodeAt(0) - 97]))]));
 const pairs16: Readonly<Record<string, number>> = { AV: -0.05, VA: -0.05, TA: -0.04 };
 const pairs22: Readonly<Record<string, number>> = { Th: -0.05, fo: -0.04, ov: -0.03 };
 
