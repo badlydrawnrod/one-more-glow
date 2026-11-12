@@ -13,6 +13,8 @@ electrified, like the walls. Destroy robots for points and clear a room for a
 bonus. Higher scores bring different robot colours, larger groups and more
 robot fire in subsequent rooms. You start with three lives and return to the
 same room after losing one. Earn extra lives at 10,000 and 50,000 points.
+The Captain eventually enters each room: he cannot be stopped by shots or
+walls, so keep moving.
 
 The [specification](SPEC.md) describes this slice and deferred features. Run
 `npm run test --workspace=very-angry-robots` for the app's tests.

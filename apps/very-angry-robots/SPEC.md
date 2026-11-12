@@ -112,8 +112,8 @@ are the reference for these rules.
   animate its entrance closing in two sliding halves. Pause gameplay during
   the scroll and door animation, then resume. Keep the HUD stationary. With
   reduced motion enabled, show the new room and closed door immediately.
-- Player defeat consumes a life as described below. Sound and the Captain
-  remain outside the implemented slice.
+- Player defeat consumes a life as described below. The Captain is implemented
+  as specified below; sound remains outside the implemented slice.
 
 ### Navigation verification
 
@@ -222,21 +222,20 @@ are the reference.
   with the player in the same update. The player cannot move or shoot during
   a two-second death interval. Show a clear death indication. The remaining
   robots and shots continue updating and interacting during this interval, as
-  in the original; if the Captain is later accepted and implemented, it also
-  continues updating. The defeated player cannot be hit again.
+  in the original; the Captain also continues updating.
+  The defeated player cannot be hit again.
   Robot destruction during this interval scores normally.
 - After the interval, if lives remain, respawn at the current room's original
   entrance position. Keep the same room, maze, closed entrance, room difficulty,
   score and destroyed-robot count. Return each surviving robot to its original
   spawn position; do not restore destroyed robots. Clear all shots and reset
-  the Captain if that separate proposal is accepted and implemented. Resume
-  play without a room transition.
+  the Captain. Resume play without a room transition.
   Preserve the original's two-second robot firing amnesty after respawning:
   robots may move and collide but may not fire during that time. Start the
   same amnesty when normal play begins after entering a room.
 - At zero lives, show game over after the death interval and stop play; offer
   the existing fresh restart. Restart resets lives, score, room, progression,
-  shots and, if implemented, the Captain. Award one extra life the first time
+  shots and the Captain. Award one extra life the first time
   the score reaches or crosses 10,000 and another at 50,000, as in the original; neither repeats in
   the same run. If one score change crosses both thresholds, award both.
   Scoring during the death interval can earn an extra life and permit a
@@ -260,7 +259,9 @@ are the reference.
 
 ## The Captain
 
-**Status: Proposed. Implementation: Not implemented.** The original's
+**Status: Accepted. Implementation: Present.** Automated tests cover the
+Captain's gameplay and clipping. Appearance, balance, gamepad and reduced-motion
+behavior have not been playtested. The original's
 [Captain](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/mobiles/Captain.java),
 [world](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/World.java)
 and [configuration](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/data/veryangryrobots.properties)
@@ -268,16 +269,17 @@ are the reference. The Captain is a persistent pursuer that encourages the
 player to leave a room, including one that has been cleared.
 
 - On room entry, place the Captain out of sight beyond the closed entrance.
-  Lurk for `max(2, 2 × initial robot count)` seconds of active room play:
-  six robots give 12 seconds, nine give 18, and twelve give 24. Calculate
+  Lurk for `max(2, 1.5 × initial robot count)` seconds of active room play:
+  six robots give 9 seconds, nine give 13.5, and twelve give 18. Calculate
   the delay once when the Captain is placed; later robot deaths do not shorten
   it. The timer does not advance during a room transition or while paused.
 - After the delay the Captain becomes visible, enters from the closed-entrance
   side and relentlessly pursues the player. Move directly toward the player
   with the original's characteristic vertical bouncing motion; the Captain
   passes through walls and doors. The original's pursuit speed is 3.75 versus
-  the player's 12.5 world units per second. Use that 0.3 ratio as a starting
-  point for adapting speed, and tune motion and size through playtesting.
+  the player's 12.5 world units per second, a 0.3 ratio. The current pursuit
+  speed is 0.5 times the player's speed for playtesting; tune motion and size
+  through playtesting.
 - The Captain cannot be destroyed or stopped by walls, doors, player shots or
   robot shots. Contact kills the player, destroys robots and consumes shots
   from either side. Robots destroyed by the Captain award normal points and
@@ -286,8 +288,11 @@ player to leave a room, including one that has been cleared.
 - Show a distinctive glowing vector character, readily distinguishable from
   the player, robots, walls and projectiles. Animate its bounce in keeping
   with the current visual style; with reduced motion, preserve the gameplay
-  trajectory while avoiding unnecessary presentation animation. Sound and
-  taunts remain deferred.
+  trajectory while avoiding unnecessary presentation animation. Clip the
+  Captain's drawing to the current room boundary, including while entering
+  from outside and while rooms scroll; no part of its vector geometry should
+  appear outside its room. This is a drawing constraint and does not change
+  movement or collisions. Sound and taunts remain deferred.
 - The Captain does not follow the player between rooms. On each room entry,
   reset it outside the new entrance and start a new lurk timer. After a death,
   also reset it outside the current entrance and calculate a fresh delay from
@@ -302,13 +307,15 @@ player to leave a room, including one that has been cleared.
 - Verify entry from all four sides, pursuit through walls and doors, and that
   shots cannot stop the Captain. Check its collisions with the player, robots
   and both shot types, including scoring and simultaneous collisions.
-- Confirm it resets on room entry and respawn, and check visibility, movement,
-  reduced-motion presentation and fairness through playtesting.
+- Confirm it resets on room entry and respawn. Check clipping at all four
+  room edges, including partially visible entry and scrolling transitions,
+  as well as visibility, movement, reduced-motion presentation and fairness
+  through playtesting.
 
 ## Deferred and open decisions
 
 Sound, the original family-member taunts and other recordings, achievements
-and persistence remain deferred. Lives are accepted above; the Captain
-remains proposed. The original's
+and persistence remain deferred. Lives and the Captain are implemented as
+described above. The original's
 artwork and recordings belong to the author;
 decisions about reusing them can wait until those features are considered.

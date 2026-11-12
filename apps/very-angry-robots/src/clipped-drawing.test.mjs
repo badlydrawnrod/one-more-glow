@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { clippedDrawing } from "./clipped-drawing.ts";
+import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 
 function recordingContext() {
   const calls = [];
@@ -30,4 +30,31 @@ test("drops points outside the view bounds after scaling", () => {
   clipped.point(2, 1);
   clipped.point(3, 0);
   assert.deepEqual(target.calls, [["point", 4, 2]]);
+});
+
+test("intersects a room clip with the fixed scene clip as rooms scroll on every side", () => {
+  const scene = { left: -504, right: 504, bottom: -364, top: 244 };
+  const room = (x, y) => ({ left: x - 500, right: x + 500, bottom: y - 300, top: y + 300 });
+  assert.deepEqual(intersectClipBounds(scene, room(-600, 0)),
+    { left: -504, right: -100, bottom: -300, top: 244 });
+  assert.deepEqual(intersectClipBounds(scene, room(600, 0)),
+    { left: 100, right: 504, bottom: -300, top: 244 });
+  assert.deepEqual(intersectClipBounds(scene, room(0, 400)),
+    { left: -500, right: 500, bottom: 100, top: 244 });
+  assert.deepEqual(intersectClipBounds(scene, room(0, -400)),
+    { left: -500, right: 500, bottom: -364, top: -100 });
+  assert.equal(intersectClipBounds(scene, room(0, 1000)), undefined);
+});
+
+test("clips partially entering geometry to the translated room and scene intersection", () => {
+  const target = recordingContext();
+  const bounds = intersectClipBounds(
+    { left: -504, right: 504, bottom: -364, top: 244 },
+    { left: -110, right: 890, bottom: -300, top: 300 },
+  );
+  assert.ok(bounds);
+  const clipped = clippedDrawing(target, bounds);
+  clipped.moveTo(-150, 0);
+  clipped.lineTo(-50, 0);
+  assert.deepEqual(target.calls, [["moveTo", -110, 0], ["lineTo", -50, 0]]);
 });

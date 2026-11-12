@@ -3,7 +3,7 @@ import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measure
 import { createGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
 import { wallOutline } from "./wall-outline.ts";
 import { InputController } from "./input.ts";
-import { clippedDrawing } from "./clipped-drawing.ts";
+import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 import { transitionOffsets } from "./transition-presentation.ts";
 import "./style.css";
 
@@ -30,6 +30,8 @@ const robotColors: Record<RobotColor, Color> = {
 };
 const blue: Color = [0.28, 0.63, 1];
 const white: Color = [0.8, 0.96, 1];
+const captainSteel: Color = [0.72, 0.82, 1];
+const captainEyes: Color = [1, 0.25, 0.2];
 const roomCenterY = -60;
 const textOptions = { font: "segment22", height: 19, spacing: "kerned" } as const;
 
@@ -114,6 +116,50 @@ function drawPlayer(context: DrawingContext, room: RoomSnapshot): void {
   context.popTransform();
 }
 
+function drawCaptain(context: DrawingContext, room: RoomSnapshot): void {
+  const captain = room.captain;
+  if (captain.state !== "chasing") return;
+  const bounce = reducedMotion.matches ? 0 : Math.sin(captain.bouncePhase) * 2;
+  context.pushTransform();
+  context.translate(captain.x, captain.y + bounce);
+  context.scale(captain.radius / 14, captain.radius / 14);
+  // An armored mask with angular side panels and inward-sloping brows.
+  line(context, [[-8,-12],[8,-12],[11,-9],[13,-9],[13,1],
+    [9,5],[7,10],[3,13],[-3,13],[-7,10],[-9,5],[-13,1],[-13,-9],[-11,-9]], captainSteel, 1.2);
+  context.setColor(captainEyes); context.setIntensity(1.5);
+  context.moveTo(-9,-5); context.lineTo(-3,-2);
+  context.moveTo(9,-5); context.lineTo(3,-2);
+  // Keep the eye cores below overdrive so the renderer preserves their red colour.
+  context.setColor([1, 0.05, 0.02]); context.setIntensity(1);
+  context.point(-6,0); context.point(6,0);
+  context.setColor(captainSteel); context.setIntensity(1.2);
+  context.moveTo(-4,-10); context.lineTo(4,-10);
+  context.moveTo(-10,1); context.lineTo(-8,4); context.lineTo(-6,4);
+  context.moveTo(10,1); context.lineTo(8,4); context.lineTo(6,4);
+  line(context, [[-6,6],[6,6],[5,10],[-5,10]], captainSteel, 1.2);
+  context.moveTo(-2,6); context.lineTo(-2,10);
+  context.moveTo(2,6); context.lineTo(2,10);
+  context.popTransform();
+}
+
+function drawRoomCaptain(room: RoomSnapshot, offsetX: number, offsetY: number): void {
+  const roomBounds = {
+    left: offsetX - ROOM.width / 2,
+    right: offsetX + ROOM.width / 2,
+    bottom: roomCenterY + offsetY - ROOM.height / 2,
+    top: roomCenterY + offsetY + ROOM.height / 2,
+  };
+  const bounds = intersectClipBounds(sceneClip, roomBounds);
+  if (!bounds) return;
+  const captainScene = clippedDrawing(drawing, bounds);
+  captainScene.pushTransform();
+  captainScene.translate(offsetX, roomCenterY + offsetY);
+  captainScene.scale(1, -1);
+  captainScene.translate(-ROOM.width / 2, -ROOM.height / 2);
+  drawCaptain(captainScene, room);
+  captainScene.popTransform();
+}
+
 function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, doorProgress = 1, showPlayer = true): void {
   const scene = clippedDrawing(drawing, sceneClip);
   scene.pushTransform();
@@ -136,6 +182,7 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
     scene.lineTo(shot.x - shot.velocityX / length * 10, shot.y - shot.velocityY / length * 10);
   }
   scene.popTransform();
+  drawRoomCaptain(room, offsetX, offsetY);
 }
 
 function draw(time: number): void {

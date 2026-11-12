@@ -44,6 +44,15 @@ export interface Shot {
   velocityY: number;
 }
 
+export interface Captain {
+  x: number;
+  y: number;
+  radius: number;
+  state: "lurking" | "chasing";
+  lurkTimeRemaining: number;
+  bouncePhase: number;
+}
+
 export type RobotColor = "dark yellow" | "red" | "dark cyan" | "green" | "dark purple"
   | "light yellow" | "white" | "light purple" | "grey";
 
@@ -64,6 +73,7 @@ export interface Game {
   roomPopulation: number;
   outcome: Outcome;
   player: Player;
+  captain: Captain;
   robots: Robot[];
   shots: Shot[];
   walls: Wall[];
@@ -83,6 +93,7 @@ export interface RoomSnapshot {
   roomY: number;
   entrance: Direction;
   player: Player;
+  captain: Captain;
   robots: Robot[];
   shots: Shot[];
   walls: Wall[];
@@ -121,6 +132,9 @@ export const ROOM_SCROLL_DURATION = 0.45;
 export const DOOR_CLOSE_DURATION = 0.35;
 
 const ROBOT_RADIUS = 14;
+const CAPTAIN_RADIUS = 22;
+const CAPTAIN_SPEED = PLAYER_SPEED * 0.5;
+const CAPTAIN_BOUNCE_SPEED = 20;
 
 const DIFFICULTIES: readonly Difficulty[] = [
   { threshold: 0, color: "dark yellow", shotLimit: 0, shotSpeed: SLOW_SHOT_SPEED },
@@ -173,6 +187,7 @@ function createRoom(seed: number, roomX: number, roomY: number, entrance: Direct
     roomPopulation: population,
     outcome: "playing",
     player: { ...playerStart, spawnX: playerStart.x, spawnY: playerStart.y, radius: 14, fireCooldown: 0 },
+    captain: createCaptain(entrance, population),
     robots: robotCells.map((cell, index) => ({ ...maze.cellCenters[cell],
       spawnX: maze.cellCenters[cell].x, spawnY: maze.cellCenters[cell].y, id: index + 1,
       radius: ROBOT_RADIUS, moveSpeed: 78, fireCooldown: 0.4 + (index % 4) * 0.35 })),
@@ -187,6 +202,23 @@ function createRoom(seed: number, roomX: number, roomY: number, entrance: Direct
     geometry,
     transition: null,
   };
+}
+
+function createCaptain(entrance: Direction, robotCount: number): Captain {
+  const margin = CAPTAIN_RADIUS + 3;
+  const captain: Captain = {
+    x: ROOM.width / 2,
+    y: ROOM.height / 2,
+    radius: CAPTAIN_RADIUS,
+    state: "lurking",
+    lurkTimeRemaining: Math.max(2, 1.5 * robotCount),
+    bouncePhase: 0,
+  };
+  if (entrance === "left") captain.x = -margin;
+  else if (entrance === "right") captain.x = ROOM.width + margin;
+  else if (entrance === "up") captain.y = -margin;
+  else captain.y = ROOM.height + margin;
+  return captain;
 }
 
 /** Resets in place so input and drawing code can keep their Game reference. */
@@ -288,6 +320,7 @@ function snapshot(game: Game): RoomSnapshot {
     roomY: game.roomY,
     entrance: game.entrance,
     player: { ...game.player },
+    captain: { ...game.captain },
     robots: game.robots.map((robot) => ({ ...robot })),
     shots: game.shots.map((shot) => ({ ...shot })),
     walls: game.walls,
@@ -305,6 +338,7 @@ function replaceGame(target: Game, source: Game): void {
   target.roomPopulation = source.roomPopulation;
   target.outcome = source.outcome;
   target.player = source.player;
+  target.captain = source.captain;
   target.robots = source.robots;
   target.shots = source.shots;
   target.walls = source.walls;
@@ -346,6 +380,7 @@ function tick(game: Game, dt: number, input: InputFrame): void {
   if (game.outcome === "lost") return;
   game.elapsed += dt;
   if (game.outcome === "dying") {
+    updateCaptain(game, dt);
     updateRobots(game, dt);
     updateShots(game, dt);
     resolveContacts(game);
@@ -358,6 +393,7 @@ function tick(game: Game, dt: number, input: InputFrame): void {
     return;
   }
 
+  updateCaptain(game, dt);
   const player = game.player;
   player.fireCooldown = Math.max(0, player.fireCooldown - dt);
   const move = normalized(input.moveX, input.moveY);
@@ -404,6 +440,7 @@ function respawn(game: Game): void {
     robot.y = robot.spawnY;
   }
   game.shots = [];
+  game.captain = createCaptain(game.entrance, game.robots.length);
   game.fireAmnestyRemaining = FIRE_AMNESTY;
   game.outcome = "playing";
 }
@@ -437,6 +474,27 @@ function updateRobots(game: Game, dt: number): void {
   }
 }
 
+function updateCaptain(game: Game, dt: number): void {
+  const captain = game.captain;
+  if (captain.state === "lurking") {
+    captain.lurkTimeRemaining = Math.max(0, captain.lurkTimeRemaining - dt);
+    if (captain.lurkTimeRemaining <= 1e-9) {
+      captain.lurkTimeRemaining = 0;
+      captain.state = "chasing";
+    }
+  }
+  if (captain.state !== "chasing") return;
+
+  const dx = game.player.x - captain.x;
+  const dy = game.player.y - captain.y;
+  const distance = Math.hypot(dx, dy);
+  captain.bouncePhase = (captain.bouncePhase + dt * Math.PI * 4) % (Math.PI * 2);
+  if (distance > 0) {
+    captain.x += dx / distance * CAPTAIN_SPEED * dt;
+    captain.y += (dy / distance * CAPTAIN_SPEED + Math.sin(captain.bouncePhase) * CAPTAIN_BOUNCE_SPEED) * dt;
+  }
+}
+
 function chooseRobotDirection(robot: Robot, dx: number, dy: number, walls: readonly Wall[]): { x: number; y: number } {
   const direct = Math.atan2(dy, dx);
   // Probe direct motion first, then nearby headings to find a route around a wall.
@@ -462,6 +520,10 @@ function updateShots(game: Game, dt: number): void {
       shot.y += shot.velocityY * dt / slices;
       if (shot.x < 0 || shot.y < 0 || shot.x > ROOM.width || shot.y > ROOM.height
         || circleHitsWall(shot.x, shot.y, SHOT_RADIUS, game.walls)) {
+        alive = false;
+        break;
+      }
+      if (game.captain.state === "chasing" && overlaps(shot, SHOT_RADIUS, game.captain, game.captain.radius)) {
         alive = false;
         break;
       }
@@ -501,7 +563,18 @@ function resolveContacts(game: Game): void {
     defeatPlayer(game);
   }
 
+  if (game.captain.state === "chasing") {
+    if (game.outcome === "playing" && overlaps(game.captain, game.captain.radius, game.player, game.player.radius)) {
+      defeatPlayer(game);
+    }
+  }
+
   const destroyed = new Set<number>();
+  if (game.captain.state === "chasing") {
+    for (const robot of game.robots) {
+      if (overlaps(game.captain, game.captain.radius, robot, robot.radius)) destroyed.add(robot.id);
+    }
+  }
   for (let i = 0; i < game.robots.length; i += 1) {
     for (let j = i + 1; j < game.robots.length; j += 1) {
       const a = game.robots[i];

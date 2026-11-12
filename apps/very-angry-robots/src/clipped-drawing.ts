@@ -7,6 +7,18 @@ export interface ClipBounds {
   top: number;
 }
 
+/** Returns the shared area of two clip rectangles, or undefined when disjoint. */
+export function intersectClipBounds(first: ClipBounds, second: ClipBounds): ClipBounds | undefined {
+  const intersection = {
+    left: Math.max(first.left, second.left),
+    right: Math.min(first.right, second.right),
+    bottom: Math.max(first.bottom, second.bottom),
+    top: Math.min(first.top, second.top),
+  };
+  if (intersection.left > intersection.right || intersection.bottom > intersection.top) return undefined;
+  return intersection;
+}
+
 type Transform = { a: number; b: number; c: number; d: number; e: number; f: number };
 type Point = { x: number; y: number };
 
