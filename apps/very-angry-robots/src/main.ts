@@ -1,6 +1,6 @@
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
   type Color, type DrawingContext, type Point } from "one-more-glow";
-import { createGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot } from "./game.ts";
+import { createGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
 import { wallOutline } from "./wall-outline.ts";
 import { InputController } from "./input.ts";
 import { clippedDrawing } from "./clipped-drawing.ts";
@@ -22,6 +22,12 @@ let walking = false;
 const cyan: Color = [0.35, 0.95, 1];
 const red: Color = [1, 0.35, 0.36];
 const amber: Color = [1, 0.75, 0.32];
+const robotColors: Record<RobotColor, Color> = {
+  "dark yellow": [0.85, 0.65, 0.12], red: [1, 0.35, 0.36],
+  "dark cyan": [0.12, 0.7, 0.7], green: [0.3, 0.95, 0.35],
+  "dark purple": [0.65, 0.3, 0.85], "light yellow": [1, 0.95, 0.5],
+  white: [1, 1, 1], "light purple": [0.85, 0.6, 1], grey: [0.7, 0.7, 0.7],
+};
 const blue: Color = [0.28, 0.63, 1];
 const white: Color = [0.8, 0.96, 1];
 const roomCenterY = -60;
@@ -118,7 +124,7 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
   for (const robot of room.robots) {
     const { x, y, radius: r } = robot;
     line(scene, [[x-r,y-r*.8],[x+r,y-r*.8],[x+r,y+r*.6],[x+r*.5,y+r*.6],
-      [x+r*.5,y+r],[x-r*.5,y+r],[x-r*.5,y+r*.6],[x-r,y+r*.6]], red);
+      [x+r*.5,y+r],[x-r*.5,y+r],[x-r*.5,y+r*.6],[x-r,y+r*.6]], robotColors[room.difficulty.color]);
     scene.setColor(amber); scene.setIntensity(1);
     scene.point(x-r*.45,y-r*.25); scene.point(x+r*.45,y-r*.25);
   }
@@ -136,7 +142,11 @@ function draw(time: number): void {
   drawing.beginFrame();
   drawing.setColor(white); drawing.setIntensity(0.7);
   drawText(drawing, "VERY ANGRY ROBOTS", -440, 350, { ...textOptions, height: 16 });
-  drawText(drawing, `ROBOTS ${game.robots.length}`, 285, 350, { ...textOptions, height: 16 });
+  const hudOptions = { ...textOptions, height: 16 };
+  const score = `SCORE ${game.score}`;
+  drawText(drawing, score, -measureText(score, hudOptions).width / 2, 350, hudOptions);
+  const robotCount = `ROBOTS ${game.robots.length}`;
+  drawText(drawing, robotCount, 440 - measureText(robotCount, hudOptions).width, 350, hudOptions);
 
   const transition = game.transition;
   if (transition) {

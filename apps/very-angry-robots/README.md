@@ -9,7 +9,9 @@ left stick to move and the right stick to fire. Press Enter or gamepad Start
 to start or restart. Electrified walls, robots and robot shots are dangerous.
 Move through an open doorway to enter an adjacent room; the door behind you
 closes. You can leave before all the robots are destroyed. Closed doors are
-electrified, like the walls.
+electrified, like the walls. Destroy robots for points and clear a room for a
+bonus. Higher scores bring different robot colours, larger groups and more
+robot fire in subsequent rooms.
 
 The [specification](SPEC.md) describes this slice and deferred features. Run
 `npm run test --workspace=very-angry-robots` for the app's tests.

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createGame, restartGame, updateGame, ROOM_SCROLL_DURATION } from "./game.ts";
+import { createGame, difficultyForScore, restartGame, updateGame, ROOM_SCROLL_DURATION } from "./game.ts";
 
 const idle = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, restartPressed: false };
 
@@ -71,7 +71,7 @@ test("open exits transition in all four directions and repopulate safely", () =>
   const game = createGame(seedRandom(42));
   travel(game, "right");
   assert.deepEqual([game.roomX, game.roomY, game.entrance], [1, 0, "left"]);
-  assert.equal(game.robots.length, 4);
+  assert.equal(game.robots.length, 6);
   assert.equal(game.shots.length, 0);
   assert.ok(game.player.x < 200);
   finishTransition(game);
@@ -97,7 +97,7 @@ test("coordinate revisits reproduce maze but repopulate actors for the return en
   travel(game, "down");
   assert.deepEqual([game.roomX, game.roomY, game.entrance], [0, 0, "up"]);
   assert.deepEqual(game.walls.slice(0, initialMazeWalls.length), initialMazeWalls);
-  assert.equal(game.robots.length, 4);
+  assert.equal(game.robots.length, 6);
   assert.equal(game.shots.length, 0);
 });
 
@@ -244,6 +244,7 @@ test("robot fires only with line of sight and its projectile can defeat the play
   assert.equal(blocked.shots.length, 0);
 
   const clear = emptyGame();
+  clear.difficulty = difficultyForScore(300);
   clear.player.x = 200;
   clear.player.y = 100;
   clear.robots = [robot(clear, 100, 100, { fireCooldown: 0 })];
@@ -251,7 +252,7 @@ test("robot fires only with line of sight and its projectile can defeat the play
   assert.equal(clear.shots[0].owner, "robot");
   clear.player.x = clear.shots[0].x + 10;
   clear.player.y = clear.shots[0].y;
-  clear.shots[0].velocityX = 235;
+  clear.shots[0].velocityX = clear.difficulty.shotSpeed;
   clear.shots[0].velocityY = 0;
   updateGame(clear, 0.02, idle);
   assert.equal(clear.outcome, "lost");
@@ -316,7 +317,7 @@ test("room clear keeps simulation playable and restart resets player, robots, wa
   assert.equal(game.outcome, "playing");
   assert.equal(game.player.x, 75);
   assert.equal(game.player.y, 300);
-  assert.equal(game.robots.length, 4);
+  assert.equal(game.robots.length, 6);
   assert.ok(game.walls.length > 0);
   assert.equal(game.shots.length, 0);
 });

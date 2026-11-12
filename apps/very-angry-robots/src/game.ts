@@ -40,7 +40,21 @@ export interface Shot {
   velocityY: number;
 }
 
+export type RobotColor = "dark yellow" | "red" | "dark cyan" | "green" | "dark purple"
+  | "light yellow" | "white" | "light purple" | "grey";
+
+export interface Difficulty {
+  threshold: number;
+  color: RobotColor;
+  shotLimit: number;
+  shotSpeed: number;
+}
+
 export interface Game {
+  score: number;
+  difficulty: Difficulty;
+  roomEntryScore: number;
+  roomPopulation: number;
   outcome: Outcome;
   player: Player;
   robots: Robot[];
@@ -57,6 +71,7 @@ export interface Game {
 }
 
 export interface RoomSnapshot {
+  difficulty: Difficulty;
   roomX: number;
   roomY: number;
   entrance: Direction;
@@ -87,7 +102,8 @@ export interface InputFrame {
 const PLAYER_SPEED = 190;
 const PLAYER_FIRE_INTERVAL = 0.32;
 const PLAYER_SHOT_SPEED = 440;
-const ROBOT_SHOT_SPEED = 235;
+const SLOW_SHOT_SPEED = 235;
+const FAST_SHOT_SPEED = SLOW_SHOT_SPEED * 1.28;
 const ROBOT_FIRE_INTERVAL = 1.15;
 const SHOT_RADIUS = 4;
 const CONTACT_RADIUS = 2;
@@ -95,12 +111,26 @@ const STEP = 1 / 120;
 export const ROOM_SCROLL_DURATION = 0.45;
 export const DOOR_CLOSE_DURATION = 0.35;
 
-const INITIAL_ROBOTS: readonly Omit<Robot, "id">[] = [
-  { x: 0, y: 0, radius: 14, moveSpeed: 82, fireCooldown: 0.4 },
-  { x: 0, y: 0, radius: 14, moveSpeed: 76, fireCooldown: 1.1 },
-  { x: 0, y: 0, radius: 14, moveSpeed: 72, fireCooldown: 1.8 },
-  { x: 0, y: 0, radius: 14, moveSpeed: 78, fireCooldown: 0.8 },
+const ROBOT_RADIUS = 14;
+
+const DIFFICULTIES: readonly Difficulty[] = [
+  { threshold: 0, color: "dark yellow", shotLimit: 0, shotSpeed: SLOW_SHOT_SPEED },
+  { threshold: 300, color: "red", shotLimit: 1, shotSpeed: SLOW_SHOT_SPEED },
+  { threshold: 1000, color: "dark cyan", shotLimit: 2, shotSpeed: SLOW_SHOT_SPEED },
+  { threshold: 2000, color: "green", shotLimit: 3, shotSpeed: SLOW_SHOT_SPEED },
+  { threshold: 4000, color: "dark purple", shotLimit: 4, shotSpeed: SLOW_SHOT_SPEED },
+  { threshold: 5000, color: "light yellow", shotLimit: 5, shotSpeed: SLOW_SHOT_SPEED },
+  { threshold: 6000, color: "white", shotLimit: 1, shotSpeed: FAST_SHOT_SPEED },
+  { threshold: 8000, color: "dark cyan", shotLimit: 2, shotSpeed: FAST_SHOT_SPEED },
+  { threshold: 10000, color: "light purple", shotLimit: 3, shotSpeed: FAST_SHOT_SPEED },
+  { threshold: 12500, color: "grey", shotLimit: 4, shotSpeed: FAST_SHOT_SPEED },
+  { threshold: 15000, color: "dark yellow", shotLimit: 5, shotSpeed: FAST_SHOT_SPEED },
+  { threshold: 20000, color: "red", shotLimit: 6, shotSpeed: FAST_SHOT_SPEED },
 ];
+
+export function difficultyForScore(score: number): Difficulty {
+  return DIFFICULTIES.findLast((tier) => score >= tier.threshold) ?? DIFFICULTIES[0];
+}
 
 const IDLE: InputFrame = {
   moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, restartPressed: false,
@@ -108,10 +138,11 @@ const IDLE: InputFrame = {
 
 export function createGame(random: () => number = Math.random): Game {
   const seed = randomSeed(random);
-  return createRoom(seed, 0, 0, "left");
+  return createRoom(seed, 0, 0, "left", 0, 6);
 }
 
-function createRoom(seed: number, roomX: number, roomY: number, entrance: Direction): Game {
+function createRoom(seed: number, roomX: number, roomY: number, entrance: Direction,
+  score: number, population: number): Game {
   const random = createRandom(roomSeed(seed, roomX, roomY));
   const maze = createMaze(random);
   const geometry = createRoomGeometry(directionSide(entrance));
@@ -122,14 +153,19 @@ function createRoom(seed: number, roomX: number, roomY: number, entrance: Direct
   else if (entrance === "right") playerStart.x = ROOM.width - 75;
   else if (entrance === "up") playerStart.y = 75;
   else playerStart.y = ROOM.height - 75;
-  const robotCells = chooseRobotCells(maze.cellCenters, playerCell, random, walls);
+  const robotCells = chooseRobotCells(maze.cellCenters, playerStart, population, random, walls);
   return {
+    score,
+    difficulty: difficultyForScore(score),
+    roomEntryScore: score,
+    roomPopulation: population,
     outcome: "playing",
     player: { ...playerStart, radius: 14, fireCooldown: 0 },
-    robots: INITIAL_ROBOTS.map((robot, index) => ({ ...robot, ...maze.cellCenters[robotCells[index]], id: index + 1 })),
+    robots: robotCells.map((cell, index) => ({ ...maze.cellCenters[cell], id: index + 1,
+      radius: ROBOT_RADIUS, moveSpeed: 78, fireCooldown: 0.4 + (index % 4) * 0.35 })),
     shots: [],
     walls,
-    nextId: INITIAL_ROBOTS.length + 1,
+    nextId: population + 1,
     elapsed: 0,
     seed,
     roomX,
@@ -211,13 +247,12 @@ function entryCell(entrance: Direction): number {
   return 12;
 }
 
-function chooseRobotCells(cells: readonly { x: number; y: number }[], playerCell: number,
-  random: () => number, walls: readonly Wall[]): number[] {
-  const player = cells[playerCell];
+function chooseRobotCells(cells: readonly { x: number; y: number }[], player: { x: number; y: number },
+  population: number, random: () => number, walls: readonly Wall[]): number[] {
   const candidates = cells.map((_, index) => index).filter((index) => {
     const cell = cells[index];
     return Math.hypot(cell.x - player.x, cell.y - player.y) >= 190
-      && !circleHitsWall(cell.x, cell.y, INITIAL_ROBOTS[0].radius + 10, walls);
+      && !circleHitsWall(cell.x, cell.y, ROBOT_RADIUS + 10, walls);
   });
   for (let i = candidates.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
@@ -227,14 +262,15 @@ function chooseRobotCells(cells: readonly { x: number; y: number }[], playerCell
   for (const index of candidates) {
     if (selected.every((other) => Math.hypot(cells[index].x - cells[other].x, cells[index].y - cells[other].y) >= 150)) {
       selected.push(index);
-      if (selected.length === INITIAL_ROBOTS.length) return selected;
+      if (selected.length === population) return selected;
     }
   }
-  throw new Error("Unable to place four robots safely in room");
+  throw new Error("Unable to place robots safely in room");
 }
 
 function snapshot(game: Game): RoomSnapshot {
   return {
+    difficulty: game.difficulty,
     roomX: game.roomX,
     roomY: game.roomY,
     entrance: game.entrance,
@@ -247,6 +283,10 @@ function snapshot(game: Game): RoomSnapshot {
 }
 
 function replaceGame(target: Game, source: Game): void {
+  target.score = source.score;
+  target.difficulty = source.difficulty;
+  target.roomEntryScore = source.roomEntryScore;
+  target.roomPopulation = source.roomPopulation;
   target.outcome = source.outcome;
   target.player = source.player;
   target.robots = source.robots;
@@ -275,7 +315,11 @@ function beginTransition(game: Game, direction: Direction): void {
   const from = snapshot(game);
   const roomX = game.roomX + (direction === "right" ? 1 : direction === "left" ? -1 : 0);
   const roomY = game.roomY + (direction === "down" ? 1 : direction === "up" ? -1 : 0);
-  const toGame = createRoom(game.seed, roomX, roomY, opposite(direction));
+  const tier = difficultyForScore(game.score);
+  let population = game.roomPopulation;
+  if (tier.threshold === 0 || tier.threshold !== game.difficulty.threshold) population = 6;
+  else if (game.score !== game.roomEntryScore) population = Math.min(12, population + 3);
+  const toGame = createRoom(game.seed, roomX, roomY, opposite(direction), game.score, population);
   const to = snapshot(toGame);
   replaceGame(game, toGame);
   game.transition = { direction, progress: 0, duration: ROOM_SCROLL_DURATION + DOOR_CLOSE_DURATION, from, to };
@@ -328,16 +372,17 @@ function updateRobots(game: Game, dt: number): void {
       const nextX = robot.x + direction.x * robot.moveSpeed * dt;
       const nextY = robot.y + direction.y * robot.moveSpeed * dt;
       if (touchesHazard(nextX, nextY, robot.radius, game.walls)) {
-        game.robots = game.robots.filter((candidate) => candidate.id !== robot.id);
+        destroyRobots(game, new Set([robot.id]));
         continue;
       }
       moveCircle(robot, nextX, nextY, robot.radius, game.walls);
     }
 
-    if (robot.fireCooldown <= 0 && hasLineOfSight(robot, player, game.walls)) {
+    if (robot.fireCooldown <= 0 && game.shots.filter((shot) => shot.owner === "robot").length < game.difficulty.shotLimit
+      && hasLineOfSight(robot, player, game.walls)) {
       const aim = normalized(player.x - robot.x, player.y - robot.y);
       spawnShot(game, "robot", robot.x + aim.x * (robot.radius + SHOT_RADIUS + 1),
-        robot.y + aim.y * (robot.radius + SHOT_RADIUS + 1), aim.x * ROBOT_SHOT_SPEED, aim.y * ROBOT_SHOT_SPEED);
+        robot.y + aim.y * (robot.radius + SHOT_RADIUS + 1), aim.x * game.difficulty.shotSpeed, aim.y * game.difficulty.shotSpeed);
       robot.fireCooldown = ROBOT_FIRE_INTERVAL;
     }
   }
@@ -374,7 +419,7 @@ function updateShots(game: Game, dt: number): void {
       if (shot.owner === "player") {
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
-          game.robots = game.robots.filter((robot) => robot.id !== target.id);
+          destroyRobots(game, new Set([target.id]));
           alive = false;
         }
       } else {
@@ -385,7 +430,7 @@ function updateShots(game: Game, dt: number): void {
         }
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
-          game.robots = game.robots.filter((robot) => robot.id !== target.id);
+          destroyRobots(game, new Set([target.id]));
           alive = false;
         }
       }
@@ -399,7 +444,7 @@ function resolveContacts(game: Game): void {
   if (playerTouchesHazard(game)) game.outcome = "lost";
   for (const robot of game.robots) {
     if (entityTouchesHazard(robot, game.walls)) {
-      game.robots = game.robots.filter((candidate) => candidate.id !== robot.id);
+      destroyRobots(game, new Set([robot.id]));
     }
   }
 
@@ -418,7 +463,15 @@ function resolveContacts(game: Game): void {
       }
     }
   }
-  if (destroyed.size > 0) game.robots = game.robots.filter((robot) => !destroyed.has(robot.id));
+  if (destroyed.size > 0) destroyRobots(game, destroyed);
+}
+
+function destroyRobots(game: Game, ids: ReadonlySet<number>): void {
+  const before = game.robots.length;
+  game.robots = game.robots.filter((robot) => !ids.has(robot.id));
+  const destroyed = before - game.robots.length;
+  game.score += destroyed * 50;
+  if (destroyed > 0 && game.robots.length === 0) game.score += 100;
 }
 
 function spawnShot(game: Game, owner: Shot["owner"], x: number, y: number, velocityX: number, velocityY: number): void {
