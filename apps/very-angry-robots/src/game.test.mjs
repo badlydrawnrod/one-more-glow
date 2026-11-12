@@ -177,7 +177,7 @@ test("outcomes freeze simulation and restart resets player, robots, walls and sh
   game.walls = [];
   restartGame(game);
   assert.equal(game.outcome, "playing");
-  assert.equal(game.player.x, 80);
+  assert.equal(game.player.x, 100);
   assert.equal(game.player.y, 300);
   assert.equal(game.robots.length, 4);
   assert.ok(game.walls.length > 0);

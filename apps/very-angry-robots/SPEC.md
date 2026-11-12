@@ -18,6 +18,13 @@ combat and vector presentation feel right before expanding the game.
   approach, adapted to this room's dimensions; doors and traversal remain
   deferred. The initial arrangement gives the player room to react and at
   least one navigable route through the room.
+- Use a 1000 × 600 room with a 5 × 3 grid of 200 × 200 cells, leaving space
+  above the room for the HUD. Show start and outcome messages over the room
+  while play is stopped.
+- **Experimental visual preview:** Show a closed entrance behind the player
+  and open doorways in the other three walls. Door traversal is not implemented;
+  the room boundary remains hazardous even where a doorway is shown, and the
+  decorative jambs do not have their own collision geometry.
 - The player can move in eight directions and shoot in eight directions.
   Movement and aiming are independently controllable, including while moving.
   Holding a firing direction fires repeatedly at a limited rate; releasing it

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createMaze, MAZE_GRID } from "./maze.ts";
+import { createMaze, MAZE_GRID, ROOM, WALL_THICKNESS } from "./maze.ts";
 
 function seededRandom(seed) {
   let state = seed >>> 0;
@@ -53,20 +53,23 @@ test("maze generation is reproducible with an injected random source", () => {
 test("division skips single-cell arms but keeps single-cell fragments beside a gap", () => {
   const { walls } = createMaze(() => 0);
   assert.deepEqual(walls, [
-    { x: 316, y: 196, width: 488, height: 8, electrified: true },
-    { x: 476, y: 396, width: 328, height: 8, electrified: true },
-    { x: 156, y: 396, width: 8, height: 208, electrified: true },
+    { x: 396, y: 196, width: 608, height: 8, electrified: true },
+    { x: 596, y: 396, width: 408, height: 8, electrified: true },
+    { x: 196, y: 396, width: 8, height: 208, electrified: true },
   ]);
 });
 
 test("maze walls fit the room and leave clear, connected grid-cell spaces", () => {
   const layout = createMaze(seededRandom(2025));
+  assert.equal(ROOM.width / MAZE_GRID.columns, 200);
+  assert.equal(ROOM.height / MAZE_GRID.rows, 200);
   assert.equal(layout.cellCenters.length, MAZE_GRID.columns * MAZE_GRID.rows);
   assert.ok(layout.walls.every((wall) => wall.electrified
     && wall.width > 0 && wall.height > 0
-    && wall.x >= -4 && wall.y >= -4
-    && wall.x + wall.width <= 804 && wall.y + wall.height <= 604));
-  assert.ok(layout.cellCenters.every(({ x, y }) => x > 14 && x < 786 && y > 14 && y < 586));
+    && wall.x >= -WALL_THICKNESS / 2 && wall.y >= -WALL_THICKNESS / 2
+    && wall.x + wall.width <= ROOM.width + WALL_THICKNESS / 2
+    && wall.y + wall.height <= ROOM.height + WALL_THICKNESS / 2));
+  assert.ok(layout.cellCenters.every(({ x, y }) => x > 14 && x < ROOM.width - 14 && y > 14 && y < ROOM.height - 14));
   for (const center of layout.cellCenters) {
     assert.ok(!layout.walls.some((wall) => center.x >= wall.x && center.x <= wall.x + wall.width
       && center.y >= wall.y && center.y <= wall.y + wall.height), "cell center is clear of walls");
