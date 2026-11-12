@@ -1,9 +1,11 @@
-import { createMaze, ROOM } from "./maze.ts";
+import { createMaze, ROOM, WALL_THICKNESS } from "./maze.ts";
+import { createRoomGeometry, DOOR_OPENING, type RoomSide } from "./room-geometry.ts";
 export { ROOM } from "./maze.ts";
 
 /** The simulation is expressed in room pixels and does not depend on rendering or input APIs. */
 
-export type Outcome = "playing" | "won" | "lost";
+export type Outcome = "playing" | "lost";
+export type Direction = "left" | "right" | "up" | "down";
 
 export interface Wall {
   x: number;
@@ -46,6 +48,31 @@ export interface Game {
   walls: Wall[];
   nextId: number;
   elapsed: number;
+  seed: number;
+  roomX: number;
+  roomY: number;
+  entrance: Direction;
+  geometry: ReturnType<typeof createRoomGeometry>;
+  transition: RoomTransition | null;
+}
+
+export interface RoomSnapshot {
+  roomX: number;
+  roomY: number;
+  entrance: Direction;
+  player: Player;
+  robots: Robot[];
+  shots: Shot[];
+  walls: Wall[];
+  geometry: ReturnType<typeof createRoomGeometry>;
+}
+
+export interface RoomTransition {
+  direction: Direction;
+  progress: number;
+  duration: number;
+  from: RoomSnapshot;
+  to: RoomSnapshot;
 }
 
 export interface InputFrame {
@@ -65,6 +92,8 @@ const ROBOT_FIRE_INTERVAL = 1.15;
 const SHOT_RADIUS = 4;
 const CONTACT_RADIUS = 2;
 const STEP = 1 / 120;
+export const ROOM_SCROLL_DURATION = 0.45;
+export const DOOR_CLOSE_DURATION = 0.35;
 
 const INITIAL_ROBOTS: readonly Omit<Robot, "id">[] = [
   { x: 0, y: 0, radius: 14, moveSpeed: 82, fireCooldown: 0.4 },
@@ -78,35 +107,53 @@ const IDLE: InputFrame = {
 };
 
 export function createGame(random: () => number = Math.random): Game {
+  const seed = randomSeed(random);
+  return createRoom(seed, 0, 0, "left");
+}
+
+function createRoom(seed: number, roomX: number, roomY: number, entrance: Direction): Game {
+  const random = createRandom(roomSeed(seed, roomX, roomY));
   const maze = createMaze(random);
-  const playerStart = maze.cellCenters[5];
-  const robotCells = [4, 14, 2, 12];
+  const geometry = createRoomGeometry(directionSide(entrance));
+  const walls = [...maze.walls, ...geometry.hazardRects];
+  const playerCell = entryCell(entrance);
+  const playerStart = { ...maze.cellCenters[playerCell] };
+  if (entrance === "left") playerStart.x = 75;
+  else if (entrance === "right") playerStart.x = ROOM.width - 75;
+  else if (entrance === "up") playerStart.y = 75;
+  else playerStart.y = ROOM.height - 75;
+  const robotCells = chooseRobotCells(maze.cellCenters, playerCell, random, walls);
   return {
     outcome: "playing",
     player: { ...playerStart, radius: 14, fireCooldown: 0 },
     robots: INITIAL_ROBOTS.map((robot, index) => ({ ...robot, ...maze.cellCenters[robotCells[index]], id: index + 1 })),
     shots: [],
-    walls: maze.walls,
+    walls,
     nextId: INITIAL_ROBOTS.length + 1,
     elapsed: 0,
+    seed,
+    roomX,
+    roomY,
+    entrance,
+    geometry,
+    transition: null,
   };
 }
 
 /** Resets in place so input and drawing code can keep their Game reference. */
 export function restartGame(game: Game): void {
   const fresh = createGame();
-  game.outcome = fresh.outcome;
-  game.player = fresh.player;
-  game.robots = fresh.robots;
-  game.shots = fresh.shots;
-  game.walls = fresh.walls;
-  game.nextId = fresh.nextId;
-  game.elapsed = fresh.elapsed;
+  replaceGame(game, fresh);
 }
 
 export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): void {
-  if (input.restartPressed) {
+  if (input.restartPressed && !game.transition) {
     restartGame(game);
+    return;
+  }
+  if (game.transition) {
+    game.transition.progress = Math.min(1, game.transition.progress + Math.max(0, dt) / game.transition.duration);
+    if (game.transition.progress >= 1) game.transition = null;
     return;
   }
   if (game.outcome !== "playing") return;
@@ -115,9 +162,123 @@ export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): vo
   if (delta === 0) return;
   const slices = Math.max(1, Math.ceil(delta / STEP));
   const step = delta / slices;
-  for (let i = 0; i < slices && game.outcome === "playing"; i += 1) {
+  for (let i = 0; i < slices && game.outcome === "playing" && !game.transition; i += 1) {
     tick(game, step, input);
   }
+}
+
+function randomSeed(random: () => number): number {
+  const value = random();
+  if (!Number.isFinite(value) || value < 0 || value >= 1) {
+    throw new RangeError("Game random source must return a number in [0, 1)");
+  }
+  return Math.floor(value * 0x1_0000_0000) >>> 0;
+}
+
+function createRandom(seed: number): () => number {
+  let state = seed || 0x6d2b79f5;
+  return () => {
+    state = (state + 0x6d2b79f5) | 0;
+    let value = state;
+    value = Math.imul(value ^ (value >>> 15), value | 1);
+    value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
+    return ((value ^ (value >>> 14)) >>> 0) / 0x1_0000_0000;
+  };
+}
+
+function roomSeed(seed: number, x: number, y: number): number {
+  let value = seed ^ Math.imul(x, 0x9e3779b1) ^ Math.imul(y, 0x85ebca77);
+  value = Math.imul(value ^ (value >>> 16), 0x7feb352d);
+  value = Math.imul(value ^ (value >>> 15), 0x846ca68b);
+  return (value ^ (value >>> 16)) >>> 0;
+}
+
+function directionSide(direction: Direction): RoomSide {
+  return direction === "up" ? "top" : direction === "down" ? "bottom" : direction;
+}
+
+function opposite(direction: Direction): Direction {
+  if (direction === "left") return "right";
+  if (direction === "right") return "left";
+  if (direction === "up") return "down";
+  return "up";
+}
+
+function entryCell(entrance: Direction): number {
+  if (entrance === "left") return 5;
+  if (entrance === "right") return 9;
+  if (entrance === "up") return 2;
+  return 12;
+}
+
+function chooseRobotCells(cells: readonly { x: number; y: number }[], playerCell: number,
+  random: () => number, walls: readonly Wall[]): number[] {
+  const player = cells[playerCell];
+  const candidates = cells.map((_, index) => index).filter((index) => {
+    const cell = cells[index];
+    return Math.hypot(cell.x - player.x, cell.y - player.y) >= 190
+      && !circleHitsWall(cell.x, cell.y, INITIAL_ROBOTS[0].radius + 10, walls);
+  });
+  for (let i = candidates.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(random() * (i + 1));
+    [candidates[i], candidates[j]] = [candidates[j], candidates[i]];
+  }
+  const selected: number[] = [];
+  for (const index of candidates) {
+    if (selected.every((other) => Math.hypot(cells[index].x - cells[other].x, cells[index].y - cells[other].y) >= 150)) {
+      selected.push(index);
+      if (selected.length === INITIAL_ROBOTS.length) return selected;
+    }
+  }
+  throw new Error("Unable to place four robots safely in room");
+}
+
+function snapshot(game: Game): RoomSnapshot {
+  return {
+    roomX: game.roomX,
+    roomY: game.roomY,
+    entrance: game.entrance,
+    player: { ...game.player },
+    robots: game.robots.map((robot) => ({ ...robot })),
+    shots: game.shots.map((shot) => ({ ...shot })),
+    walls: game.walls,
+    geometry: game.geometry,
+  };
+}
+
+function replaceGame(target: Game, source: Game): void {
+  target.outcome = source.outcome;
+  target.player = source.player;
+  target.robots = source.robots;
+  target.shots = source.shots;
+  target.walls = source.walls;
+  target.nextId = source.nextId;
+  target.elapsed = source.elapsed;
+  target.seed = source.seed;
+  target.roomX = source.roomX;
+  target.roomY = source.roomY;
+  target.entrance = source.entrance;
+  target.geometry = source.geometry;
+  target.transition = source.transition;
+}
+
+function findExit(game: Game, x: number, y: number): Direction | null {
+  const clearance = DOOR_OPENING / 2 - WALL_THICKNESS / 2 - game.player.radius;
+  if (x < 0 && y >= ROOM.height / 2 - clearance && y <= ROOM.height / 2 + clearance && game.entrance !== "left") return "left";
+  if (x > ROOM.width && y >= ROOM.height / 2 - clearance && y <= ROOM.height / 2 + clearance && game.entrance !== "right") return "right";
+  if (y < 0 && x >= ROOM.width / 2 - clearance && x <= ROOM.width / 2 + clearance && game.entrance !== "up") return "up";
+  if (y > ROOM.height && x >= ROOM.width / 2 - clearance && x <= ROOM.width / 2 + clearance && game.entrance !== "down") return "down";
+  return null;
+}
+
+function beginTransition(game: Game, direction: Direction): void {
+  const from = snapshot(game);
+  const roomX = game.roomX + (direction === "right" ? 1 : direction === "left" ? -1 : 0);
+  const roomY = game.roomY + (direction === "down" ? 1 : direction === "up" ? -1 : 0);
+  const toGame = createRoom(game.seed, roomX, roomY, opposite(direction));
+  const to = snapshot(toGame);
+  replaceGame(game, toGame);
+  game.transition = { direction, progress: 0, duration: ROOM_SCROLL_DURATION + DOOR_CLOSE_DURATION, from, to };
 }
 
 function tick(game: Game, dt: number, input: InputFrame): void {
@@ -128,8 +289,15 @@ function tick(game: Game, dt: number, input: InputFrame): void {
   const move = normalized(input.moveX, input.moveY);
   const nextPlayerX = player.x + move.x * PLAYER_SPEED * dt;
   const nextPlayerY = player.y + move.y * PLAYER_SPEED * dt;
-  if (touchesHazard(nextPlayerX, nextPlayerY, player.radius, game.walls)) game.outcome = "lost";
-  moveCircle(player, nextPlayerX, nextPlayerY, player.radius, game.walls);
+  const exit = findExit(game, nextPlayerX, nextPlayerY);
+  if (!exit && touchesPlayerHazard(game, nextPlayerX, nextPlayerY)) game.outcome = "lost";
+  if (exit) {
+    // Only the player may cross a doorway. Robots and shots remain in this room.
+    player.x = nextPlayerX;
+    player.y = nextPlayerY;
+  } else {
+    movePlayerCircle(game, nextPlayerX, nextPlayerY);
+  }
 
   if (input.fire && player.fireCooldown <= 0) {
     const aim = normalized(input.aimX, input.aimY);
@@ -144,8 +312,8 @@ function tick(game: Game, dt: number, input: InputFrame): void {
   resolveContacts(game);
 
   // Loss takes precedence if the final robot and player are defeated in one tick.
-  if (playerTouchesHazard(player, game.walls)) game.outcome = "lost";
-  if (game.outcome === "playing" && game.robots.length === 0) game.outcome = "won";
+  if (playerTouchesHazard(game)) game.outcome = "lost";
+  if (game.outcome === "playing" && exit) beginTransition(game, exit);
 }
 
 function updateRobots(game: Game, dt: number): void {
@@ -228,7 +396,7 @@ function updateShots(game: Game, dt: number): void {
 }
 
 function resolveContacts(game: Game): void {
-  if (playerTouchesHazard(game.player, game.walls)) game.outcome = "lost";
+  if (playerTouchesHazard(game)) game.outcome = "lost";
   for (const robot of game.robots) {
     if (entityTouchesHazard(robot, game.walls)) {
       game.robots = game.robots.filter((candidate) => candidate.id !== robot.id);
@@ -275,13 +443,46 @@ function entityTouchesHazard(entity: { x: number; y: number; radius: number }, w
   return touchesHazard(entity.x, entity.y, entity.radius, walls);
 }
 
-function playerTouchesHazard(player: Player, walls: readonly Wall[]): boolean {
-  return touchesHazard(player.x, player.y, player.radius, walls);
+function playerTouchesHazard(game: Game): boolean {
+  return touchesPlayerHazard(game, game.player.x, game.player.y);
 }
 
 function touchesHazard(x: number, y: number, radius: number, walls: readonly Wall[]): boolean {
   if (x <= radius || y <= radius || x >= ROOM.width - radius || y >= ROOM.height - radius) return true;
   return walls.some((wall) => wall.electrified && circleHitsSingleWall(x, y, radius, wall));
+}
+
+function touchesPlayerHazard(game: Game, x: number, y: number): boolean {
+  const r = game.player.radius;
+  const onOpenLeft = game.entrance !== "left" && x <= r && openDoorClearance(y, ROOM.height / 2, r);
+  const onOpenRight = game.entrance !== "right" && x >= ROOM.width - r && openDoorClearance(y, ROOM.height / 2, r);
+  const onOpenTop = game.entrance !== "up" && y <= r && openDoorClearance(x, ROOM.width / 2, r);
+  const onOpenBottom = game.entrance !== "down" && y >= ROOM.height - r && openDoorClearance(x, ROOM.width / 2, r);
+  if ((x <= r && !onOpenLeft) || (x >= ROOM.width - r && !onOpenRight)
+    || (y <= r && !onOpenTop) || (y >= ROOM.height - r && !onOpenBottom)) return true;
+  return game.walls.some((wall) => wall.electrified && circleHitsSingleWall(x, y, r, wall));
+}
+
+function openDoorClearance(value: number, center: number, radius: number): boolean {
+  const clearance = DOOR_OPENING / 2 - WALL_THICKNESS / 2 - radius;
+  return Math.abs(value - center) <= clearance;
+}
+
+function movePlayerCircle(game: Game, x: number, y: number): void {
+  const player = game.player;
+  const r = player.radius;
+  if (!circleHitsWall(x, player.y, r, game.walls)) {
+    const inVerticalOpening = openDoorClearance(player.y, ROOM.height / 2, r);
+    if ((x >= r || (game.entrance !== "left" && inVerticalOpening))
+      && (x <= ROOM.width - r || (game.entrance !== "right" && inVerticalOpening))) player.x = x;
+    else player.x = clamp(x, r, ROOM.width - r);
+  }
+  if (!circleHitsWall(player.x, y, r, game.walls)) {
+    const inHorizontalOpening = openDoorClearance(player.x, ROOM.width / 2, r);
+    if ((y >= r || (game.entrance !== "up" && inHorizontalOpening))
+      && (y <= ROOM.height - r || (game.entrance !== "down" && inHorizontalOpening))) player.y = y;
+    else player.y = clamp(y, r, ROOM.height - r);
+  }
 }
 
 function circleHitsSingleWall(x: number, y: number, radius: number, wall: Wall): boolean {

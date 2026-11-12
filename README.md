@@ -12,7 +12,7 @@ renderer.
   card and sample scene.
 - [`apps/asteroids-demo/`](apps/asteroids-demo/README.md) — keyboard and gamepad controlled Asteroids arcade game.
 - [`apps/gyruss-demo/`](apps/gyruss-demo/README.md) — keyboard and gamepad controlled orbital shooter demo.
-- [`apps/very-angry-robots/`](apps/very-angry-robots/README.md) — single-room vector robot combat.
+- [`apps/very-angry-robots/`](apps/very-angry-robots/README.md) — vector robot combat across connected rooms.
 - `docs/specs/` — durable behavior requirements.
 
 All consumer apps depend on the library by package name. Keep game or app

@@ -10,7 +10,7 @@ apps/
   diagnostics/              # Vite app for checking library rendering
   asteroids-demo/           # Vite app for keyboard/gamepad Asteroids gameplay
   gyruss-demo/              # Vite app for a keyboard/gamepad orbital shooter
-  very-angry-robots/        # Vite app for single-room robot combat
+  very-angry-robots/        # Vite app for room-based robot combat
 packages/
   one-more-glow/            # reusable drawing library
 docs/

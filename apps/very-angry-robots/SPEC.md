@@ -1,11 +1,11 @@
-# Very Angry Robots: single-room demo
+# Very Angry Robots
 
 ## Scope and status
 
 **Status: Accepted. Implementation: Present; browser and gamepad playtesting
 and visual tuning remain outstanding.**
 
-Create a playable, single-room vector interpretation of Rod Hyde's
+Create a playable vector interpretation of Rod Hyde's
 [Very Angry Robots](https://github.com/libgdx/libgdx-demo-very-angry-robots).
 The original game is the reference for its character and mechanics; this slice
 does not require a line-by-line port. Its purpose is to establish whether the
@@ -13,18 +13,13 @@ combat and vector presentation feel right before expanding the game.
 
 ## Play
 
-- The player and several hostile robots occupy one enclosed room with internal
+- The player and several hostile robots occupy a room with internal
   walls. Generate the maze using the original game's recursive-division
-  approach, adapted to this room's dimensions; doors and traversal remain
-  deferred. The initial arrangement gives the player room to react and at
-  least one navigable route through the room.
+  approach, adapted to this room's dimensions. The initial arrangement gives
+  the player room to react and at least one navigable route through the room.
 - Use a 1000 × 600 room with a 5 × 3 grid of 200 × 200 cells, leaving space
   above the room for the HUD. Show start and outcome messages over the room
   while play is stopped.
-- **Experimental visual preview:** Show a closed entrance behind the player
-  and open doorways in the other three walls. Door traversal is not implemented;
-  the room boundary remains hazardous even where a doorway is shown, and the
-  decorative jambs do not have their own collision geometry.
 - The player can move in eight directions and shoot in eight directions.
   Movement and aiming are independently controllable, including while moving.
   Holding a firing direction fires repeatedly at a limited rate; releasing it
@@ -39,14 +34,13 @@ combat and vector presentation feel right before expanding the game.
   defeats the player or a robot, in keeping with the original game. Robots can
   also be destroyed by robot shots or contact with one another. A shot can
   affect at most one target, and a defeated entity cannot be defeated again.
-- Defeating every robot wins the room; defeat of the player loses it. Clearly
-  show the outcome and offer a fresh restart that resets the room, player,
-  robots and shots. Once an outcome is reached, gameplay stops until restart.
+- Defeat of the player ends the run. Clearly show the outcome and offer a
+  fresh restart that resets the room, player, robots and shots. Gameplay stops
+  after defeat until restart.
 
 The exact layout, robot count, speeds, firing rates, collision dimensions and
 visual effects are playtest choices. Start from the original's behavior where
-practical; adjust them to make this slice readable and enjoyable. If both win
-and loss occur in the same update, loss takes precedence.
+practical; adjust them to make this slice readable and enjoyable.
 
 ## Controls and presentation
 
@@ -71,17 +65,68 @@ and loss occur in the same update, loss takes precedence.
   or a robot; robots can navigate around obstacles where a route is available.
 - Player shots destroy robots; robot shots and robot contact defeat the player.
   Robot friendly fire and robot-to-robot collisions destroy their targets.
-  Simultaneous contacts do not produce duplicate effects, and loss takes
-  precedence over a simultaneous room clear.
-- Clearing the room or losing shows the corresponding outcome and stops play.
-  Restart returns to a playable initial state without leftover shots or damage.
+  Simultaneous contacts do not produce duplicate effects; a player defeat
+  still ends the run if the final robot is destroyed in the same update.
+- Losing shows the outcome and stops play. Restart returns to a playable
+  initial state without leftover shots or damage. Clearing the current room
+  leaves the game playable.
 - Check the room and controls at narrow and wide viewport sizes and playtest
   both keyboard and gamepad for readable, fair combat.
 
+## Room navigation
+
+**Status: Accepted. Implementation: Present; browser and gamepad playtesting
+and visual tuning remain outstanding.**
+
+Extend the demo to a continuous sequence of adjacent rooms. The original
+game's [world](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/World.java),
+[maze generator](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/MazeGenerator.java)
+and [room presentation](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/WorldView.java)
+are the reference for these rules.
+
+- Retain the current room size, square-cell maze, visual style and HUD space.
+  Each of the four walls has a centered doorway. The entrance is closed and
+  the other three doorways are open. The initial room's entrance is on the
+  left, behind the player, as in the current demo.
+- The player can leave through any open doorway at any time, including while
+  robots remain. Clearing a room does not end the game or close its exits.
+  Crossing an exit takes the player to the adjacent room in that direction;
+  the corresponding opposite doorway is the closed entrance to the new room.
+  Place the player safely just inside that entrance, with room to react.
+- Walls, closed doors and their visible jambs have matching collision
+  geometry. They are hazardous as in the original; the player can cross an
+  open doorway without touching an invisible hazardous boundary. Shots and
+  robots do not travel into adjacent rooms.
+- Generate a room's maze from a run-specific seed and its grid coordinates.
+  Revisiting a room in the same run reproduces its maze, while the entrance
+  door reflects the direction of entry. As in the original, populate the room
+  afresh on entry rather than preserving its surviving robots or shots.
+  Generate a new run seed on restart. Spawn robots clear of the player, walls,
+  closed door and one another, with a reasonable opportunity to react.
+- Show the old room scrolling out and the new room scrolling in along the
+  direction of travel, as in the original. Once the new room is in place,
+  animate its entrance closing in two sliding halves. Pause gameplay during
+  the scroll and door animation, then resume. Keep the HUD stationary. With
+  reduced motion enabled, show the new room and closed door immediately.
+- Player defeat still ends this slice and offers a fresh restart. Sound,
+  scoring, lives, difficulty progression and the Captain remain deferred.
+
+### Navigation verification
+
+- Leave through each open side, with robots alive and after clearing them;
+  arrive at the opposite entrance and confirm the other three exits are open.
+- Touch walls, the closed door and jambs; traverse an open doorway without
+  taking damage. Confirm neither robots nor shots enter another room.
+- Follow a loop back to a previously visited coordinate: its maze matches,
+  its entrance matches the return direction, and its robots and shots are
+  freshly populated. Restart starts a new run.
+- Check that the scrolling direction matches the exit, the HUD stays in place,
+  and input and combat do not advance during transitions. Check reduced motion.
+
 ## Deferred and open decisions
 
-Sound, the original family-member taunts and other recordings, multiple rooms,
-door traversal, the Captain, score and lives, difficulty progression,
-achievements and persistence are outside this slice. Their eventual treatment
+Sound, the original family-member taunts and other recordings, the Captain,
+score and lives, difficulty progression, achievements and persistence are
+outside this slice. Their eventual treatment
 remains open. The original's artwork and recordings belong to the author;
 decisions about reusing them can wait until those features are considered.

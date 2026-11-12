@@ -2,6 +2,10 @@
 
 **Status:** In progress
 
+Room navigation is now accepted and supersedes the single-room win behavior.
+See [the navigation plan](room-navigation.md) for that implementation; the
+outstanding controls and visual playtesting here remains relevant.
+
 ## Objective
 
 Build and playtest the accepted single-room vector adaptation, establishing
@@ -16,10 +20,10 @@ whether its combat and presentation capture the original game's character.
 
 ## Scope
 
-Implement the playable room, combat, controls, outcomes and presentation in
-the app specification. Integrate the app with workspace commands and document
-how to run it. Sound, taunts, multiple rooms, the Captain, score, lives and
-other deferred features remain outside this plan.
+Verify the original playable slice's combat, controls and presentation in the
+current navigable-room game. The navigation plan covers the implementation of
+multiple rooms; sound, taunts, the Captain, score, lives and other deferred
+features remain outside this plan.
 
 ## Decisions
 
@@ -69,7 +73,7 @@ keyboard and a standard gamepad at narrow and wide sizes; tune as needed.
 
 ## Completion criteria
 
-- [ ] All accepted single-room behaviors are implemented and lasting decisions
+- [ ] Accepted combat and control behaviors are verified and lasting decisions
   and implementation status are recorded in the app spec.
 - [ ] Relevant automated checks and the spec's manual review scenarios have
   been performed, with results and any limitations recorded.
