@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createGame, difficultyForScore, updateGame } from "./game.ts";
+import { createGame, difficultyForScore, restartGame, updateGame } from "./game.ts";
 
 const idle = { moveX: 0, moveY: 0, aimX: 0, aimY: 0, fire: false, restartPressed: false };
 const thresholds = [0, 300, 1_000, 2_000, 4_000, 5_000, 6_000, 8_000, 10_000, 12_500, 15_000, 20_000];
@@ -89,6 +89,15 @@ test("a run starts with zero score and six robots, and room entry selects the sc
   assert.equal(game.robots.length, 6);
 });
 
+test("lives carry across room transitions and each new room starts firing amnesty", () => {
+  const game = createGame(seeded(19));
+  game.lives = 5;
+  const transition = crossExit(game, "right", { keepRobots: true });
+  assert.equal(game.lives, 5);
+  assert.equal(transition.to.entrance, "left");
+  assert.equal(game.fireAmnestyRemaining, 2);
+});
+
 test("tier zero blocks robot fire and a score threshold applies only on the next room entry", () => {
   const game = createGame(seeded(22));
   game.robots.forEach((entry) => { entry.fireCooldown = 0; });
@@ -164,6 +173,7 @@ test("robot shots share the room cap and use the selected tier speed", () => {
     robot(game, 300, 100, { fireCooldown: 0 }),
     robot(game, 700, 100, { fireCooldown: 0 }),
   ];
+  game.fireAmnestyRemaining = 0;
 
   updateGame(game, 0.02, idle);
   const enemyShots = () => game.shots.filter((entry) => entry.owner === "robot");
@@ -207,7 +217,7 @@ test("restart resets score, difficulty and population for a fresh run", () => {
   game.score = 5_050;
   crossExit(game, "up");
   assert.equal(game.roomPopulation, 9);
-  updateGame(game, 0.01, { ...idle, restartPressed: true });
+  restartGame(game);
   assert.equal(game.score, 0);
   assert.equal(game.roomEntryScore, 0);
   assert.equal(game.difficulty.threshold, 0);

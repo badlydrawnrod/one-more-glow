@@ -36,9 +36,9 @@ combat and vector presentation feel right before expanding the game.
   defeats the player or a robot, in keeping with the original game. Robots can
   also be destroyed by robot shots or contact with one another. A shot can
   affect at most one target, and a defeated entity cannot be defeated again.
-- Defeat of the player ends the run. Clearly show the outcome and offer a
-  fresh restart that resets the room, player, robots and shots. Gameplay stops
-  after defeat until restart.
+- A player defeat costs a life. Respawn in the current room while lives remain;
+  when no lives remain after the death interval, show game over and offer a
+  fresh restart. The lives and respawning rules are specified below.
 
 The exact layout, robot count, speeds, firing rates, collision dimensions and
 visual effects are playtest choices. Start from the original's behavior where
@@ -68,10 +68,10 @@ practical; adjust them to make this slice readable and enjoyable.
 - Player shots destroy robots; robot shots and robot contact defeat the player.
   Robot friendly fire and robot-to-robot collisions destroy their targets.
   Simultaneous contacts do not produce duplicate effects; a player defeat
-  still ends the run if the final robot is destroyed in the same update.
-- Losing shows the outcome and stops play. Restart returns to a playable
-  initial state without leftover shots or damage. Clearing the current room
-  leaves the game playable.
+  still costs a life if the final robot is destroyed in the same update.
+- Losing the last life shows the outcome and stops play. Restart returns to a
+  playable initial state without leftover shots or damage. Clearing the
+  current room leaves the game playable.
 - Check the room and controls at narrow and wide viewport sizes and playtest
   both keyboard and gamepad for readable, fair combat.
 
@@ -112,9 +112,8 @@ are the reference for these rules.
   animate its entrance closing in two sliding halves. Pause gameplay during
   the scroll and door animation, then resume. Keep the HUD stationary. With
   reduced motion enabled, show the new room and closed door immediately.
-- Player defeat still ends this slice and offers a fresh restart. Sound,
-  lives and the Captain remain deferred; score and difficulty progression
-  are specified below.
+- Player defeat consumes a life as described below. Sound and the Captain
+  remain outside the implemented slice.
 
 ### Navigation verification
 
@@ -206,9 +205,110 @@ share the same pursuit behavior.
 - Verify that a score threshold crossed in a room does not alter its current
   robots or shots, but applies when the next room is entered.
 
+## Lives and respawning
+
+**Status: Accepted. Implementation: Present.** Automated tests cover the
+lives and respawning rules, and the user reports that playtesting is good.
+Gamepad and reduced-motion checks remain unverified. The original's
+[world](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/World.java),
+[status manager](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/StatusManager.java)
+and [configuration](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/data/veryangryrobots.properties)
+are the reference.
+
+- Start a run with three lives, including the life currently being played.
+  Show the number of lives in the HUD alongside the score and robot count;
+  keep all three readable and the room's existing size and placement.
+- A lethal collision costs exactly one life, even if several hazards collide
+  with the player in the same update. The player cannot move or shoot during
+  a two-second death interval. Show a clear death indication. The remaining
+  robots and shots continue updating and interacting during this interval, as
+  in the original; if the Captain is later accepted and implemented, it also
+  continues updating. The defeated player cannot be hit again.
+  Robot destruction during this interval scores normally.
+- After the interval, if lives remain, respawn at the current room's original
+  entrance position. Keep the same room, maze, closed entrance, room difficulty,
+  score and destroyed-robot count. Return each surviving robot to its original
+  spawn position; do not restore destroyed robots. Clear all shots and reset
+  the Captain if that separate proposal is accepted and implemented. Resume
+  play without a room transition.
+  Preserve the original's two-second robot firing amnesty after respawning:
+  robots may move and collide but may not fire during that time. Start the
+  same amnesty when normal play begins after entering a room.
+- At zero lives, show game over after the death interval and stop play; offer
+  the existing fresh restart. Restart resets lives, score, room, progression,
+  shots and, if implemented, the Captain. Award one extra life the first time
+  the score reaches or crosses 10,000 and another at 50,000, as in the original; neither repeats in
+  the same run. If one score change crosses both thresholds, award both.
+  Scoring during the death interval can earn an extra life and permit a
+  respawn even when the most recent death reduced the count to zero. This
+  specifies the observable result explicitly: the original deducts the life
+  at the end of the death interval rather than at the moment of death.
+- A room-clear bonus is still awarded at most once per populated room, even
+  if its last robot is destroyed during the death interval. A death does not
+  repopulate the room or re-evaluate difficulty. Exiting and revisiting still
+  populate a fresh room under the existing navigation rules.
+
+### Lives verification
+
+- Confirm the HUD starts at three; each lethal cause and simultaneous hazards
+  deduct one life. Check the delay, disabled controls and continued scoring.
+- Check survivors return to their spawn positions, destroyed robots remain
+  absent, shots clear, and firing amnesty applies after
+  respawn and room entry. Confirm maze, score, tier and clear-bonus state persist.
+- Test extra lives at and across both thresholds, no duplicate awards, a life
+  earned during the death interval, final game over and fresh restart.
+
+## The Captain
+
+**Status: Proposed. Implementation: Not implemented.** The original's
+[Captain](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/mobiles/Captain.java),
+[world](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/World.java)
+and [configuration](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/data/veryangryrobots.properties)
+are the reference. The Captain is a persistent pursuer that encourages the
+player to leave a room, including one that has been cleared.
+
+- On room entry, place the Captain out of sight beyond the closed entrance.
+  Lurk for `max(2, 2 × initial robot count)` seconds of active room play:
+  six robots give 12 seconds, nine give 18, and twelve give 24. Calculate
+  the delay once when the Captain is placed; later robot deaths do not shorten
+  it. The timer does not advance during a room transition or while paused.
+- After the delay the Captain becomes visible, enters from the closed-entrance
+  side and relentlessly pursues the player. Move directly toward the player
+  with the original's characteristic vertical bouncing motion; the Captain
+  passes through walls and doors. The original's pursuit speed is 3.75 versus
+  the player's 12.5 world units per second. Use that 0.3 ratio as a starting
+  point for adapting speed, and tune motion and size through playtesting.
+- The Captain cannot be destroyed or stopped by walls, doors, player shots or
+  robot shots. Contact kills the player, destroys robots and consumes shots
+  from either side. Robots destroyed by the Captain award normal points and
+  can trigger the room-clear bonus. The Captain neither fires nor awards
+  points when hit.
+- Show a distinctive glowing vector character, readily distinguishable from
+  the player, robots, walls and projectiles. Animate its bounce in keeping
+  with the current visual style; with reduced motion, preserve the gameplay
+  trajectory while avoiding unnecessary presentation animation. Sound and
+  taunts remain deferred.
+- The Captain does not follow the player between rooms. On each room entry,
+  reset it outside the new entrance and start a new lurk timer. After a death,
+  also reset it outside the current entrance and calculate a fresh delay from
+  the number of surviving robots at respawn, including a two-second minimum
+  for an empty room. The lurk timer and Captain continue during the death
+  interval until that reset, matching the original's mobile updates.
+
+### Captain verification
+
+- Check lurk timing for six, nine, twelve and zero robots, including robot
+  deaths after placement, a cleared room, transitions, and respawn.
+- Verify entry from all four sides, pursuit through walls and doors, and that
+  shots cannot stop the Captain. Check its collisions with the player, robots
+  and both shot types, including scoring and simultaneous collisions.
+- Confirm it resets on room entry and respawn, and check visibility, movement,
+  reduced-motion presentation and fairness through playtesting.
+
 ## Deferred and open decisions
 
-Sound, the original family-member taunts and other recordings, the Captain,
-lives, achievements and persistence remain deferred. The original's
+Sound, the original family-member taunts and other recordings, achievements
+and persistence remain deferred. Lives are accepted above; the Captain
+remains proposed. The original's
 artwork and recordings belong to the author;
 decisions about reusing them can wait until those features are considered.

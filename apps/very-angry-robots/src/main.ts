@@ -128,7 +128,7 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
     scene.setColor(amber); scene.setIntensity(1);
     scene.point(x-r*.45,y-r*.25); scene.point(x+r*.45,y-r*.25);
   }
-  if (showPlayer && game.outcome !== "lost") drawPlayer(scene, room);
+  if (showPlayer && game.outcome === "playing") drawPlayer(scene, room);
   for (const shot of room.shots) {
     const length = Math.hypot(shot.velocityX, shot.velocityY) || 1;
     scene.setColor(shot.owner === "player" ? cyan : amber); scene.setIntensity(1.4);
@@ -144,7 +144,9 @@ function draw(time: number): void {
   drawText(drawing, "VERY ANGRY ROBOTS", -440, 350, { ...textOptions, height: 16 });
   const hudOptions = { ...textOptions, height: 16 };
   const score = `SCORE ${game.score}`;
-  drawText(drawing, score, -measureText(score, hudOptions).width / 2, 350, hudOptions);
+  drawText(drawing, score, -190, 350, hudOptions);
+  const lives = `LIVES ${game.lives}`;
+  drawText(drawing, lives, 70, 350, hudOptions);
   const robotCount = `ROBOTS ${game.robots.length}`;
   drawText(drawing, robotCount, 440 - measureText(robotCount, hudOptions).width, 350, hudOptions);
 
@@ -161,7 +163,13 @@ function draw(time: number): void {
   }
 
   if (!started) label("PRESS ENTER OR START", roomCenterY, amber);
-  else if (game.outcome === "lost") label("YOU DIED - PRESS ENTER OR START", roomCenterY, red);
+  else if (game.outcome === "dying") {
+    label("PLAYER DOWN", roomCenterY + 12, red);
+    if (game.lives > 0) {
+      const seconds = Math.max(0, game.deathTimeRemaining).toFixed(1);
+      label(`RESPAWNING IN ${seconds}`, roomCenterY - 14, amber);
+    }
+  } else if (game.outcome === "lost") label("GAME OVER - PRESS ENTER OR START", roomCenterY, red);
   drawing.endFrame();
 }
 

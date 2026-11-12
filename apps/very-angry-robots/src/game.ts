@@ -4,7 +4,7 @@ export { ROOM } from "./maze.ts";
 
 /** The simulation is expressed in room pixels and does not depend on rendering or input APIs. */
 
-export type Outcome = "playing" | "lost";
+export type Outcome = "playing" | "dying" | "lost";
 export type Direction = "left" | "right" | "up" | "down";
 
 export interface Wall {
@@ -16,6 +16,8 @@ export interface Wall {
 }
 
 export interface Player {
+  spawnX: number;
+  spawnY: number;
   x: number;
   y: number;
   radius: number;
@@ -23,6 +25,8 @@ export interface Player {
 }
 
 export interface Robot {
+  spawnX: number;
+  spawnY: number;
   id: number;
   x: number;
   y: number;
@@ -51,6 +55,9 @@ export interface Difficulty {
 }
 
 export interface Game {
+  lives: number;
+  deathTimeRemaining: number;
+  fireAmnestyRemaining: number;
   score: number;
   difficulty: Difficulty;
   roomEntryScore: number;
@@ -105,6 +112,8 @@ const PLAYER_SHOT_SPEED = 440;
 const SLOW_SHOT_SPEED = 235;
 const FAST_SHOT_SPEED = SLOW_SHOT_SPEED * 1.28;
 const ROBOT_FIRE_INTERVAL = 1.15;
+const DEATH_INTERVAL = 2;
+const FIRE_AMNESTY = 2;
 const SHOT_RADIUS = 4;
 const CONTACT_RADIUS = 2;
 const STEP = 1 / 120;
@@ -155,13 +164,17 @@ function createRoom(seed: number, roomX: number, roomY: number, entrance: Direct
   else playerStart.y = ROOM.height - 75;
   const robotCells = chooseRobotCells(maze.cellCenters, playerStart, population, random, walls);
   return {
+    lives: 3,
+    deathTimeRemaining: 0,
+    fireAmnestyRemaining: FIRE_AMNESTY,
     score,
     difficulty: difficultyForScore(score),
     roomEntryScore: score,
     roomPopulation: population,
     outcome: "playing",
-    player: { ...playerStart, radius: 14, fireCooldown: 0 },
-    robots: robotCells.map((cell, index) => ({ ...maze.cellCenters[cell], id: index + 1,
+    player: { ...playerStart, spawnX: playerStart.x, spawnY: playerStart.y, radius: 14, fireCooldown: 0 },
+    robots: robotCells.map((cell, index) => ({ ...maze.cellCenters[cell],
+      spawnX: maze.cellCenters[cell].x, spawnY: maze.cellCenters[cell].y, id: index + 1,
       radius: ROBOT_RADIUS, moveSpeed: 78, fireCooldown: 0.4 + (index % 4) * 0.35 })),
     shots: [],
     walls,
@@ -183,7 +196,7 @@ export function restartGame(game: Game): void {
 }
 
 export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): void {
-  if (input.restartPressed && !game.transition) {
+  if (input.restartPressed && game.outcome === "lost" && !game.transition) {
     restartGame(game);
     return;
   }
@@ -192,13 +205,13 @@ export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): vo
     if (game.transition.progress >= 1) game.transition = null;
     return;
   }
-  if (game.outcome !== "playing") return;
+  if (game.outcome === "lost") return;
 
   const delta = Math.min(Math.max(dt, 0), 0.1);
   if (delta === 0) return;
   const slices = Math.max(1, Math.ceil(delta / STEP));
   const step = delta / slices;
-  for (let i = 0; i < slices && game.outcome === "playing" && !game.transition; i += 1) {
+  for (let i = 0; i < slices && !game.transition; i += 1) {
     tick(game, step, input);
   }
 }
@@ -283,6 +296,9 @@ function snapshot(game: Game): RoomSnapshot {
 }
 
 function replaceGame(target: Game, source: Game): void {
+  target.lives = source.lives;
+  target.deathTimeRemaining = source.deathTimeRemaining;
+  target.fireAmnestyRemaining = source.fireAmnestyRemaining;
   target.score = source.score;
   target.difficulty = source.difficulty;
   target.roomEntryScore = source.roomEntryScore;
@@ -320,30 +336,43 @@ function beginTransition(game: Game, direction: Direction): void {
   if (tier.threshold === 0 || tier.threshold !== game.difficulty.threshold) population = 6;
   else if (game.score !== game.roomEntryScore) population = Math.min(12, population + 3);
   const toGame = createRoom(game.seed, roomX, roomY, opposite(direction), game.score, population);
+  toGame.lives = game.lives;
   const to = snapshot(toGame);
   replaceGame(game, toGame);
   game.transition = { direction, progress: 0, duration: ROOM_SCROLL_DURATION + DOOR_CLOSE_DURATION, from, to };
 }
 
 function tick(game: Game, dt: number, input: InputFrame): void {
+  if (game.outcome === "lost") return;
   game.elapsed += dt;
+  if (game.outcome === "dying") {
+    updateRobots(game, dt);
+    updateShots(game, dt);
+    resolveContacts(game);
+    game.deathTimeRemaining = Math.max(0, game.deathTimeRemaining - dt);
+    if (game.deathTimeRemaining < 1e-9) {
+      game.deathTimeRemaining = 0;
+      if (game.lives > 0) respawn(game);
+      else game.outcome = "lost";
+    }
+    return;
+  }
+
   const player = game.player;
   player.fireCooldown = Math.max(0, player.fireCooldown - dt);
-
   const move = normalized(input.moveX, input.moveY);
   const nextPlayerX = player.x + move.x * PLAYER_SPEED * dt;
   const nextPlayerY = player.y + move.y * PLAYER_SPEED * dt;
   const exit = findExit(game, nextPlayerX, nextPlayerY);
-  if (!exit && touchesPlayerHazard(game, nextPlayerX, nextPlayerY)) game.outcome = "lost";
+  if (!exit && touchesPlayerHazard(game, nextPlayerX, nextPlayerY)) defeatPlayer(game);
   if (exit) {
-    // Only the player may cross a doorway. Robots and shots remain in this room.
     player.x = nextPlayerX;
     player.y = nextPlayerY;
   } else {
     movePlayerCircle(game, nextPlayerX, nextPlayerY);
   }
 
-  if (input.fire && player.fireCooldown <= 0) {
+  if (game.outcome === "playing" && input.fire && player.fireCooldown <= 0) {
     const aim = normalized(input.aimX, input.aimY);
     if (aim.x !== 0 || aim.y !== 0) {
       spawnShot(game, "player", player.x, player.y, aim.x * PLAYER_SHOT_SPEED, aim.y * PLAYER_SHOT_SPEED);
@@ -354,10 +383,29 @@ function tick(game: Game, dt: number, input: InputFrame): void {
   updateRobots(game, dt);
   updateShots(game, dt);
   resolveContacts(game);
-
-  // Loss takes precedence if the final robot and player are defeated in one tick.
-  if (playerTouchesHazard(game)) game.outcome = "lost";
+  game.fireAmnestyRemaining = Math.max(0, game.fireAmnestyRemaining - dt);
+  // A lethal collision takes precedence over leaving, even if the last robot also dies.
   if (game.outcome === "playing" && exit) beginTransition(game, exit);
+}
+
+function defeatPlayer(game: Game): void {
+  if (game.outcome !== "playing") return;
+  game.lives -= 1;
+  game.outcome = "dying";
+  game.deathTimeRemaining = DEATH_INTERVAL;
+}
+
+function respawn(game: Game): void {
+  game.player.x = game.player.spawnX;
+  game.player.y = game.player.spawnY;
+  game.player.fireCooldown = 0;
+  for (const robot of game.robots) {
+    robot.x = robot.spawnX;
+    robot.y = robot.spawnY;
+  }
+  game.shots = [];
+  game.fireAmnestyRemaining = FIRE_AMNESTY;
+  game.outcome = "playing";
 }
 
 function updateRobots(game: Game, dt: number): void {
@@ -378,7 +426,8 @@ function updateRobots(game: Game, dt: number): void {
       moveCircle(robot, nextX, nextY, robot.radius, game.walls);
     }
 
-    if (robot.fireCooldown <= 0 && game.shots.filter((shot) => shot.owner === "robot").length < game.difficulty.shotLimit
+    if (game.outcome === "playing" && game.fireAmnestyRemaining <= 1e-9
+      && robot.fireCooldown <= 0 && game.shots.filter((shot) => shot.owner === "robot").length < game.difficulty.shotLimit
       && hasLineOfSight(robot, player, game.walls)) {
       const aim = normalized(player.x - robot.x, player.y - robot.y);
       spawnShot(game, "robot", robot.x + aim.x * (robot.radius + SHOT_RADIUS + 1),
@@ -423,8 +472,8 @@ function updateShots(game: Game, dt: number): void {
           alive = false;
         }
       } else {
-        if (overlaps(shot, SHOT_RADIUS, game.player, game.player.radius)) {
-          game.outcome = "lost";
+        if (game.outcome === "playing" && overlaps(shot, SHOT_RADIUS, game.player, game.player.radius)) {
+          defeatPlayer(game);
           alive = false;
           break;
         }
@@ -441,15 +490,15 @@ function updateShots(game: Game, dt: number): void {
 }
 
 function resolveContacts(game: Game): void {
-  if (playerTouchesHazard(game)) game.outcome = "lost";
+  if (game.outcome === "playing" && playerTouchesHazard(game)) defeatPlayer(game);
   for (const robot of game.robots) {
     if (entityTouchesHazard(robot, game.walls)) {
       destroyRobots(game, new Set([robot.id]));
     }
   }
 
-  if (game.robots.some((robot) => overlaps(robot, robot.radius, game.player, game.player.radius))) {
-    game.outcome = "lost";
+  if (game.outcome === "playing" && game.robots.some((robot) => overlaps(robot, robot.radius, game.player, game.player.radius))) {
+    defeatPlayer(game);
   }
 
   const destroyed = new Set<number>();
@@ -470,8 +519,12 @@ function destroyRobots(game: Game, ids: ReadonlySet<number>): void {
   const before = game.robots.length;
   game.robots = game.robots.filter((robot) => !ids.has(robot.id));
   const destroyed = before - game.robots.length;
+  const oldScore = game.score;
   game.score += destroyed * 50;
   if (destroyed > 0 && game.robots.length === 0) game.score += 100;
+  for (const threshold of [10_000, 50_000]) {
+    if (oldScore < threshold && game.score >= threshold) game.lives += 1;
+  }
 }
 
 function spawnShot(game: Game, owner: Shot["owner"], x: number, y: number, velocityX: number, velocityY: number): void {

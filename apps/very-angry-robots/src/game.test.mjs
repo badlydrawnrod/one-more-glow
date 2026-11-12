@@ -105,10 +105,12 @@ test("transition pauses movement and combat until the new room is in place", () 
   const game = createGame(seedRandom(17));
   travel(game, "right");
   const elapsed = game.elapsed;
+  const amnesty = game.fireAmnestyRemaining;
   const player = { ...game.player };
   const robotState = game.robots.map((robot) => ({ ...robot }));
   updateGame(game, game.transition.duration / 2, { ...idle, moveX: 1, aimX: 1, fire: true });
   assert.equal(game.elapsed, elapsed);
+  assert.equal(game.fireAmnestyRemaining, amnesty);
   assert.deepEqual(game.player, player);
   assert.deepEqual(game.robots, robotState);
   assert.equal(game.shots.length, 0);
@@ -120,6 +122,7 @@ test("transition pauses movement and combat until the new room is in place", () 
   assert.equal(game.shots.length, 0);
   finishTransition(game);
   assert.equal(game.elapsed, 0);
+  assert.equal(game.fireAmnestyRemaining, 2);
 });
 
 test("closed entrance and doorway jambs remain hazardous while open gaps are traversable", () => {
@@ -129,14 +132,14 @@ test("closed entrance and doorway jambs remain hazardous while open gaps are tra
   for (let i = 0; i < 20 && closed.outcome === "playing"; i += 1) {
     updateGame(closed, 0.05, { ...idle, moveX: -1 });
   }
-  assert.equal(closed.outcome, "lost");
+  assert.equal(closed.outcome, "dying");
   assert.equal(closed.transition, null);
 
   const jamb = createGame(seedRandom(53));
   jamb.player.x = 970;
   jamb.player.y = 253;
   updateGame(jamb, 0.05, { ...idle, moveX: 1 });
-  assert.equal(jamb.outcome, "lost");
+  assert.equal(jamb.outcome, "dying");
   assert.equal(jamb.transition, null);
 
   const doorway = createGame(seedRandom(54));
@@ -157,7 +160,7 @@ test("closed entrance and doorway jambs remain hazardous while open gaps are tra
   for (let i = 0; i < 20 && jambContact.outcome === "playing"; i += 1) {
     updateGame(jambContact, 0.05, { ...idle, moveX: 1 });
   }
-  assert.equal(jambContact.outcome, "lost");
+  assert.equal(jambContact.outcome, "dying");
   assert.equal(jambContact.transition, null);
 });
 
@@ -245,6 +248,7 @@ test("robot fires only with line of sight and its projectile can defeat the play
 
   const clear = emptyGame();
   clear.difficulty = difficultyForScore(300);
+  clear.fireAmnestyRemaining = 0;
   clear.player.x = 200;
   clear.player.y = 100;
   clear.robots = [robot(clear, 100, 100, { fireCooldown: 0 })];
@@ -255,7 +259,7 @@ test("robot fires only with line of sight and its projectile can defeat the play
   clear.shots[0].velocityX = clear.difficulty.shotSpeed;
   clear.shots[0].velocityY = 0;
   updateGame(clear, 0.02, idle);
-  assert.equal(clear.outcome, "lost");
+  assert.equal(clear.outcome, "dying");
 });
 
 test("a robot shot can destroy a different robot and robot contact destroys both", () => {
@@ -270,16 +274,16 @@ test("a robot shot can destroy a different robot and robot contact destroys both
   assert.equal(game.robots.length, 0);
 });
 
-test("electrified wall and room edge contact defeat the player and robots", () => {
+test("electrified wall and room edge contact start a death interval; robots still die to hazards", () => {
   const game = emptyGame();
   game.walls = [{ x: 120, y: 80, width: 20, height: 40, electrified: true }];
   updateGame(game, 0.1, { ...idle, moveX: 1 });
-  assert.equal(game.outcome, "lost");
+  assert.equal(game.outcome, "dying");
 
   const edge = emptyGame();
   edge.player.x = 20;
   updateGame(edge, 0.1, { ...idle, moveX: -1 });
-  assert.equal(edge.outcome, "lost");
+  assert.equal(edge.outcome, "dying");
 
   const robotGame = emptyGame();
   robotGame.player.x = 700;
@@ -291,13 +295,157 @@ test("electrified wall and room edge contact defeat the player and robots", () =
   assert.equal(robotGame.outcome, "playing");
 });
 
-test("loss is recorded even when the final robot is destroyed in the same update", () => {
+test("player death is recorded when the final robot is destroyed in the same update", () => {
   const game = emptyGame();
   game.robots = [robot(game, 140, 100)];
   game.shots = [shot(game, "player", 120, 100, 440, 0), shot(game, "robot", 100, 100)];
   updateGame(game, 0.05, idle);
   assert.equal(game.robots.length, 0);
+  assert.equal(game.score, 150, "the final robot and room-clear bonus still score during player death");
+  assert.equal(game.outcome, "dying");
+});
+
+function advance(game, seconds) {
+  const ticks = Math.ceil(seconds / 0.1);
+  for (let i = 0; i < ticks; i += 1) updateGame(game, Math.min(0.1, seconds - i * 0.1), idle);
+}
+
+test("runs start with three lives and robot firing amnesty after room entry", () => {
+  const game = createGame(seedRandom(61));
+  assert.equal(game.lives, 3);
+  assert.equal(game.outcome, "playing");
+  assert.equal(game.fireAmnestyRemaining, 2);
+
+  game.walls = [];
+  game.player.x = 500;
+  game.player.y = 100;
+  game.difficulty = difficultyForScore(300);
+  game.robots = [robot(game, 100, 100, { fireCooldown: 0 })];
+  updateGame(game, 1, idle);
+  assert.equal(game.shots.filter((entry) => entry.owner === "robot").length, 0);
+  assert.ok(game.fireAmnestyRemaining > 1.8 && game.fireAmnestyRemaining < 2);
+  advance(game, 2);
+  assert.equal(game.shots.filter((entry) => entry.owner === "robot").length, 1);
+});
+
+test("each lethal hazard starts one two-second death interval despite simultaneous hits", () => {
+  const cases = [
+    ["robot projectile", (game) => { game.shots = [shot(game, "robot", 100, 100)]; }],
+    ["robot contact", (game) => { game.robots = [robot(game, 100, 100)]; }],
+    ["electrified wall", (game) => { game.walls = [{ x: 90, y: 80, width: 20, height: 40, electrified: true }]; }],
+    ["room edge", (game) => { game.player.x = 10; }],
+    ["multiple simultaneous hazards", (game) => {
+      game.robots = [robot(game, 100, 100), robot(game, 100, 100)];
+      game.shots = [shot(game, "robot", 100, 100), shot(game, "robot", 100, 100)];
+    }],
+  ];
+
+  for (const [cause, arrange] of cases) {
+    const game = emptyGame();
+    game.fireAmnestyRemaining = 0;
+    game.robots = [];
+    arrange(game);
+    updateGame(game, 0.02, idle);
+    assert.equal(game.outcome, "dying", cause);
+    assert.ok(game.deathTimeRemaining > 1.9 && game.deathTimeRemaining <= 2, cause);
+    assert.equal(game.lives, 2, "each death consumes one life immediately");
+    const position = { x: game.player.x, y: game.player.y };
+    const shots = game.shots.length;
+    updateGame(game, 0.5, { ...idle, moveX: 1, aimX: 1, fire: true });
+    assert.deepEqual({ x: game.player.x, y: game.player.y }, position, cause);
+    assert.equal(game.shots.length, shots, cause);
+    assert.ok(game.deathTimeRemaining < 1.91 && game.deathTimeRemaining > 1.8, cause);
+  }
+});
+
+test("death interval keeps combat and scoring active, then respawns surviving actors", () => {
+  const game = emptyGame();
+  game.walls = [];
+  game.player.x = 100;
+  game.player.y = 100;
+  game.player.spawnX = 100;
+  game.player.spawnY = 100;
+  game.robots = [
+    robot(game, 300, 300, { spawnX: 300, spawnY: 300 }),
+    robot(game, 200, 200, { spawnX: 200, spawnY: 200 }),
+  ];
+  game.shots = [shot(game, "robot", 100, 100), shot(game, "player", 190, 200, 0, 0)];
+  updateGame(game, 0.01, idle);
+  assert.equal(game.outcome, "dying");
+  assert.equal(game.score, 50);
+  assert.equal(game.robots.length, 1, "a destroyed robot stays destroyed");
+  advance(game, 1.99);
+  assert.equal(game.outcome, "dying");
+  updateGame(game, 0.02, idle);
+  assert.equal(game.outcome, "playing");
+  assert.equal(game.lives, 2);
+  assert.deepEqual([game.player.x, game.player.y], [100, 100]);
+  assert.deepEqual([game.robots[0].x, game.robots[0].y], [300, 300]);
+  assert.equal(game.robots.length, 1);
+  assert.equal(game.shots.length, 0);
+  assert.equal(game.score, 50);
+  assert.ok(game.fireAmnestyRemaining > 1.9 && game.fireAmnestyRemaining <= 2);
+});
+
+test("score thresholds award extra lives once, including while dying", () => {
+  const game = emptyGame();
+  game.lives = 1;
+  game.score = 9_950;
+  game.walls = [];
+  game.robots = [robot(game, 200, 200)];
+  game.shots = [shot(game, "robot", 100, 100), shot(game, "player", 180, 200, 440, 0)];
+  updateGame(game, 0.01, idle);
+  assert.equal(game.outcome, "dying");
+  assert.equal(game.score, 10_100, "robot and room-clear points cross the 10,000 threshold");
+  advance(game, 2.01);
+  assert.equal(game.outcome, "playing");
+  assert.equal(game.lives, 1, "the earned life permits respawn after the last life was consumed");
+
+  game.score = 49_950;
+  game.robots = [robot(game, 200, 200)];
+  game.shots = [shot(game, "player", 180, 200, 440, 0)];
+  updateGame(game, 0.05, idle);
+  assert.equal(game.lives, 2);
+  game.robots = [robot(game, 200, 200)];
+  game.shots = [shot(game, "player", 180, 200, 440, 0)];
+  updateGame(game, 0.05, idle);
+  assert.equal(game.lives, 2, "each threshold awards at most once per run");
+});
+
+test("one simultaneous score award crossing both life thresholds grants both", () => {
+  const game = emptyGame();
+  game.lives = 1;
+  game.score = 9_950;
+  game.walls = [];
+  game.robots = Array.from({ length: 801 }, (_, index) => robot(game, 300, 300, { id: index + 1 }));
+  game.shots = [shot(game, "robot", 100, 100)];
+  updateGame(game, 0.01, idle);
+  assert.equal(game.outcome, "dying");
+  assert.equal(game.robots.length, 0);
+  assert.equal(game.score, 50_100);
+  assert.equal(game.lives, 2, "the one score change awards a life at both 10,000 and 50,000");
+  advance(game, 2.01);
+  assert.equal(game.outcome, "playing", "both earned lives allow the respawn");
+  assert.equal(game.lives, 2);
+});
+
+test("last life becomes game over only after the death interval; restart starts a fresh run", () => {
+  const game = emptyGame();
+  game.lives = 1;
+  game.robots = [robot(game, 100, 100)];
+  updateGame(game, 0.01, idle);
+  assert.equal(game.outcome, "dying");
+  advance(game, 1.99);
+  assert.equal(game.outcome, "dying");
+  updateGame(game, 0.02, idle);
   assert.equal(game.outcome, "lost");
+  updateGame(game, 0.1, { ...idle, moveX: 1 });
+  assert.equal(game.outcome, "lost");
+  updateGame(game, 0.01, { ...idle, restartPressed: true });
+  assert.equal(game.outcome, "playing");
+  assert.equal(game.lives, 3);
+  assert.equal(game.score, 0);
+  assert.equal(game.shots.length, 0);
 });
 
 test("room clear keeps simulation playable and restart resets player, robots, walls and shots", () => {
