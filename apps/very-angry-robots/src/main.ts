@@ -123,22 +123,10 @@ function drawCaptain(context: DrawingContext, room: RoomSnapshot): void {
   context.pushTransform();
   context.translate(captain.x, captain.y + bounce);
   context.scale(captain.radius / 14, captain.radius / 14);
-  // An armored mask with angular side panels and inward-sloping brows.
-  line(context, [[-8,-12],[8,-12],[11,-9],[13,-9],[13,1],
-    [9,5],[7,10],[3,13],[-3,13],[-7,10],[-9,5],[-13,1],[-13,-9],[-11,-9]], captainSteel, 1.2);
-  context.setColor(captainEyes); context.setIntensity(1.5);
-  context.moveTo(-9,-5); context.lineTo(-3,-2);
-  context.moveTo(9,-5); context.lineTo(3,-2);
-  // Keep the eye cores below overdrive so the renderer preserves their red colour.
-  context.setColor([1, 0.05, 0.02]); context.setIntensity(1);
-  context.point(-6,0); context.point(6,0);
-  context.setColor(captainSteel); context.setIntensity(1.2);
-  context.moveTo(-4,-10); context.lineTo(4,-10);
-  context.moveTo(-10,1); context.lineTo(-8,4); context.lineTo(-6,4);
-  context.moveTo(10,1); context.lineTo(8,4); context.lineTo(6,4);
-  line(context, [[-6,6],[6,6],[5,10],[-5,10]], captainSteel, 1.2);
-  context.moveTo(-2,6); context.lineTo(-2,10);
-  context.moveTo(2,6); context.lineTo(2,10);
+  // Keep the robot-head silhouette, enlarged and with the Captain's steel finish.
+  line(context, [[-14,-11],[14,-11],[14,8],[7,8],[7,16],[-7,16],[-7,8],[-14,8]], captainSteel, 1.2);
+  context.setColor(captainEyes); context.setIntensity(1);
+  context.point(-6,-3); context.point(6,-3);
   context.popTransform();
 }
 

@@ -260,7 +260,8 @@ are the reference.
 ## The Captain
 
 **Status: Accepted. Implementation: Present.** Automated tests cover the
-Captain's gameplay and clipping. Appearance, balance, gamepad and reduced-motion
+Captain's gameplay and clipping. The user reports that the Captain's balance
+is pretty good and has accepted his appearance. Gamepad and reduced-motion
 behavior have not been playtested. The original's
 [Captain](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/mobiles/Captain.java),
 [world](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/World.java)
@@ -285,9 +286,10 @@ player to leave a room, including one that has been cleared.
   from either side. Robots destroyed by the Captain award normal points and
   can trigger the room-clear bonus. The Captain neither fires nor awards
   points when hit.
-- Show a distinctive glowing vector character, readily distinguishable from
-  the player, robots, walls and projectiles. Animate its bounce in keeping
-  with the current visual style; with reduced motion, preserve the gameplay
+- Show a larger robot-head silhouette matching the robots’ blocky vector style,
+  with a steel-blue outline and red eyes. Keep it readily distinguishable from
+  the player, regular robots, walls and projectiles. Animate its bounce in
+  keeping with the current visual style; with reduced motion, preserve the gameplay
   trajectory while avoiding unnecessary presentation animation. Clip the
   Captain's drawing to the current room boundary, including while entering
   from outside and while rooms scroll; no part of its vector geometry should
