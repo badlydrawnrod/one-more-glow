@@ -4,7 +4,7 @@ Plans are temporary, resumable records of implementation work.
 
 They describe **how work is progressing**, not the durable requirements of the software.
 
-Shared library requirements belong in `docs/specs/`; app-specific specifications belong with the app. Architectural rules belong in `docs/architecture.md` and `docs/engineering.md`.
+Package requirements belong in `packages/<package>/docs/specs/`; app-specific specifications belong in `apps/<app>/docs/specs/`. Cross-package requirements belong in root `docs/specs/`. Architectural rules belong in `docs/architecture.md` and `docs/engineering.md`.
 
 Keep plans for work confined to one app in `apps/<app>/plans/active/`. Keep library and cross-app plans in `plans/active/`. Create the relevant directory when needed.
 

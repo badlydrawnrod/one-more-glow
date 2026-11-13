@@ -1,8 +1,8 @@
 # One More Glow
 
-One More Glow is a small TypeScript library for retro-inspired 2D vector
-drawing. Its renderer-independent `DrawingContext` API currently has a WebGL2
-renderer.
+One More Glow is a TypeScript project for retro-inspired 2D vector graphics.
+It includes a renderer-independent drawing library with a WebGL2 backend and
+interactive demo apps built on that library.
 
 ## Repository layout
 
@@ -13,7 +13,7 @@ renderer.
 - [`apps/asteroids-demo/`](apps/asteroids-demo/README.md) — keyboard and gamepad controlled Asteroids arcade game.
 - [`apps/gyruss-demo/`](apps/gyruss-demo/README.md) — keyboard and gamepad controlled orbital shooter demo.
 - [`apps/very-angry-robots/`](apps/very-angry-robots/README.md) — vector robot combat across connected rooms.
-- `docs/specs/` — durable behavior requirements.
+- `packages/one-more-glow/docs/specs/` — library behavior requirements.
 
 All consumer apps depend on the library by package name. Keep game or app
 behavior in apps; place code in a shared package when a concrete reuse need appears. See
@@ -77,7 +77,7 @@ renderer.setDisplayProfile({ ...DEFAULT_DISPLAY_PROFILE, glowStrength: 0.5 });
 ```
 
 The profile controls line width, point radius, glow strength and glow spread.
-See the [display specification](docs/specs/vector-display.md) for ranges and
+See the [display specification](packages/one-more-glow/docs/specs/SPEC.md) for ranges and
 update semantics. The diagnostics app's Profile view allows live adjustment.
 
 ## Segment text
@@ -97,4 +97,4 @@ uppercase height; `metrics.ascent + metrics.descent` gives the full nominal
 font height. `metrics.width` is the advance to the next character, including
 trailing spaces. Choose `segment16` for the uppercase design; ASCII lowercase
 is converted automatically. Fixed spacing is the default. See the
-[segment text specification](docs/specs/segment-text.md) for coverage and behavior.
+[segment text specification](packages/one-more-glow/docs/specs/segment-text.md) for coverage and behavior.

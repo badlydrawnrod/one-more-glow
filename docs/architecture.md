@@ -17,19 +17,24 @@ apps/
     docs/specs/             # app-specific behavior requirements
 packages/
   one-more-glow/            # reusable drawing library
+    docs/specs/             # package behavior requirements
 docs/
-  specs/                    # durable behavior requirements
+  specs/                    # cross-package behavior requirements
 ```
 
 Reusable libraries live under `packages/`; runnable consumers live under
-`apps/`. Apps depend on packages through their public package names and
-exports. Packages must not depend on apps. Code specific to one app should
-remain in that app. Create a shared package when a concrete reusable boundary
-emerges, rather than in anticipation of hypothetical reuse.
+`apps/`. The `packages/` directory may contain multiple reusable packages;
+each package owns its code, public exports and `docs/specs/`. This repository
+currently contains one package. Apps depend on packages through their public
+package names and exports. Packages must not depend on apps. Code specific to
+one app should remain in that app. Create a shared package when a concrete
+reusable boundary emerges, rather than in anticipation of hypothetical reuse.
 
-App-specific specifications live with the app under `docs/specs/`, with
-`SPEC.md` as the index when specifications are split by capability. Practical
-documentation lives in the app's `README.md` when needed. App-specific active
+Package specifications live with the package under `docs/specs/`; app
+specifications live with the app under `docs/specs/`. Each uses `SPEC.md` as
+the index when requirements are split by capability. Cross-package
+specifications live under the root `docs/specs/`. Practical documentation
+lives in the package's or app's `README.md` when needed. App-specific active
 plans live under the app's `plans/active/`; shared and cross-app plans live
 under the root `plans/`.
 

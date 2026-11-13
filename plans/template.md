@@ -12,7 +12,7 @@ Explain what success looks like, not just what code will be changed.
 
 Link to relevant specifications, architecture documents and other authoritative requirements.
 
-- `docs/specs/...`
+- `packages/<package>/docs/specs/...` or `apps/<app>/docs/specs/...`
 - `docs/architecture.md`
 
 Do not duplicate durable requirements here.

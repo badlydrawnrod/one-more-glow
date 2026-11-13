@@ -3,7 +3,7 @@
 This is a reverse-engineered baseline of the current diagnostic app, not a
 claim that every scene detail is an accepted design decision. See [README.md](../../README.md)
 for how to run it and select views. Shared display requirements remain in the
-[vector display specification](../../../../docs/specs/vector-display.md).
+[vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md).
 
 ## Purpose and current behavior
 
@@ -64,7 +64,7 @@ without editing the URL.
 **Implementation: Implemented.**
 
 The test card provides a labelled comparison of normal intensity and overdrive
-for evaluating the response specified in the [vector display specification](../../../../docs/specs/vector-display.md).
+for evaluating the response specified in the [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md).
 It shows lines and points in at least two distinct colours at intensities 0.5,
 1, 1.25, 1.5 and 2, using the same colours and geometry at each intensity so
 the changes in core colour and halo are easy to compare. The samples remain

@@ -28,7 +28,7 @@ The 22-segment font adapts Stewart C. Russell's
 the [Litronix DL-3422 character chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85).
 The source font's licence and attribution must accompany any adaptation used
 in the library; see the library's
-[licence notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
+[licence notice](../../THREEFOURTWOTWO-OFL.txt).
 
 ## Public API
 

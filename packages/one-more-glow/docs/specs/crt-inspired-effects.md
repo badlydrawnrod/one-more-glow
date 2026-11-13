@@ -4,7 +4,7 @@
 
 This document collects possible effects for the imaginary vector display. The
 accepted behaviour and current implementation remain in the
-[vector display specification](vector-display.md). The aim is to explore a
+[vector display specification](SPEC.md). The aim is to explore a
 luminous visual character, not to commit to accurate hardware emulation.
 
 ## Starting point

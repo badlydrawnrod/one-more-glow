@@ -1,12 +1,16 @@
 # Agent instructions
 
-One More Glow is a small TypeScript library for retro-inspired vector graphics. The WebGL2 renderer implements the renderer-independent `DrawingContext`; preserve that boundary so future renderers can serve the same consumers.
+One More Glow is a TypeScript workspace for retro-inspired vector graphics,
+with reusable packages under `packages/` and demo apps under `apps/`. The
+current drawing package's WebGL2 renderer implements the renderer-independent
+`DrawingContext`; preserve that boundary so future renderers can serve the
+same consumers.
 
 ## Read what applies
 
 - Read `docs/engineering.md` for engineering conventions and the specification lifecycle.
 - Read `docs/architecture.md` when a change touches module boundaries, dependencies or repository layout.
-- Read only relevant files in root `docs/specs/` for library behavior and unresolved decisions.
+- When working on a package, read its `docs/specs/SPEC.md` index if present, then the relevant capability specs it links.
 - When working on an app, read its `docs/specs/SPEC.md` index if present, then the relevant app capability specs it links.
 - For substantial work, follow `plans/README.md` and inspect relevant root and app-local active plans.
 - Use `README.md` for workspace commands.
