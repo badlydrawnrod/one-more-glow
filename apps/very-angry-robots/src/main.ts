@@ -8,6 +8,8 @@ import { transitionOffsets } from "./transition-presentation.ts";
 import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores } from "./high-scores.ts";
 import { createScreenFlow, updateScreenFlow } from "./screen-flow.ts";
 import { createInitialsEntry, updateInitialsEntry } from "./initials-entry.ts";
+import { addScoreFlyup, clearScoreFlyups, createScoreFlyupState, retainPresentedRoomFlyups,
+  scoreFlyupOpacity, scoreFlyupRise, updateScoreFlyups } from "./score-flyups.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
@@ -22,6 +24,7 @@ const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
 let highScores = loadHighScores(() => window.localStorage);
 let initialsEntry = createInitialsEntry();
+const scoreFlyups = createScoreFlyupState();
 let aim = { x: 1, y: 0 };
 let walking = false;
 const cyan: Color = [0.35, 0.95, 1];
@@ -174,6 +177,21 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
     scene.moveTo(shot.x, shot.y);
     scene.lineTo(shot.x - shot.velocityX / length * 10, shot.y - shot.velocityY / length * 10);
   }
+  const flyupScene = clippedDrawing(scene, { left: 0, right: ROOM.width, bottom: 0, top: ROOM.height });
+  for (let index = 0; index < scoreFlyups.items.length; index += 1) {
+    const flyup = scoreFlyups.items[index];
+    if (flyup.roomX !== room.roomX || flyup.roomY !== room.roomY) continue;
+    const nearbyCount = scoreFlyups.items.slice(0, index).filter((other) => other.roomX === flyup.roomX
+      && other.roomY === flyup.roomY && other.age < 0.3
+      && Math.hypot(other.x - flyup.x, other.y - flyup.y) < 38).length;
+    const fan = nearbyCount === 0 ? 0 : (nearbyCount % 2 === 1 ? 1 : -1) * Math.ceil(nearbyCount / 2) * 18;
+    const value = String(flyup.points);
+    const options = { ...textOptions, height: 16 } as const;
+    const x = flyup.x + fan - measureText(value, options).width / 2;
+    flyupScene.setColor(robotColors[flyup.color]);
+    flyupScene.setIntensity(1.15 * scoreFlyupOpacity(flyup));
+    drawText(flyupScene, value, x, flyup.y + scoreFlyupRise(flyup, reducedMotion.matches), options);
+  }
   scene.popTransform();
   drawRoomCaptain(room, offsetX, offsetY);
 }
@@ -245,9 +263,11 @@ function draw(time: number): void {
     const scrollProgress = reducedMotion.matches ? 1 : Math.min(1, elapsed / ROOM_SCROLL_DURATION);
     const doorProgress = reducedMotion.matches ? 1 : Math.max(0, Math.min(1, (elapsed - ROOM_SCROLL_DURATION) / DOOR_CLOSE_DURATION));
     const offsets = transitionOffsets(transition.direction, scrollProgress);
+    retainPresentedRoomFlyups(scoreFlyups, [transition.from, transition.to]);
     drawRoom(transition.from, time, offsets.from.x, offsets.from.y, 1, false);
     drawRoom(transition.to, time, offsets.to.x, offsets.to.y, doorProgress);
   } else {
+    retainPresentedRoomFlyups(scoreFlyups, [game]);
     drawRoom(game, time);
   }
 
@@ -286,8 +306,12 @@ function frame(time: number): void {
     if (!game.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
     const previousX = game.player.x, previousY = game.player.y;
     const simulationDelta = reducedMotion.matches && game.transition ? game.transition.duration : delta;
-    updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
+    const events = updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
       fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
+    for (const event of events) {
+      if (event.type === "robot-destroyed") addScoreFlyup(scoreFlyups, event);
+    }
+    updateScoreFlyups(scoreFlyups, delta, reducedMotion.matches);
     walking = !game.transition && game.outcome === "playing" && (game.player.x !== previousX || game.player.y !== previousY);
     if (game.outcome === "lost") {
       screenFlow = updateScreenFlow(screenFlow, {
@@ -313,6 +337,7 @@ function frame(time: number): void {
     }
   } else if (controls.startPressed) {
     restartGame(game);
+    clearScoreFlyups(scoreFlyups);
     initialsEntry = createInitialsEntry();
     screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
   } else if (controls.screenAdvancePressed) {

@@ -87,6 +87,19 @@ export interface Game {
   transition: RoomTransition | null;
 }
 
+/** A gameplay event for presentation systems to consume without changing simulation state. */
+export interface RobotDestroyedEvent {
+  type: "robot-destroyed";
+  roomX: number;
+  roomY: number;
+  x: number;
+  y: number;
+  color: RobotColor;
+  points: number;
+}
+
+export type GameEvent = RobotDestroyedEvent;
+
 export interface RoomSnapshot {
   difficulty: Difficulty;
   roomX: number;
@@ -227,25 +240,27 @@ export function restartGame(game: Game): void {
   replaceGame(game, fresh);
 }
 
-export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): void {
+export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): GameEvent[] {
+  const events: GameEvent[] = [];
   if (input.restartPressed && game.outcome === "lost" && !game.transition) {
     restartGame(game);
-    return;
+    return events;
   }
   if (game.transition) {
     game.transition.progress = Math.min(1, game.transition.progress + Math.max(0, dt) / game.transition.duration);
     if (game.transition.progress >= 1) game.transition = null;
-    return;
+    return events;
   }
-  if (game.outcome === "lost") return;
+  if (game.outcome === "lost") return events;
 
   const delta = Math.min(Math.max(dt, 0), 0.1);
-  if (delta === 0) return;
+  if (delta === 0) return events;
   const slices = Math.max(1, Math.ceil(delta / STEP));
   const step = delta / slices;
   for (let i = 0; i < slices && !game.transition; i += 1) {
-    tick(game, step, input);
+    tick(game, step, input, events);
   }
+  return events;
 }
 
 function randomSeed(random: () => number): number {
@@ -376,14 +391,14 @@ function beginTransition(game: Game, direction: Direction): void {
   game.transition = { direction, progress: 0, duration: ROOM_SCROLL_DURATION + DOOR_CLOSE_DURATION, from, to };
 }
 
-function tick(game: Game, dt: number, input: InputFrame): void {
+function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): void {
   if (game.outcome === "lost") return;
   game.elapsed += dt;
   if (game.outcome === "dying") {
     updateCaptain(game, dt);
-    updateRobots(game, dt);
-    updateShots(game, dt);
-    resolveContacts(game);
+    updateRobots(game, dt, events);
+    updateShots(game, dt, events);
+    resolveContacts(game, events);
     game.deathTimeRemaining = Math.max(0, game.deathTimeRemaining - dt);
     if (game.deathTimeRemaining < 1e-9) {
       game.deathTimeRemaining = 0;
@@ -416,9 +431,9 @@ function tick(game: Game, dt: number, input: InputFrame): void {
     }
   }
 
-  updateRobots(game, dt);
-  updateShots(game, dt);
-  resolveContacts(game);
+  updateRobots(game, dt, events);
+  updateShots(game, dt, events);
+  resolveContacts(game, events);
   game.fireAmnestyRemaining = Math.max(0, game.fireAmnestyRemaining - dt);
   // A lethal collision takes precedence over leaving, even if the last robot also dies.
   if (game.outcome === "playing" && exit) beginTransition(game, exit);
@@ -445,7 +460,7 @@ function respawn(game: Game): void {
   game.outcome = "playing";
 }
 
-function updateRobots(game: Game, dt: number): void {
+function updateRobots(game: Game, dt: number, events: GameEvent[]): void {
   const player = game.player;
   for (const robot of game.robots) {
     robot.fireCooldown = Math.max(0, robot.fireCooldown - dt);
@@ -457,7 +472,7 @@ function updateRobots(game: Game, dt: number): void {
       const nextX = robot.x + direction.x * robot.moveSpeed * dt;
       const nextY = robot.y + direction.y * robot.moveSpeed * dt;
       if (touchesHazard(nextX, nextY, robot.radius, game.walls)) {
-        destroyRobots(game, new Set([robot.id]));
+        destroyRobots(game, new Set([robot.id]), events);
         continue;
       }
       moveCircle(robot, nextX, nextY, robot.radius, game.walls);
@@ -509,7 +524,7 @@ function chooseRobotDirection(robot: Robot, dx: number, dy: number, walls: reado
   return { x: 0, y: 0 };
 }
 
-function updateShots(game: Game, dt: number): void {
+function updateShots(game: Game, dt: number, events: GameEvent[]): void {
   const survivors: Shot[] = [];
   for (const shot of game.shots) {
     const travel = Math.hypot(shot.velocityX, shot.velocityY) * dt;
@@ -530,7 +545,7 @@ function updateShots(game: Game, dt: number): void {
       if (shot.owner === "player") {
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
-          destroyRobots(game, new Set([target.id]));
+          destroyRobots(game, new Set([target.id]), events);
           alive = false;
         }
       } else {
@@ -541,7 +556,7 @@ function updateShots(game: Game, dt: number): void {
         }
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
-          destroyRobots(game, new Set([target.id]));
+          destroyRobots(game, new Set([target.id]), events);
           alive = false;
         }
       }
@@ -551,11 +566,11 @@ function updateShots(game: Game, dt: number): void {
   game.shots = survivors;
 }
 
-function resolveContacts(game: Game): void {
+function resolveContacts(game: Game, events: GameEvent[]): void {
   if (game.outcome === "playing" && playerTouchesHazard(game)) defeatPlayer(game);
   for (const robot of game.robots) {
     if (entityTouchesHazard(robot, game.walls)) {
-      destroyRobots(game, new Set([robot.id]));
+      destroyRobots(game, new Set([robot.id]), events);
     }
   }
 
@@ -585,16 +600,27 @@ function resolveContacts(game: Game): void {
       }
     }
   }
-  if (destroyed.size > 0) destroyRobots(game, destroyed);
+  if (destroyed.size > 0) destroyRobots(game, destroyed, events);
 }
 
-function destroyRobots(game: Game, ids: ReadonlySet<number>): void {
-  const before = game.robots.length;
-  game.robots = game.robots.filter((robot) => !ids.has(robot.id));
-  const destroyed = before - game.robots.length;
+function destroyRobots(game: Game, ids: ReadonlySet<number>, events: GameEvent[]): void {
+  const destroyedRobots = game.robots.filter((robot) => ids.has(robot.id));
+  if (destroyedRobots.length === 0) return;
   const oldScore = game.score;
-  game.score += destroyed * 50;
-  if (destroyed > 0 && game.robots.length === 0) game.score += 100;
+  game.robots = game.robots.filter((robot) => !ids.has(robot.id));
+  const roomClearBonus = game.robots.length === 0 ? 100 : 0;
+  game.score += destroyedRobots.length * 50 + roomClearBonus;
+  destroyedRobots.forEach((robot, index) => {
+    events.push({
+      type: "robot-destroyed",
+      roomX: game.roomX,
+      roomY: game.roomY,
+      x: robot.x,
+      y: robot.y,
+      color: game.difficulty.color,
+      points: 50 + (index === 0 ? roomClearBonus : 0),
+    });
+  });
   for (const threshold of [10_000, 50_000]) {
     if (oldScore < threshold && game.score >= threshold) game.lives += 1;
   }

@@ -2,7 +2,9 @@
 
 ## Scope and status
 
-**Status: Accepted. Implementation: Not yet implemented.** The original game's
+**Status: Accepted. Implementation: Present.** Robot destruction events feed
+transient room-scoped score flyups. Type checking and the production build
+pass; automated behavior tests have not been run. The original game's
 [Flyup](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/Flyup.java),
 [FlyupManager](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/FlyupManager.java)
 and [scoring events](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/StatusManager.java)
