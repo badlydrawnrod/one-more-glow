@@ -6,8 +6,8 @@ import type { Wall } from "./game.ts";
  * Recursive-division room layout adapted from Very Angry Robots by Rod Hyde.
  * The original Java MazeGenerator and RoomBuilder are Apache-2.0 licensed.
  * This adaptation uses the game's 5×3 grid in a 1000×600 pixel room, keeps
- * walls thin and electrified, and omits perimeter walls (room edges are handled
- * by the game simulation). Door generation remains deferred.
+ * walls thin and electrified. This module generates internal maze walls;
+ * perimeter walls and doorway geometry are handled by room-geometry.ts.
  */
 export const MAZE_GRID = { columns: 5, rows: 3 } as const;
 
@@ -70,8 +70,8 @@ export function createMaze(random: () => number = Math.random): MazeLayout {
     divide(cx, cy, x2, y2);
   };
 
-  // Match MazeGenerator.subdivideChamber(0, 0, width, height). Its perimeter
-  // wall definitions and doors are intentionally omitted in this room slice.
+  // Match MazeGenerator.subdivideChamber(0, 0, width, height). Perimeter walls
+  // and doorways are generated separately by room-geometry.ts.
   divide(0, 0, MAZE_GRID.columns, MAZE_GRID.rows);
 
   const cellWidth = ROOM.width / MAZE_GRID.columns;
