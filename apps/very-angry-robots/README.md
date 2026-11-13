@@ -16,5 +16,5 @@ same room after losing one. Earn extra lives at 10,000 and 50,000 points.
 The Captain eventually enters each room: he cannot be stopped by shots or
 walls, so keep moving.
 
-The [specification](SPEC.md) describes this slice and deferred features. Run
+The [specification](docs/specs/SPEC.md) describes this slice and deferred features. Run
 `npm run test --workspace=very-angry-robots` for the app's tests.

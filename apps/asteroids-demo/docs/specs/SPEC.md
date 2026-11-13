@@ -1,7 +1,7 @@
 # Asteroids: gameplay
 
 This specification preserves the original Asteroids-style flight baseline and
-records the accepted complete-game refresh. See [README.md](README.md) for how
+records the accepted complete-game refresh. See [README.md](../../README.md) for how
 to run and control the game.
 
 ## Previous flight baseline
@@ -211,7 +211,7 @@ configurable bindings and online leaderboards are deferred.
 ## Accepted: live display settings
 
 **Status: Accepted.** Shared profile semantics and valid values are defined by
-the [vector display specification](../../docs/specs/vector-display.md#global-display-profile-options).
+the [vector display specification](../../../../docs/specs/vector-display.md#global-display-profile-options).
 
 **Implementation: Implemented.**
 

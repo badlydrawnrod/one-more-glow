@@ -7,4 +7,4 @@ Move around the rim with Left/Right, A/D, a gamepad stick or D-pad. Fire inward
 with Space, Up, Z or the gamepad's first face button. After game over, press R
 or select Restart.
 
-See [SPEC.md](SPEC.md) for the current gameplay baseline and experimental work.
+See [SPEC.md](docs/specs/SPEC.md) for the current gameplay baseline and experimental work.

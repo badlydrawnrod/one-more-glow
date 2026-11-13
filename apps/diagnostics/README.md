@@ -22,7 +22,7 @@ URL query parameters are also available for opening a specific view directly:
   the static diagnostic views.
 
 Parameters can be combined, for example `?scene=testcard&orientation=portrait`.
-See [SPEC.md](SPEC.md) for the current diagnostic behavior.
+See [SPEC.md](docs/specs/SPEC.md) for the current diagnostic behavior.
 
 The library’s 22-segment font adapts Stewart C. Russell’s ThreeFourTwoTwo font
 to vector strokes. See its [licence notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).

@@ -2,7 +2,7 @@
 
 This is a reverse-engineered baseline of the current Gyruss-style demo, not a
 claim that every detail is an accepted design decision. Values and mechanics
-can be reconsidered as the game develops. See [README.md](README.md) for how to
+can be reconsidered as the game develops. See [README.md](../../README.md) for how to
 run and control it.
 
 ## Current game

@@ -8,9 +8,13 @@ coordinate packages, but the root itself is not a publishable package.
 ```text
 apps/
   diagnostics/              # Vite app for checking library rendering
+    docs/specs/             # app-specific behavior requirements
   asteroids-demo/           # Vite app for keyboard/gamepad Asteroids gameplay
+    docs/specs/             # app-specific behavior requirements
   gyruss-demo/              # Vite app for a keyboard/gamepad orbital shooter
+    docs/specs/             # app-specific behavior requirements
   very-angry-robots/        # Vite app for room-based robot combat
+    docs/specs/             # app-specific behavior requirements
 packages/
   one-more-glow/            # reusable drawing library
 docs/
@@ -23,9 +27,11 @@ exports. Packages must not depend on apps. Code specific to one app should
 remain in that app. Create a shared package when a concrete reusable boundary
 emerges, rather than in anticipation of hypothetical reuse.
 
-App-specific specifications and practical documentation live with the app, in
-`SPEC.md` and `README.md` when needed. App-specific active plans live under the
-app's `plans/active/`; shared and cross-app plans live under the root `plans/`.
+App-specific specifications live with the app under `docs/specs/`, with
+`SPEC.md` as the index when specifications are split by capability. Practical
+documentation lives in the app's `README.md` when needed. App-specific active
+plans live under the app's `plans/active/`; shared and cross-app plans live
+under the root `plans/`.
 
 The root `package.json` declares npm workspaces and the commands documented in
 the root README. Each workspace owns its package manifest and local build

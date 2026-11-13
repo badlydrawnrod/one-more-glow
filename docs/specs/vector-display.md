@@ -215,7 +215,7 @@ Display effects should not require consumers to submit additional geometry to si
 
 WebGL2 uses alpha blending, shader-expanded line and point quads with matching dimensions, and per-frame batching.
 
-The Vite diagnostic uses WebGL2; its current scenes and controls are described in the [diagnostic app documentation](../../apps/diagnostics/SPEC.md).
+The Vite diagnostic uses WebGL2; its current scenes and controls are described in the [diagnostic app documentation](../../apps/diagnostics/docs/specs/SPEC.md).
 
 The WebGL2 shader combines inner and outer falloff, uses separate line and point halo strengths, and tapers line halos near their endpoints. The numeric profile remains adjustable if later visual feedback warrants it. Future backends should implement the same accepted appearance without requiring pixel-identical output.
 

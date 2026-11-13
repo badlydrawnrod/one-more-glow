@@ -1,9 +1,9 @@
 # Rendering diagnostics
 
 This is a reverse-engineered baseline of the current diagnostic app, not a
-claim that every scene detail is an accepted design decision. See [README.md](README.md)
+claim that every scene detail is an accepted design decision. See [README.md](../../README.md)
 for how to run it and select views. Shared display requirements remain in the
-[vector display specification](../../docs/specs/vector-display.md).
+[vector display specification](../../../../docs/specs/vector-display.md).
 
 ## Purpose and current behavior
 
@@ -26,7 +26,7 @@ renderer and evaluating display characteristics. It currently uses WebGL2.
   [ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based
   on the [Litronix DL-3422 chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85),
   into vector line centres. The adaptation retains the source font's licence;
-  see the [library notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
+  see the [library notice](../../../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
 - A segment-spacing view compares both fonts and spacing modes using game HUD
   labels, digits and punctuation at small and larger sizes.
 - The 22-segment interpretation includes dots and strokes below the baseline
@@ -64,7 +64,7 @@ without editing the URL.
 **Implementation: Implemented.**
 
 The test card provides a labelled comparison of normal intensity and overdrive
-for evaluating the response specified in the [vector display specification](../../docs/specs/vector-display.md).
+for evaluating the response specified in the [vector display specification](../../../../docs/specs/vector-display.md).
 It shows lines and points in at least two distinct colours at intensities 0.5,
 1, 1.25, 1.5 and 2, using the same colours and geometry at each intensity so
 the changes in core colour and halo are easy to compare. The samples remain
