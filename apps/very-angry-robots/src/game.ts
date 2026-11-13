@@ -115,6 +115,8 @@ export interface ShotImpactEvent {
   owner: Shot["owner"];
   velocityX: number;
   velocityY: number;
+  targetVelocityX: number;
+  targetVelocityY: number;
   target: "wall" | "robot" | "player" | "captain";
 }
 
@@ -413,11 +415,12 @@ function beginTransition(game: Game, direction: Direction): void {
 
 function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): void {
   if (game.outcome === "lost") return;
+  const startingPositions = captureActorPositions(game);
   game.elapsed += dt;
   if (game.outcome === "dying") {
     updateCaptain(game, dt);
     updateRobots(game, dt, events);
-    updateShots(game, dt, events);
+    updateShots(game, dt, events, startingPositions);
     resolveContacts(game, events);
     game.deathTimeRemaining = Math.max(0, game.deathTimeRemaining - dt);
     if (game.deathTimeRemaining < 1e-9) {
@@ -454,7 +457,7 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
   }
 
   updateRobots(game, dt, events);
-  updateShots(game, dt, events);
+  updateShots(game, dt, events, startingPositions);
   resolveContacts(game, events);
   game.fireAmnestyRemaining = Math.max(0, game.fireAmnestyRemaining - dt);
   // A lethal collision takes precedence over leaving, even if the last robot also dies.
@@ -547,7 +550,22 @@ function chooseRobotDirection(robot: Robot, dx: number, dy: number, walls: reado
   return { x: 0, y: 0 };
 }
 
-function updateShots(game: Game, dt: number, events: GameEvent[]): void {
+interface ActorPositions {
+  captain: { x: number; y: number };
+}
+
+function captureActorPositions(game: Game): ActorPositions {
+  return {
+    captain: { x: game.captain.x, y: game.captain.y },
+  };
+}
+
+function actorVelocity(start: { x: number; y: number } | undefined, actor: { x: number; y: number }, dt: number): { x: number; y: number } {
+  if (!start || dt <= 0) return { x: 0, y: 0 };
+  return { x: (actor.x - start.x) / dt, y: (actor.y - start.y) / dt };
+}
+
+function updateShots(game: Game, dt: number, events: GameEvent[], startingPositions: ActorPositions): void {
   const survivors: Shot[] = [];
   for (const shot of game.shots) {
     const travel = Math.hypot(shot.velocityX, shot.velocityY) * dt;
@@ -561,32 +579,32 @@ function updateShots(game: Game, dt: number, events: GameEvent[]): void {
         break;
       }
       if (circleHitsWall(shot.x, shot.y, SHOT_RADIUS, game.walls)) {
-        events.push(shotImpactEvent(game, shot, "wall"));
+        events.push(shotImpactEvent(game, shot, "wall", { x: 0, y: 0 }));
         alive = false;
         break;
       }
       if (game.captain.state === "chasing" && overlaps(shot, SHOT_RADIUS, game.captain, game.captain.radius)) {
-        events.push(shotImpactEvent(game, shot, "captain"));
+        events.push(shotImpactEvent(game, shot, "captain", actorVelocity(startingPositions.captain, game.captain, dt)));
         alive = false;
         break;
       }
       if (shot.owner === "player") {
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
-          events.push(shotImpactEvent(game, shot, "robot"));
+          events.push(shotImpactEvent(game, shot, "robot", { x: 0, y: 0 }));
           destroyRobots(game, new Set([target.id]), events);
           alive = false;
         }
       } else {
         if (game.outcome === "playing" && overlaps(shot, SHOT_RADIUS, game.player, game.player.radius)) {
-          events.push(shotImpactEvent(game, shot, "player"));
+          events.push(shotImpactEvent(game, shot, "player", { x: 0, y: 0 }));
           defeatPlayer(game, events);
           alive = false;
           break;
         }
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
-          events.push(shotImpactEvent(game, shot, "robot"));
+          events.push(shotImpactEvent(game, shot, "robot", { x: 0, y: 0 }));
           destroyRobots(game, new Set([target.id]), events);
           alive = false;
         }
@@ -597,7 +615,7 @@ function updateShots(game: Game, dt: number, events: GameEvent[]): void {
   game.shots = survivors;
 }
 
-function shotImpactEvent(game: Game, shot: Shot, target: ShotImpactEvent["target"]): ShotImpactEvent {
+function shotImpactEvent(game: Game, shot: Shot, target: ShotImpactEvent["target"], targetVelocity: { x: number; y: number }): ShotImpactEvent {
   return {
     type: "shot-impact",
     roomX: game.roomX,
@@ -607,6 +625,8 @@ function shotImpactEvent(game: Game, shot: Shot, target: ShotImpactEvent["target
     owner: shot.owner,
     velocityX: shot.velocityX,
     velocityY: shot.velocityY,
+    targetVelocityX: targetVelocity.x,
+    targetVelocityY: targetVelocity.y,
     target,
   };
 }

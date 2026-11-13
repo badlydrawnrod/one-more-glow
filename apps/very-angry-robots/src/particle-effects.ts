@@ -19,6 +19,9 @@ export interface ParticleBurst {
   readonly roomY: number;
   readonly x: number;
   readonly y: number;
+  /** Velocity inherited from the struck object, in room pixels per second. */
+  readonly velocityX: number;
+  readonly velocityY: number;
   readonly color: Color;
   readonly kind: "robot-destroyed" | "player-defeated" | "shot-impact";
   readonly marks: readonly ParticleMark[];
@@ -94,6 +97,8 @@ export function addParticleEffect(state: ParticleEffectState, event: ParticleEff
     roomY: event.roomY,
     x: event.x,
     y: event.y,
+    velocityX: event.type === "shot-impact" ? event.targetVelocityX : 0,
+    velocityY: event.type === "shot-impact" ? event.targetVelocityY : 0,
     color,
     kind,
     marks,
@@ -117,8 +122,8 @@ export function updateParticleEffects(state: ParticleEffectState, deltaSeconds: 
 export function particleMarkOffset(mark: ParticleMark, burst: ParticleBurst, reducedMotion = false): { x: number; y: number } {
   const progress = reducedMotion ? 0 : Math.max(0, Math.min(1, burst.age / PARTICLE_EFFECT_LIFETIME));
   return {
-    x: Math.cos(mark.angle) * mark.distance * progress,
-    y: Math.sin(mark.angle) * mark.distance * progress,
+    x: (reducedMotion ? 0 : burst.velocityX * burst.age) + Math.cos(mark.angle) * mark.distance * progress,
+    y: (reducedMotion ? 0 : burst.velocityY * burst.age) + Math.sin(mark.angle) * mark.distance * progress,
   };
 }
 

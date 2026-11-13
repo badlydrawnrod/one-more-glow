@@ -21,8 +21,10 @@ Add transient visual feedback for important combat impacts:
 - When a shot hits a wall, robot, player or the Captain, emit a smaller impact
   burst at the collision point. A shot that merely leaves the play area does
   not create an impact effect. Sparks from a player-shot impact fan back
-  opposite the shot's travel direction. Robot-destruction bursts remain radial
-  regardless of what destroyed the robot.
+  opposite the shot's travel direction. Impacts on the Captain also inherit its
+  velocity because it continues moving after the hit. Robot-hit effects stay at
+  the impact point because the robot is destroyed; its destruction burst remains
+  radial regardless of what caused it.
 - Bursts use small glowing vector marks that spread briefly from the event,
   then fade. Their size, density, speed and lifetime are tuning choices; keep
   them short and restrained so they do not obscure the room or entities.
