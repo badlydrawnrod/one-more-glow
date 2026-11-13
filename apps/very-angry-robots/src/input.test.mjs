@@ -10,6 +10,10 @@ test("keyboard movement and aiming are independent and support diagonals", () =>
     move: { x: 0, y: -1 },
     aim: { x: 1, y: 0 },
     startPressed: false,
+    keyPresses: ["W"],
+    screenAdvancePressed: true,
+    initialsSlotDelta: 0,
+    initialsCharDelta: 0,
   });
 
   input.keyDown("d");
@@ -90,4 +94,61 @@ test("gamepad Start is edge-triggered and must be released before it starts agai
   assert.equal(input.read(pressed).startPressed, false);
   assert.equal(input.read(released).startPressed, false);
   assert.equal(input.read(pressed).startPressed, true);
+});
+
+test("letter and Backspace presses are one-shot keyboard events", () => {
+  const input = new InputController();
+  assert.equal(input.keyDown("a"), true);
+  assert.equal(input.keyDown("A", true), true);
+  assert.equal(input.read().keyPresses.join(","), "A");
+  assert.deepEqual(input.read().keyPresses, []);
+
+  input.keyUp("a");
+  input.keyDown("z");
+  input.keyDown("Backspace");
+  assert.deepEqual(input.read().keyPresses, ["Z", "Backspace"]);
+  input.keyDown("Backspace", true);
+  assert.deepEqual(input.read().keyPresses, []);
+});
+
+test("keyboard directions advance once per press while movement remains held", () => {
+  const input = new InputController();
+  input.keyDown("ArrowLeft");
+  assert.equal(input.read().screenAdvancePressed, true);
+  assert.equal(input.read().screenAdvancePressed, false);
+  input.keyDown("ArrowLeft", true);
+  assert.equal(input.read().screenAdvancePressed, false);
+  input.keyUp("ArrowLeft");
+  input.keyDown("ArrowLeft");
+  assert.equal(input.read().screenAdvancePressed, true);
+});
+
+test("either gamepad stick advances once until both sticks return to neutral", () => {
+  const input = new InputController();
+  const neutral = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: false };
+  const left = { ...neutral, leftX: 0.5 };
+  const right = { ...neutral, rightY: 0.6 };
+  assert.equal(input.read(left).screenAdvancePressed, true);
+  assert.equal(input.read(right).screenAdvancePressed, false);
+  assert.equal(input.read(neutral).screenAdvancePressed, false);
+  assert.equal(input.read(right).screenAdvancePressed, true);
+});
+
+test("gamepad initials controls step once and rearm in their neutral dead zones", () => {
+  const input = new InputController();
+  const neutral = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: false };
+  assert.deepEqual(input.read({ ...neutral, leftX: -0.8, rightY: 0.9 }), {
+    move: { x: -1, y: 0 },
+    aim: { x: 0, y: 1 },
+    startPressed: false,
+    keyPresses: [],
+    screenAdvancePressed: true,
+    initialsSlotDelta: -1,
+    initialsCharDelta: 1,
+  });
+  assert.deepEqual(input.read({ ...neutral, leftX: -0.7, rightY: 0.8 }).initialsSlotDelta, 0);
+  assert.equal(input.read({ ...neutral, leftX: 0.1, rightY: -0.1 }).initialsSlotDelta, 0);
+  const next = input.read({ ...neutral, leftX: 0.9, rightY: -0.9 });
+  assert.equal(next.initialsSlotDelta, 1);
+  assert.equal(next.initialsCharDelta, -1);
 });

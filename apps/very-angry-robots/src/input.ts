@@ -17,26 +17,44 @@ export interface InputState {
   aim: Direction;
   /** True for one read only when Enter or gamepad Start has just been pressed. */
   startPressed: boolean;
+  /** One-shot keyboard events: uppercase A–Z or Backspace. */
+  keyPresses: string[];
+  /** True once when a gameplay direction is pressed or a stick leaves neutral. */
+  screenAdvancePressed: boolean;
+  /** One-step initials slot selection from the left stick's horizontal axis. */
+  initialsSlotDelta: -1 | 0 | 1;
+  /** One-step initials character cycling from the right stick's vertical axis. */
+  initialsCharDelta: -1 | 0 | 1;
 }
 
 const MOVEMENT_KEYS = new Set(["w", "a", "s", "d"]);
 const AIM_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
-const INPUT_KEYS = new Set([...MOVEMENT_KEYS, ...AIM_KEYS, "Enter"]);
+const INPUT_KEYS = new Set([...MOVEMENT_KEYS, ...AIM_KEYS, "Enter", "Backspace"]);
 const GAMEPAD_DEAD_ZONE = 0.2;
 
 /** Tracks controls without touching DOM or navigator APIs. */
 export class InputController {
   private readonly keysDown = new Set<string>();
   private enterPressedEdge = false;
+  private screenAdvanceKeyEdge = false;
+  private readonly keyPressEdges: string[] = [];
   private previousGamepadStart = false;
+  private previousGamepadDirection = false;
+  private leftStickSlotArmed = true;
+  private rightStickCharArmed = true;
 
   /** Returns whether the key is used by this controller. */
   keyDown(rawKey: string, repeat = false): boolean {
     const key = normalizeKey(rawKey);
-    if (!INPUT_KEYS.has(key)) return false;
+    const isLetter = /^[a-z]$/.test(key);
+    if (!INPUT_KEYS.has(key) && !isLetter) return false;
 
-    if (!repeat && !this.keysDown.has(key) && key === "Enter") {
-      this.enterPressedEdge = true;
+    const freshPress = !repeat && !this.keysDown.has(key);
+    if (freshPress) {
+      if (key === "Enter") this.enterPressedEdge = true;
+      if (MOVEMENT_KEYS.has(key) || AIM_KEYS.has(key)) this.screenAdvanceKeyEdge = true;
+      if (isLetter) this.keyPressEdges.push(key.toUpperCase());
+      if (key === "Backspace") this.keyPressEdges.push("Backspace");
     }
     this.keysDown.add(key);
     return true;
@@ -50,6 +68,8 @@ export class InputController {
   clearKeyboard(): void {
     this.keysDown.clear();
     this.enterPressedEdge = false;
+    this.screenAdvanceKeyEdge = false;
+    this.keyPressEdges.length = 0;
   }
 
   read(gamepad?: GamepadState): InputState {
@@ -63,7 +83,31 @@ export class InputController {
     const startPressed = this.enterPressedEdge || gamepadStartPressed;
     this.enterPressedEdge = false;
 
-    return { move, aim, startPressed };
+    const leftMagnitude = gamepad ? Math.hypot(gamepad.leftX, gamepad.leftY) : 0;
+    const rightMagnitude = gamepad ? Math.hypot(gamepad.rightX, gamepad.rightY) : 0;
+    const gamepadDirectionActive = leftMagnitude > GAMEPAD_DEAD_ZONE || rightMagnitude > GAMEPAD_DEAD_ZONE;
+    const gamepadDirectionEdge = gamepadDirectionActive && !this.previousGamepadDirection;
+    this.previousGamepadDirection = gamepadDirectionActive;
+
+    const leftX = gamepad?.leftX ?? 0;
+    const rightY = gamepad?.rightY ?? 0;
+    let initialsSlotDelta: -1 | 0 | 1 = 0;
+    if (Math.abs(leftX) <= GAMEPAD_DEAD_ZONE) this.leftStickSlotArmed = true;
+    else if (this.leftStickSlotArmed) {
+      initialsSlotDelta = Math.sign(leftX) as -1 | 1;
+      this.leftStickSlotArmed = false;
+    }
+    let initialsCharDelta: -1 | 0 | 1 = 0;
+    if (Math.abs(rightY) <= GAMEPAD_DEAD_ZONE) this.rightStickCharArmed = true;
+    else if (this.rightStickCharArmed) {
+      initialsCharDelta = Math.sign(rightY) as -1 | 1;
+      this.rightStickCharArmed = false;
+    }
+
+    const keyPresses = this.keyPressEdges.splice(0);
+    const screenAdvancePressed = this.screenAdvanceKeyEdge || gamepadDirectionEdge;
+    this.screenAdvanceKeyEdge = false;
+    return { move, aim, startPressed, keyPresses, screenAdvancePressed, initialsSlotDelta, initialsCharDelta };
   }
 }
 

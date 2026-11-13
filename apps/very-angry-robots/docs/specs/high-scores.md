@@ -1,8 +1,10 @@
 # High scores and attract screens
 
-**Status: Proposed. Implementation: Not started.** The original game's exact
-high-score rules are not recalled; this proposal uses a conventional arcade
-top-ten table and the flow described for this port.
+**Status: Accepted. Implementation: Complete.** Automated tests cover the score
+table, screen flow, initials editor and input handling. The user reports manual
+verification of the behavior. The original game's exact high-score rules are
+not recalled; this capability uses a conventional arcade top-ten table and the
+flow described for this port.
 
 - Keep the ten highest scores, ordered from highest to lowest. When a run ends,
   qualify its final score if it would appear in the top ten. If it qualifies,
@@ -15,17 +17,25 @@ top-ten table and the flow described for this port.
   uppercase, use backspace to correct, and Enter to submit. On a gamepad, use
   the left stick to select a character slot, the right stick's vertical
   direction to change that character, and Start to submit; the player can
-  submit with no characters selected. Store the score and the initials as
-  entered only when the player submits; then show the Top Scores screen.
+  submit with no characters selected. The left stick selects slots 1–3 from
+  left to right, with slot 1 selected initially. The right stick cycles through
+  blank and A–Z, wrapping in either direction. Highlight the active slot: after
+  keyboard entry advance the highlight to the next slot, keep it on slot 3 when
+  all three initials are filled, and move it back to the removed slot after
+  Backspace. Store the score and the initials as entered only when the player
+  submits; then show the Top Scores screen.
 - The Top Scores screen shows the ten entries in rank order, with rank,
-  initials and score. The Main Menu screen shows the game title and a clear
-  prompt to start. These screens replace the playfield and gameplay HUD.
+  initials and score. On app startup, show the Main Menu screen. It shows the
+  game title and a clear prompt to start. These screens replace the playfield
+  and gameplay HUD. Draw all high-score and attract screens in the existing
+  canvas using the app's current drawing API; do not build their UI with HTML.
 - After Game Over, keep the player on the initials-entry screen until they
   submit, if their score qualified. The Top Scores and Main Menu screens then
   alternate every 30 seconds. A screen-advance input switches to the other
-  screen immediately and restarts that screen's 30-second timer. Enter or
-  Gamepad Start starts a fresh game from either screen; another gameplay
-  button advances to the other screen.
+  screen immediately and restarts that screen's 30-second timer. Pressing
+  Enter on the keyboard or Gamepad Start starts a fresh game from either
+  screen; any gameplay direction input (WASD, arrow keys or either gamepad
+  stick) advances to the other screen.
 - Preserve the top-ten table across runs and browser restarts using local
   browser storage. If storage is unavailable or invalid, start with an empty
   table and continue the game normally.

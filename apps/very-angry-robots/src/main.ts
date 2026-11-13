@@ -1,10 +1,13 @@
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
   type Color, type DrawingContext, type Point } from "one-more-glow";
-import { createGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
+import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
 import { wallOutline } from "./wall-outline.ts";
 import { InputController } from "./input.ts";
 import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 import { transitionOffsets } from "./transition-presentation.ts";
+import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores } from "./high-scores.ts";
+import { createScreenFlow, updateScreenFlow } from "./screen-flow.ts";
+import { createInitialsEntry, updateInitialsEntry } from "./initials-entry.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
@@ -16,7 +19,9 @@ const drawing = createWebGL2Renderer(gl);
 const game = createGame();
 const input = new InputController();
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
-let started = false;
+let screenFlow = createScreenFlow();
+let highScores = loadHighScores(() => window.localStorage);
+let initialsEntry = createInitialsEntry();
 let aim = { x: 1, y: 0 };
 let walking = false;
 const cyan: Color = [0.35, 0.95, 1];
@@ -173,7 +178,56 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
   drawRoomCaptain(room, offsetX, offsetY);
 }
 
+function drawAttractScreen(): void {
+  drawing.beginFrame();
+  if (screenFlow.screen === "main-menu") {
+    label("VERY ANGRY ROBOTS", 105, amber);
+    label("PRESS ENTER OR START TO BEGIN", 5, white);
+    label("MOVE A DIRECTION TO VIEW TOP SCORES", -55, white);
+  } else if (screenFlow.screen === "initials") {
+    label("NEW HIGH SCORE", 150, amber);
+    label("ENTER UP TO THREE INITIALS", 75, white);
+    initialsEntry.characters.forEach((initial, index) => {
+      const x = -28 + index * 28;
+      const value = initial || "_";
+      drawing.setColor(index === initialsEntry.selectedSlot ? amber : white);
+      drawing.setIntensity(1);
+      drawText(drawing, value, x - measureText(value, textOptions).width / 2, 0, textOptions);
+      if (index === initialsEntry.selectedSlot) {
+        drawing.moveTo(x - 8, -12);
+        drawing.lineTo(x + 8, -12);
+      }
+    });
+    label("TYPE LETTERS OR USE THE LEFT STICK FOR SLOTS", -55, white);
+    label("RIGHT STICK CHANGES LETTERS", -80, white);
+    label("BACKSPACE CORRECTS - ENTER OR START SUBMITS", -125, white);
+  } else {
+    label("TOP SCORES", 230, amber);
+    drawing.setColor(white); drawing.setIntensity(0.7);
+    drawText(drawing, "RANK", -300, 175, textOptions);
+    drawText(drawing, "INITIALS", -90, 175, textOptions);
+    drawText(drawing, "SCORE", 150, 175, textOptions);
+    if (highScores.length === 0) label("NO SCORES YET", 95, white);
+    highScores.forEach((entry, index) => {
+      const y = 135 - index * 28;
+      drawing.setColor(white); drawing.setIntensity(1);
+      drawText(drawing, String(index + 1).padStart(2, "0"), -300, y, textOptions);
+      if (entry.initials) drawText(drawing, entry.initials, -90, y, textOptions);
+      const value = String(entry.score);
+      drawText(drawing, value, 150, y, textOptions);
+    });
+    label("PRESS ENTER OR START TO PLAY", -210, white);
+    label("MOVE A DIRECTION TO RETURN TO MAIN MENU", -260, white);
+  }
+  drawing.endFrame();
+}
+
 function draw(time: number): void {
+  if (screenFlow.screen !== "playing") {
+    drawAttractScreen();
+    return;
+  }
+
   drawing.beginFrame();
   drawing.setColor(white); drawing.setIntensity(0.7);
   drawText(drawing, "VERY ANGRY ROBOTS", -440, 350, { ...textOptions, height: 16 });
@@ -197,18 +251,20 @@ function draw(time: number): void {
     drawRoom(game, time);
   }
 
-  if (!started) label("PRESS ENTER OR START", roomCenterY, amber);
-  else if (game.outcome === "dying") {
+  if (game.outcome === "dying") {
     label("PLAYER DOWN", roomCenterY + 12, red);
     if (game.lives > 0) {
       const seconds = Math.max(0, game.deathTimeRemaining).toFixed(1);
       label(`RESPAWNING IN ${seconds}`, roomCenterY - 14, amber);
     }
-  } else if (game.outcome === "lost") label("GAME OVER - PRESS ENTER OR START", roomCenterY, red);
+  }
   drawing.endFrame();
 }
 
-window.addEventListener("keydown", (event) => { if (input.keyDown(event.key, event.repeat)) event.preventDefault(); });
+window.addEventListener("keydown", (event) => {
+  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (input.keyDown(event.key, event.repeat)) event.preventDefault();
+});
 window.addEventListener("keyup", (event) => input.keyUp(event.key));
 window.addEventListener("blur", () => input.clearKeyboard());
 document.addEventListener("visibilitychange", () => { if (document.hidden) input.clearKeyboard(); });
@@ -226,14 +282,43 @@ function frame(time: number): void {
   lastTime = time;
   const pad = Array.from(navigator.getGamepads?.() ?? []).find((p) => p?.connected && p.mapping === "standard");
   const controls = input.read(pad ? { leftX: pad.axes[0] ?? 0, leftY: pad.axes[1] ?? 0, rightX: pad.axes[2] ?? 0, rightY: pad.axes[3] ?? 0, startPressed: pad.buttons[9]?.pressed ?? false } : undefined);
-  if (!game.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
-  if (!started && controls.startPressed) started = true;
-  else if (started) {
+  if (screenFlow.screen === "playing") {
+    if (!game.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
     const previousX = game.player.x, previousY = game.player.y;
     const simulationDelta = reducedMotion.matches && game.transition ? game.transition.duration : delta;
     updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
-      fire: !!(controls.aim.x || controls.aim.y), restartPressed: controls.startPressed && game.outcome !== "playing" });
+      fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
     walking = !game.transition && game.outcome === "playing" && (game.player.x !== previousX || game.player.y !== previousY);
+    if (game.outcome === "lost") {
+      screenFlow = updateScreenFlow(screenFlow, {
+        type: "run-ended",
+        score: game.score,
+        qualifies: qualifiesForHighScore(highScores, game.score),
+      });
+      initialsEntry = createInitialsEntry();
+    }
+  } else if (screenFlow.screen === "initials") {
+    initialsEntry = updateInitialsEntry(initialsEntry, {
+      keyPresses: controls.keyPresses,
+      slotDelta: controls.initialsSlotDelta,
+      charDelta: controls.initialsCharDelta,
+    });
+    if (controls.startPressed) {
+      const submittedInitials = initialsEntry.characters.join("");
+      if (screenFlow.runScore !== null) {
+        highScores = insertHighScore(highScores, { initials: submittedInitials, score: screenFlow.runScore });
+        saveHighScores(() => window.localStorage, highScores);
+      }
+      screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
+    }
+  } else if (controls.startPressed) {
+    restartGame(game);
+    initialsEntry = createInitialsEntry();
+    screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
+  } else if (controls.screenAdvancePressed) {
+    screenFlow = updateScreenFlow(screenFlow, { type: "advance" });
+  } else {
+    screenFlow = updateScreenFlow(screenFlow, { type: "tick", elapsedMs: delta * 1000 });
   }
   draw(time);
   requestAnimationFrame(frame);

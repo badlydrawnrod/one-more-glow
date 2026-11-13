@@ -15,13 +15,12 @@ organized by capability:
 - [Room navigation](room-navigation.md) — adjacent rooms, exits and transitions.
 - [Score and robot difficulty progression](progression.md) — scoring and tiers.
 - [Lives and respawning](lives.md) — lives, death and respawn rules.
-- [High scores and attract screens](high-scores.md) — **proposed**, not yet
-  accepted or implemented.
+- [High scores and attract screens](high-scores.md) — accepted and implemented.
 - [The Captain](captain.md) — the persistent pursuer and its presentation.
 
 Sound, the original family-member taunts and other recordings, achievements
 and persistent game state remain deferred. High-score persistence is included
-in the high-score proposal but is not yet accepted. The original artwork and
+in the accepted high-score capability. The original artwork and
 recordings belong to the author; decisions about reusing them can wait until
 those features are considered. See the relevant capability spec for additional
 deferrals and verification gaps.

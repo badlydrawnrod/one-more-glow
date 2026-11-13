@@ -16,5 +16,10 @@ same room after losing one. Earn extra lives at 10,000 and 50,000 points.
 The Captain eventually enters each room: he cannot be stopped by shots or
 walls, so keep moving.
 
+The game opens on the Main Menu. Press Enter or Gamepad Start to begin. On the
+attract screens, use WASD, the arrow keys, or either gamepad stick to switch
+between the Main Menu and Top Scores. Qualifying scores can be saved with up to
+three initials and are kept in browser storage.
+
 The [specification](docs/specs/SPEC.md) describes this slice and deferred features. Run
 `npm run test --workspace=very-angry-robots` for the app's tests.
