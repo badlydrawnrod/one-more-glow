@@ -14,6 +14,8 @@ organized by capability:
 - [Core gameplay](gameplay.md) — room, combat, controls and presentation.
 - [Room navigation](room-navigation.md) — adjacent rooms, exits and transitions.
 - [Score and robot difficulty progression](progression.md) — scoring and tiers.
+- [Particle effects](particle-effects.md) — transient hit and destruction effects.
+- [Floating score awards](score-flyups.md) — brief score labels at scoring events.
 - [Lives and respawning](lives.md) — lives, death and respawn rules.
 - [High scores and attract screens](high-scores.md) — accepted and implemented.
 - [The Captain](captain.md) — the persistent pursuer and its presentation.
