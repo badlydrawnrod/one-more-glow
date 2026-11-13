@@ -2,7 +2,9 @@
 
 ## Scope and status
 
-**Status: Accepted. Implementation: Not yet implemented.** The original game's
+**Status: Accepted. Implementation: Present.** Room-scoped simulation events
+now drive transient vector bursts. Type checking and the production build
+pass; automated behavior tests have not been run. The original game's
 [ParticleAdapter](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/ParticleAdapter.java)
 and [WorldView](https://github.com/libgdx/libgdx-demo-very-angry-robots/blob/master/core/src/com/badlydrawngames/veryangryrobots/WorldView.java)
 are references for the events and brief bursts; this app should express them
@@ -18,7 +20,9 @@ Add transient visual feedback for important combat impacts:
   alter lives, controls or the death interval.
 - When a shot hits a wall, robot, player or the Captain, emit a smaller impact
   burst at the collision point. A shot that merely leaves the play area does
-  not create an impact effect.
+  not create an impact effect. Sparks from a player-shot impact fan back
+  opposite the shot's travel direction. Robot-destruction bursts remain radial
+  regardless of what destroyed the robot.
 - Bursts use small glowing vector marks that spread briefly from the event,
   then fade. Their size, density, speed and lifetime are tuning choices; keep
   them short and restrained so they do not obscure the room or entities.

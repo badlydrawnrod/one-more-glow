@@ -32,6 +32,8 @@ export interface PresentedRoom {
 }
 
 export const SCORE_FLYUP_LIFETIME = 1.15;
+/** Start labels slightly above the event center so they leave room for impact bursts. */
+export const SCORE_FLYUP_START_OFFSET = 12;
 export const SCORE_FLYUP_RISE_DISTANCE = 24;
 
 export function createScoreFlyupState(): ScoreFlyupState {

@@ -9,7 +9,9 @@ import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores 
 import { createScreenFlow, updateScreenFlow } from "./screen-flow.ts";
 import { createInitialsEntry, updateInitialsEntry } from "./initials-entry.ts";
 import { addScoreFlyup, clearScoreFlyups, createScoreFlyupState, retainPresentedRoomFlyups,
-  scoreFlyupOpacity, scoreFlyupRise, updateScoreFlyups } from "./score-flyups.ts";
+  SCORE_FLYUP_START_OFFSET, scoreFlyupOpacity, scoreFlyupRise, updateScoreFlyups } from "./score-flyups.ts";
+import { addParticleEffect, clearParticleEffects, createParticleEffectState, particleEffectOpacity,
+  particleMarkOffset, retainPresentedRoomParticleEffects, updateParticleEffects } from "./particle-effects.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
@@ -25,6 +27,7 @@ let screenFlow = createScreenFlow();
 let highScores = loadHighScores(() => window.localStorage);
 let initialsEntry = createInitialsEntry();
 const scoreFlyups = createScoreFlyupState();
+const particleEffects = createParticleEffectState();
 let aim = { x: 1, y: 0 };
 let walking = false;
 const cyan: Color = [0.35, 0.95, 1];
@@ -138,6 +141,23 @@ function drawCaptain(context: DrawingContext, room: RoomSnapshot): void {
   context.popTransform();
 }
 
+function drawParticleBurst(context: DrawingContext, burst: typeof particleEffects.items[number]): void {
+  const opacity = particleEffectOpacity(burst);
+  if (opacity <= 0) return;
+  context.setColor(burst.color);
+  context.setIntensity(1.4 * opacity);
+  for (const mark of burst.marks) {
+    const offset = particleMarkOffset(mark, burst, reducedMotion.matches);
+    const halfLength = mark.length / 2;
+    const dx = Math.cos(mark.angle) * halfLength;
+    const dy = Math.sin(mark.angle) * halfLength;
+    const x = burst.x + offset.x;
+    const y = burst.y + offset.y;
+    context.moveTo(x - dx, y - dy);
+    context.lineTo(x + dx, y + dy);
+  }
+}
+
 function drawRoomCaptain(room: RoomSnapshot, offsetX: number, offsetY: number): void {
   const roomBounds = {
     left: offsetX - ROOM.width / 2,
@@ -177,7 +197,7 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
     scene.moveTo(shot.x, shot.y);
     scene.lineTo(shot.x - shot.velocityX / length * 10, shot.y - shot.velocityY / length * 10);
   }
-  const flyupScene = clippedDrawing(scene, { left: 0, right: ROOM.width, bottom: 0, top: ROOM.height });
+  const roomEffectsScene = clippedDrawing(scene, { left: 0, right: ROOM.width, bottom: 0, top: ROOM.height });
   for (let index = 0; index < scoreFlyups.items.length; index += 1) {
     const flyup = scoreFlyups.items[index];
     if (flyup.roomX !== room.roomX || flyup.roomY !== room.roomY) continue;
@@ -188,9 +208,13 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
     const value = String(flyup.points);
     const options = { ...textOptions, height: 16 } as const;
     const x = flyup.x + fan - measureText(value, options).width / 2;
-    flyupScene.setColor(robotColors[flyup.color]);
-    flyupScene.setIntensity(1.15 * scoreFlyupOpacity(flyup));
-    drawText(flyupScene, value, x, flyup.y + scoreFlyupRise(flyup, reducedMotion.matches), options);
+    roomEffectsScene.setColor(robotColors[flyup.color]);
+    roomEffectsScene.setIntensity(1.15 * scoreFlyupOpacity(flyup));
+    drawText(roomEffectsScene, value, x,
+      flyup.y - SCORE_FLYUP_START_OFFSET + scoreFlyupRise(flyup, reducedMotion.matches), options);
+  }
+  for (const burst of particleEffects.items) {
+    if (burst.roomX === room.roomX && burst.roomY === room.roomY) drawParticleBurst(roomEffectsScene, burst);
   }
   scene.popTransform();
   drawRoomCaptain(room, offsetX, offsetY);
@@ -264,10 +288,12 @@ function draw(time: number): void {
     const doorProgress = reducedMotion.matches ? 1 : Math.max(0, Math.min(1, (elapsed - ROOM_SCROLL_DURATION) / DOOR_CLOSE_DURATION));
     const offsets = transitionOffsets(transition.direction, scrollProgress);
     retainPresentedRoomFlyups(scoreFlyups, [transition.from, transition.to]);
+    retainPresentedRoomParticleEffects(particleEffects, [transition.from, transition.to]);
     drawRoom(transition.from, time, offsets.from.x, offsets.from.y, 1, false);
     drawRoom(transition.to, time, offsets.to.x, offsets.to.y, doorProgress);
   } else {
     retainPresentedRoomFlyups(scoreFlyups, [game]);
+    retainPresentedRoomParticleEffects(particleEffects, [game]);
     drawRoom(game, time);
   }
 
@@ -310,8 +336,10 @@ function frame(time: number): void {
       fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
     for (const event of events) {
       if (event.type === "robot-destroyed") addScoreFlyup(scoreFlyups, event);
+      addParticleEffect(particleEffects, event);
     }
     updateScoreFlyups(scoreFlyups, delta, reducedMotion.matches);
+    updateParticleEffects(particleEffects, delta, reducedMotion.matches);
     walking = !game.transition && game.outcome === "playing" && (game.player.x !== previousX || game.player.y !== previousY);
     if (game.outcome === "lost") {
       screenFlow = updateScreenFlow(screenFlow, {
@@ -338,6 +366,7 @@ function frame(time: number): void {
   } else if (controls.startPressed) {
     restartGame(game);
     clearScoreFlyups(scoreFlyups);
+    clearParticleEffects(particleEffects);
     initialsEntry = createInitialsEntry();
     screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
   } else if (controls.screenAdvancePressed) {

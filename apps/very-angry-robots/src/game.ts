@@ -98,7 +98,27 @@ export interface RobotDestroyedEvent {
   points: number;
 }
 
-export type GameEvent = RobotDestroyedEvent;
+export interface PlayerDefeatedEvent {
+  type: "player-defeated";
+  roomX: number;
+  roomY: number;
+  x: number;
+  y: number;
+}
+
+export interface ShotImpactEvent {
+  type: "shot-impact";
+  roomX: number;
+  roomY: number;
+  x: number;
+  y: number;
+  owner: Shot["owner"];
+  velocityX: number;
+  velocityY: number;
+  target: "wall" | "robot" | "player" | "captain";
+}
+
+export type GameEvent = RobotDestroyedEvent | PlayerDefeatedEvent | ShotImpactEvent;
 
 export interface RoomSnapshot {
   difficulty: Difficulty;
@@ -415,7 +435,9 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
   const nextPlayerX = player.x + move.x * PLAYER_SPEED * dt;
   const nextPlayerY = player.y + move.y * PLAYER_SPEED * dt;
   const exit = findExit(game, nextPlayerX, nextPlayerY);
-  if (!exit && touchesPlayerHazard(game, nextPlayerX, nextPlayerY)) defeatPlayer(game);
+  if (!exit && touchesPlayerHazard(game, nextPlayerX, nextPlayerY)) {
+    defeatPlayer(game, events, nextPlayerX, nextPlayerY);
+  }
   if (exit) {
     player.x = nextPlayerX;
     player.y = nextPlayerY;
@@ -439,11 +461,12 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
   if (game.outcome === "playing" && exit) beginTransition(game, exit);
 }
 
-function defeatPlayer(game: Game): void {
+function defeatPlayer(game: Game, events: GameEvent[], x = game.player.x, y = game.player.y): void {
   if (game.outcome !== "playing") return;
   game.lives -= 1;
   game.outcome = "dying";
   game.deathTimeRemaining = DEATH_INTERVAL;
+  events.push({ type: "player-defeated", roomX: game.roomX, roomY: game.roomY, x, y });
 }
 
 function respawn(game: Game): void {
@@ -533,29 +556,37 @@ function updateShots(game: Game, dt: number, events: GameEvent[]): void {
     for (let i = 0; i < slices && alive; i += 1) {
       shot.x += shot.velocityX * dt / slices;
       shot.y += shot.velocityY * dt / slices;
-      if (shot.x < 0 || shot.y < 0 || shot.x > ROOM.width || shot.y > ROOM.height
-        || circleHitsWall(shot.x, shot.y, SHOT_RADIUS, game.walls)) {
+      if (shot.x < 0 || shot.y < 0 || shot.x > ROOM.width || shot.y > ROOM.height) {
+        alive = false;
+        break;
+      }
+      if (circleHitsWall(shot.x, shot.y, SHOT_RADIUS, game.walls)) {
+        events.push(shotImpactEvent(game, shot, "wall"));
         alive = false;
         break;
       }
       if (game.captain.state === "chasing" && overlaps(shot, SHOT_RADIUS, game.captain, game.captain.radius)) {
+        events.push(shotImpactEvent(game, shot, "captain"));
         alive = false;
         break;
       }
       if (shot.owner === "player") {
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
+          events.push(shotImpactEvent(game, shot, "robot"));
           destroyRobots(game, new Set([target.id]), events);
           alive = false;
         }
       } else {
         if (game.outcome === "playing" && overlaps(shot, SHOT_RADIUS, game.player, game.player.radius)) {
-          defeatPlayer(game);
+          events.push(shotImpactEvent(game, shot, "player"));
+          defeatPlayer(game, events);
           alive = false;
           break;
         }
         const target = game.robots.find((robot) => overlaps(shot, SHOT_RADIUS, robot, robot.radius));
         if (target) {
+          events.push(shotImpactEvent(game, shot, "robot"));
           destroyRobots(game, new Set([target.id]), events);
           alive = false;
         }
@@ -566,8 +597,22 @@ function updateShots(game: Game, dt: number, events: GameEvent[]): void {
   game.shots = survivors;
 }
 
+function shotImpactEvent(game: Game, shot: Shot, target: ShotImpactEvent["target"]): ShotImpactEvent {
+  return {
+    type: "shot-impact",
+    roomX: game.roomX,
+    roomY: game.roomY,
+    x: shot.x,
+    y: shot.y,
+    owner: shot.owner,
+    velocityX: shot.velocityX,
+    velocityY: shot.velocityY,
+    target,
+  };
+}
+
 function resolveContacts(game: Game, events: GameEvent[]): void {
-  if (game.outcome === "playing" && playerTouchesHazard(game)) defeatPlayer(game);
+  if (game.outcome === "playing" && playerTouchesHazard(game)) defeatPlayer(game, events);
   for (const robot of game.robots) {
     if (entityTouchesHazard(robot, game.walls)) {
       destroyRobots(game, new Set([robot.id]), events);
@@ -575,12 +620,12 @@ function resolveContacts(game: Game, events: GameEvent[]): void {
   }
 
   if (game.outcome === "playing" && game.robots.some((robot) => overlaps(robot, robot.radius, game.player, game.player.radius))) {
-    defeatPlayer(game);
+    defeatPlayer(game, events);
   }
 
   if (game.captain.state === "chasing") {
     if (game.outcome === "playing" && overlaps(game.captain, game.captain.radius, game.player, game.player.radius)) {
-      defeatPlayer(game);
+      defeatPlayer(game, events);
     }
   }
 
