@@ -368,13 +368,80 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
   drawRoomCaptain(room, offsetX, offsetY);
 }
 
-function drawAttractScreen(): void {
+function drawTitleRobot(x: number, y: number, scale: number, color: Color): void {
+  drawing.pushTransform();
+  drawing.translate(x, y);
+  drawing.scale(scale, scale);
+  line(drawing, [[-11,15],[-15,24],[-10,35],[10,35],[15,24],[11,15]], color, 0.9);
+  line(drawing, [[-15,13],[15,13],[18,-9],[11,-15],[-11,-15],[-18,-9]], color, 0.9);
+  drawing.setColor(amber); drawing.setIntensity(1.1);
+  drawing.point(-6, 25); drawing.point(6, 25);
+  drawing.setColor(color); drawing.setIntensity(0.9);
+  drawing.moveTo(-11, -12); drawing.lineTo(-15, -25); drawing.lineTo(-8, -29);
+  drawing.moveTo(11, -12); drawing.lineTo(15, -25); drawing.lineTo(8, -29);
+  drawing.moveTo(-16, 7); drawing.lineTo(-25, 0); drawing.lineTo(-22, -8);
+  drawing.moveTo(16, 7); drawing.lineTo(25, 0); drawing.lineTo(22, -8);
+  drawing.popTransform();
+}
+
+function drawTitleVignette(): void {
+  const left = -315, right = 315, bottom = -55, top = 112;
+  drawing.setColor(blue); drawing.setIntensity(0.72);
+  drawing.moveTo(left, bottom); drawing.lineTo(left, top);
+  drawing.moveTo(left, top); drawing.lineTo(-245, top);
+  drawing.moveTo(-165, top); drawing.lineTo(right, top);
+  drawing.moveTo(right, top); drawing.lineTo(right, bottom);
+  drawing.moveTo(left, bottom); drawing.lineTo(-45, bottom);
+  drawing.moveTo(45, bottom); drawing.lineTo(right, bottom);
+  drawing.moveTo(-95, bottom); drawing.lineTo(-95, 5); drawing.lineTo(-35, 5);
+  drawing.moveTo(90, top); drawing.lineTo(90, 48); drawing.lineTo(165, 48);
+  drawing.moveTo(90, 28); drawing.lineTo(90, 5);
+  drawing.setColor(amber); drawing.setIntensity(0.95);
+  drawing.moveTo(-45, bottom + 7); drawing.lineTo(-45, bottom + 25);
+  drawing.moveTo(45, bottom + 7); drawing.lineTo(45, bottom + 25);
+
+  drawTitleRobot(-205, -7, 1.2, cyan);
+  drawTitleRobot(202, -8, 1.45, captainSteel);
+}
+
+function menuText(text: string, x: number, y: number, color: Color, height = 17): void {
+  drawing.setColor(color); drawing.setIntensity(0.95);
+  drawText(drawing, text, x, y, { ...textOptions, height });
+}
+
+function drawAttractScreen(time: number): void {
   drawing.beginFrame();
   if (screenFlow.screen === "main-menu") {
-    label("VERY ANGRY ROBOTS", 105, amber);
-    label("PRESS ENTER OR START TO BEGIN", 5, white);
-    label("MOVE A DIRECTION TO VIEW TOP SCORES", -55, white);
-    label("S / BACK OR SELECT: SETTINGS", -115, blue);
+    const brandOptions = { font: "segment16", height: 24, spacing: "kerned" } as const;
+    const prefix = "ONE MORE ";
+    const glow = "GLOW";
+    const brandWidth = measureText(`${prefix}${glow}`, brandOptions).width;
+    const brandX = -brandWidth / 2;
+    drawing.setColor(white); drawing.setIntensity(0.9);
+    drawText(drawing, prefix, brandX, 326, brandOptions);
+    const pulse = reducedMotion.matches ? 0 : (1 + Math.sin(time * Math.PI * 2 / 3000)) / 2;
+    drawing.setColor([
+      white[0] + (amber[0] - white[0]) * pulse,
+      white[1] + (amber[1] - white[1]) * pulse,
+      white[2] + (amber[2] - white[2]) * pulse,
+    ]);
+    drawing.setIntensity(1 + 0.3 * pulse);
+    drawText(drawing, glow, brandX + measureText(prefix, brandOptions).width, 326, brandOptions);
+    const titleOptions = { font: "segment16", height: 46, spacing: "kerned" } as const;
+    const title = "VERY ANGRY ROBOTS";
+    drawing.setColor(amber); drawing.setIntensity(1.25);
+    drawText(drawing, title, -measureText(title, titleOptions).width / 2, 242, titleOptions);
+    drawTitleVignette();
+
+    menuText("KEYBOARD", -330, -139, cyan, 15);
+    menuText("WASD MOVE   ARROWS FIRE", -330, -166, white);
+    menuText("ENTER START   P PAUSE", -330, -192, white);
+    menuText("GAMEPAD", 55, -139, cyan, 15);
+    menuText("LEFT STICK MOVE   RIGHT STICK FIRE", 55, -166, white);
+    menuText("START PLAY / PAUSE", 55, -192, white);
+    label("PRESS ENTER OR START TO BEGIN", -246, amber);
+    label("MOVE A DIRECTION TO VIEW TOP SCORES", -288, white);
+    label("S / BACK OR SELECT: SETTINGS", -330, blue);
   } else if (screenFlow.screen === "initials") {
     label("NEW HIGH SCORE", 150, amber);
     label("ENTER UP TO THREE INITIALS", 75, white);
@@ -418,13 +485,13 @@ function drawAttractScreen(): void {
   drawing.endFrame();
 }
 
-function draw(time: number): void {
+function draw(time: number, wallClockTime: number): void {
   if (settingsOpen) {
     drawSettings();
     return;
   }
   if (screenFlow.screen !== "playing") {
-    drawAttractScreen();
+    drawAttractScreen(wallClockTime);
     return;
   }
 
@@ -612,7 +679,7 @@ function frame(time: number): void {
     screenFlow = updateScreenFlow(screenFlow, { type: "tick", elapsedMs: delta * 1000 });
   }
   previousSettingsButtons = new Set([0, 1, 3, 8, 9, 12, 13, 14, 15].filter(buttonDown));
-  draw(sceneTime);
+  draw(sceneTime, time);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
