@@ -1,6 +1,7 @@
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
   type Color, type DisplayProfile, type DrawingContext, type Point } from "one-more-glow";
-import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
+import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION,
+  type GameView, type RoomView, type RobotColor } from "./game.ts";
 import { createMaze } from "./maze.ts";
 import { createRoomGeometry } from "./room-geometry.ts";
 import { wallOutline } from "./wall-outline.ts";
@@ -30,6 +31,7 @@ const audio = createAudioController();
 let displayProfile: DisplayProfile = readDisplayProfile(() => window.localStorage);
 drawing.setDisplayProfile(displayProfile);
 const game = createGame();
+const gameView: GameView = game;
 const input = new InputController();
 let latestGamepadState: GamepadState | undefined;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -263,7 +265,7 @@ function line(context: DrawingContext, points: readonly Point[], color: Color, i
 
 const sceneClip = { left: -ROOM.width / 2 - 4, right: ROOM.width / 2 + 4,
   bottom: roomCenterY - ROOM.height / 2 - 4, top: roomCenterY + ROOM.height / 2 + 4 };
-const wallCache = new WeakMap<RoomSnapshot["walls"], [number, number, number, number][]>();
+const wallCache = new WeakMap<RoomView["walls"], [number, number, number, number][]>();
 function seededRandom(seed: number): () => number {
   let state = seed >>> 0;
   return () => {
@@ -276,12 +278,12 @@ const titleRoomGeometry = createRoomGeometry("left");
 const titleWalls = [...titleMaze.walls, ...titleRoomGeometry.hazardRects];
 const titleWallEdges = wallOutline(titleWalls.filter((wall) => wall !== titleRoomGeometry.closedDoorRect));
 
-function isClosedDoor(wall: RoomSnapshot["walls"][number], room: RoomSnapshot): boolean {
+function isClosedDoor(wall: RoomView["walls"][number], room: RoomView): boolean {
   const door = room.geometry.closedDoorRect;
   return wall.x === door.x && wall.y === door.y && wall.width === door.width && wall.height === door.height;
 }
 
-function drawWalls(context: DrawingContext, room: RoomSnapshot, time: number, doorProgress: number): void {
+function drawWalls(context: DrawingContext, room: RoomView, time: number, doorProgress: number): void {
   let edges = wallCache.get(room.walls);
   if (!edges) {
     // The closed door is drawn as an amber bar, like the original preview.
@@ -315,12 +317,12 @@ function drawWalls(context: DrawingContext, room: RoomSnapshot, time: number, do
   }
 }
 
-function drawPlayer(context: DrawingContext, room: RoomSnapshot): void {
+function drawPlayer(context: DrawingContext, room: RoomView): void {
   const { x, y } = room.player;
   context.pushTransform();
   context.translate(x, y);
   context.scale(1.18, 1.18);
-  const stride = walking ? Math.sin(game.elapsed * 14) * 3 : 0;
+  const stride = walking ? Math.sin(gameView.elapsed * 14) * 3 : 0;
   context.setColor(cyan); context.setIntensity(1);
   drawCircle(context, [0, -8], 6);
   context.setColor(white); context.setIntensity(0.85);
@@ -344,7 +346,7 @@ function drawPlayer(context: DrawingContext, room: RoomSnapshot): void {
   context.popTransform();
 }
 
-function drawCaptain(context: DrawingContext, room: RoomSnapshot): void {
+function drawCaptain(context: DrawingContext, room: RoomView): void {
   const captain = room.captain;
   if (captain.state !== "chasing") return;
   const bounce = reducedMotion.matches ? 0 : Math.sin(captain.bouncePhase) * 2;
@@ -375,7 +377,7 @@ function drawParticleBurst(context: DrawingContext, burst: typeof particleEffect
   }
 }
 
-function drawRoomCaptain(room: RoomSnapshot, offsetX: number, offsetY: number): void {
+function drawRoomCaptain(room: RoomView, offsetX: number, offsetY: number): void {
   const roomBounds = {
     left: offsetX - ROOM.width / 2,
     right: offsetX + ROOM.width / 2,
@@ -393,7 +395,7 @@ function drawRoomCaptain(room: RoomSnapshot, offsetX: number, offsetY: number): 
   captainScene.popTransform();
 }
 
-function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, doorProgress = 1, showPlayer = true): void {
+function drawRoom(room: RoomView, time: number, offsetX = 0, offsetY = 0, doorProgress = 1, showPlayer = true): void {
   const scene = clippedDrawing(drawing, sceneClip);
   scene.pushTransform();
   scene.translate(offsetX, roomCenterY + offsetY);
@@ -401,11 +403,11 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
   scene.translate(-ROOM.width / 2, -ROOM.height / 2);
   drawWalls(scene, room, time, doorProgress);
   for (const robot of room.robots) {
-    const stride = walkingRobots.has(robot.id) ? Math.sin(game.elapsed * 14 + robot.id * 0.73) * 4 : 0;
+    const stride = walkingRobots.has(robot.id) ? Math.sin(gameView.elapsed * 14 + robot.id * 0.73) * 4 : 0;
     const gaze = robotGaze.get(robot.id) ?? { x: 0, y: 0 };
     drawCharacterRobot(scene, robot.x, robot.y, robotVisualScale, robotColors[room.difficulty.color], -1, stride, gaze.x, -gaze.y);
   }
-  if (showPlayer && game.outcome === "playing") drawPlayer(scene, room);
+  if (showPlayer && gameView.outcome === "playing") drawPlayer(scene, room);
   for (const shot of room.shots) {
     const length = Math.hypot(shot.velocityX, shot.velocityY) || 1;
     scene.setColor(shot.owner === "player" ? cyan : amber); scene.setIntensity(1.4);
@@ -624,14 +626,14 @@ function draw(time: number, wallClockTime: number): void {
   drawing.setColor(white); drawing.setIntensity(0.7);
   drawText(drawing, "VERY ANGRY ROBOTS", -440, 350, { ...textOptions, height: 16 });
   const hudOptions = { ...textOptions, height: 16 };
-  const score = `SCORE ${game.score}`;
+  const score = `SCORE ${gameView.score}`;
   drawText(drawing, score, -190, 350, hudOptions);
-  const lives = `LIVES ${game.lives}`;
+  const lives = `LIVES ${gameView.lives}`;
   drawText(drawing, lives, 70, 350, hudOptions);
-  const robotCount = `ROBOTS ${game.robots.length}`;
+  const robotCount = `ROBOTS ${gameView.robots.length}`;
   drawText(drawing, robotCount, 440 - measureText(robotCount, hudOptions).width, 350, hudOptions);
 
-  const transition = game.transition;
+  const transition = gameView.transition;
   if (transition) {
     const elapsed = transition.progress * transition.duration;
     const scrollProgress = reducedMotion.matches ? 1 : Math.min(1, elapsed / ROOM_SCROLL_DURATION);
@@ -642,15 +644,15 @@ function draw(time: number, wallClockTime: number): void {
     drawRoom(transition.from, time, offsets.from.x, offsets.from.y, 1, false);
     drawRoom(transition.to, time, offsets.to.x, offsets.to.y, doorProgress);
   } else {
-    retainPresentedRoomFlyups(scoreFlyups, [game]);
-    retainPresentedRoomParticleEffects(particleEffects, [game]);
-    drawRoom(game, time);
+    retainPresentedRoomFlyups(scoreFlyups, [gameView]);
+    retainPresentedRoomParticleEffects(particleEffects, [gameView]);
+    drawRoom(gameView, time);
   }
 
-  if (game.outcome === "dying") {
+  if (gameView.outcome === "dying") {
     label("PLAYER DOWN", roomCenterY + 12, red);
-    if (game.lives > 0) {
-      const seconds = Math.max(0, game.deathTimeRemaining).toFixed(1);
+    if (gameView.lives > 0) {
+      const seconds = Math.max(0, gameView.deathTimeRemaining).toFixed(1);
       label(`RESPAWNING IN ${seconds}`, roomCenterY - 14, amber);
     }
   }
@@ -759,29 +761,29 @@ function frame(time: number): void {
     input.clearKeyboard();
     input.suppressGamepadWhileHeld(latestGamepadState);
   } else if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) {
-    if (!game.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
-    const previousX = game.player.x, previousY = game.player.y;
-    const previousRobotPositions = new Map(game.robots.map((robot) => [robot.id, { x: robot.x, y: robot.y }]));
-    const simulationDelta = reducedMotion.matches && game.transition ? game.transition.duration : delta;
-    const wasInTransition = game.transition !== null;
+    if (!gameView.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
+    const previousX = gameView.player.x, previousY = gameView.player.y;
+    const previousRobotPositions = new Map(gameView.robots.map((robot) => [robot.id, { x: robot.x, y: robot.y }]));
+    const simulationDelta = reducedMotion.matches && gameView.transition ? gameView.transition.duration : delta;
+    const wasInTransition = gameView.transition !== null;
     const events = updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
       fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
     const audioActions = gameAudioActions(events);
     if (audioActions.stopTaunts) audio.stopTaunts();
-    else if (!wasInTransition && game.transition) audio.stopTaunts();
+    else if (!wasInTransition && gameView.transition) audio.stopTaunts();
     if (audioActions.tauntSet) runTauntSet = audioActions.tauntSet;
     if (audioActions.effects.length) audio.playEffects(audioActions.effects);
     for (const voice of audioActions.voices) audio.playVoice(voice);
     if (events.some((event) => event.type === "room-entered" || event.type === "player-respawned")) {
       audio.startTaunts(runTauntSet);
     }
-    walkingRobots = game.transition ? new Set() : new Set(game.robots
+    walkingRobots = gameView.transition ? new Set() : new Set(gameView.robots
       .filter((robot) => {
         const previous = previousRobotPositions.get(robot.id);
         return previous !== undefined && Math.hypot(robot.x - previous.x, robot.y - previous.y) > 0.001;
       })
       .map((robot) => robot.id));
-    robotGaze = new Map(game.robots.map((robot) => {
+    robotGaze = new Map(gameView.robots.map((robot) => {
       const previous = previousRobotPositions.get(robot.id);
       const dx = previous ? robot.x - previous.x : 0;
       const dy = previous ? robot.y - previous.y : 0;
@@ -797,12 +799,13 @@ function frame(time: number): void {
     }
     updateScoreFlyups(scoreFlyups, delta, reducedMotion.matches);
     updateParticleEffects(particleEffects, delta, reducedMotion.matches);
-    walking = !game.transition && game.outcome === "playing" && (game.player.x !== previousX || game.player.y !== previousY);
-    if (game.outcome === "lost") {
+    walking = !gameView.transition && gameView.outcome === "playing"
+      && (gameView.player.x !== previousX || gameView.player.y !== previousY);
+    if (gameView.outcome === "lost") {
       screenFlow = updateScreenFlow(screenFlow, {
         type: "run-ended",
-        score: game.score,
-        qualifies: qualifiesForHighScore(highScores, game.score),
+        score: gameView.score,
+        qualifies: qualifiesForHighScore(highScores, gameView.score),
       });
       initialsEntry = createInitialsEntry();
     }

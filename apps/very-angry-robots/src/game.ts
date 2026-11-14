@@ -87,6 +87,18 @@ export interface Game {
   transition: RoomTransition | null;
 }
 
+type DeepReadonly<T> = T extends readonly unknown[]
+  ? { readonly [Index in keyof T]: DeepReadonly<T[Index]> }
+  : T extends object
+    ? { readonly [Key in keyof T]: DeepReadonly<T[Key]> }
+    : T;
+
+/** A compile-time readonly view of the live simulation state for presentation code. */
+export type GameView = DeepReadonly<Game>;
+
+/** A compile-time readonly room view, including snapshots used during transitions. */
+export type RoomView = DeepReadonly<RoomSnapshot>;
+
 /** A gameplay event for presentation systems to consume without changing simulation state. */
 export interface RobotDestroyedEvent {
   type: "robot-destroyed";

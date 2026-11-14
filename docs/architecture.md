@@ -125,6 +125,8 @@ than library internals.
 
 `apps/very-angry-robots/` is an independent vector-game consumer. Its room,
 combat and input belong to the app; it draws through the public library API.
+Its simulation and presentation boundary is described in
+[`apps/very-angry-robots/docs/architecture.md`](../apps/very-angry-robots/docs/architecture.md).
 
 ## Dependency direction
 
