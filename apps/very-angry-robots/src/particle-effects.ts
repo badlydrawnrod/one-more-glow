@@ -74,6 +74,7 @@ export function createParticleEffectState(): ParticleEffectState {
 
 /** Copies a simulation event into room-scoped transient presentation state. */
 export function addParticleEffect(state: ParticleEffectState, event: ParticleEffectEvent): void {
+  if (event.type !== "robot-destroyed" && event.type !== "player-defeated" && event.type !== "shot-impact") return;
   let kind: ParticleBurst["kind"];
   let color: Color;
   let marks: ParticleMark[];

@@ -36,7 +36,7 @@ are the reference for these rules.
   the scroll and door animation, then resume. Keep the HUD stationary. With
   reduced motion enabled, show the new room and closed door immediately.
 - Player defeat consumes a life as described below. The Captain is implemented
-  as specified below; sound remains outside the implemented slice.
+  as specified below. Sound effects are specified in [Audio](audio.md).
 
 ### Navigation verification
 

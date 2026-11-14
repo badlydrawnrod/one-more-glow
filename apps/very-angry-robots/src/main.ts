@@ -16,6 +16,8 @@ import { addParticleEffect, clearParticleEffects, createParticleEffectState, par
   particleMarkOffset, retainPresentedRoomParticleEffects, updateParticleEffects } from "./particle-effects.ts";
 import { ROBOTS_DEFAULT_DISPLAY_PROFILE, readDisplayProfile, writeDisplayProfile } from "./display-profile.ts";
 import { canOpenDisplaySettings, focusLossOverlayState, shouldAdvanceGame, shouldAdvanceSceneTime, shouldTickAttractScreen } from "./interaction-policy.ts";
+import { createAudioController, type AudioPreferences, type TauntSet } from "./audio.ts";
+import { gameAudioActions } from "./game-audio.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
@@ -24,6 +26,7 @@ const screen = canvas;
 const gl = screen.getContext("webgl2");
 if (!gl) throw new Error("WebGL2 is unavailable");
 const drawing = createWebGL2Renderer(gl);
+const audio = createAudioController();
 let displayProfile: DisplayProfile = readDisplayProfile(() => window.localStorage);
 drawing.setDisplayProfile(displayProfile);
 const game = createGame();
@@ -44,11 +47,13 @@ let paused = false;
 let settingsOpen = false;
 let settingsNeedsGamepadNeutral = false;
 let selectedSetting = 0;
+let audioPreferences: AudioPreferences = { ...audio.preferences };
+let runTauntSet: TauntSet = "standard";
 let settingsNavAt = 0;
 let previousSettingsButtons = new Set<number>();
 const displayFields = ["lineWidth", "pointRadius", "glowStrength", "glowSpread"] as const;
 const displayRanges = [[0.5, 4], [0.5, 4], [0, 2], [0.5, 2]] as const;
-const displayRows = [205, 105, 5, -95] as const;
+const settingsRows = [205, 125, 45, -35, -115, -195] as const;
 const cyan: Color = [0.35, 0.95, 1];
 const red: Color = [1, 0.35, 0.36];
 const amber: Color = [1, 0.75, 0.32];
@@ -88,6 +93,7 @@ function openSettings(): void {
   settingsNeedsGamepadNeutral = true;
   input.clearKeyboard();
   input.suppressGamepadWhileHeld(latestGamepadState);
+  audio.playEffects(["interface"]);
 }
 
 function closeSettings(): void {
@@ -96,6 +102,7 @@ function closeSettings(): void {
   settingsNeedsGamepadNeutral = true;
   input.clearKeyboard();
   input.suppressGamepadWhileHeld(latestGamepadState);
+  audio.playEffects(["interface"]);
 }
 
 function applyDisplayProfile(): void {
@@ -112,13 +119,27 @@ function setDisplayField(index: number, value: number): void {
 }
 
 function adjustSelectedSetting(direction: number): void {
-  if (selectedSetting >= displayFields.length) return;
-  const field = displayFields[selectedSetting];
-  setDisplayField(selectedSetting, displayProfile[field] + direction * 0.1);
+  if (selectedSetting < displayFields.length) {
+    const field = displayFields[selectedSetting];
+    setDisplayField(selectedSetting, displayProfile[field] + direction * 0.1);
+    audio.playEffects(["interface"]);
+  } else if (selectedSetting === 4) {
+    setAudioPreferences({ ...audioPreferences, enabled: !audioPreferences.enabled });
+  } else if (selectedSetting === 5) {
+    setAudioPreferences({ ...audioPreferences, volume: Math.max(0, Math.min(1, Math.round((audioPreferences.volume + direction * 0.1) * 10) / 10)) });
+  }
 }
 
 function moveSettingSelection(direction: number): void {
-  selectedSetting = (selectedSetting + direction + 6) % 6;
+  selectedSetting = (selectedSetting + direction + 8) % 8;
+  audio.playEffects(["interface"]);
+}
+
+function setAudioPreferences(next: AudioPreferences): void {
+  if (next.enabled === audioPreferences.enabled && next.volume === audioPreferences.volume) return;
+  audioPreferences = next;
+  audio.setPreferences(audioPreferences);
+  audio.playEffects(["interface"]);
 }
 
 function resetDisplayProfile(): void {
@@ -127,25 +148,26 @@ function resetDisplayProfile(): void {
 }
 
 function activateSetting(): void {
-  if (selectedSetting === 4) resetDisplayProfile();
-  else if (selectedSetting === 5) closeSettings();
+  if (selectedSetting === 4) setAudioPreferences({ ...audioPreferences, enabled: !audioPreferences.enabled });
+  else if (selectedSetting === 6) { resetDisplayProfile(); audio.playEffects(["interface"]); }
+  else if (selectedSetting === 7) closeSettings();
   else adjustSelectedSetting(1);
 }
 
 function drawSettings(): void {
   drawing.beginFrame();
-  settingsLabel("DISPLAY SETTINGS", -448, 320, amber, 26);
+  settingsLabel("DISPLAY & AUDIO SETTINGS", -448, 320, amber, 26);
   settingsLabel("TUNE THE VECTOR DISPLAY", -448, 282, blue, 15);
 
   const labels = ["LINE WIDTH", "POINT RADIUS", "GLOW STRENGTH", "GLOW SPREAD"];
   const track = { left: -420, right: 24 };
   for (let index = 0; index < displayFields.length; index += 1) {
-    const rowY = displayRows[index];
+    const rowY = settingsRows[index];
     const trackY = rowY - 29;
     const [minimum, maximum] = displayRanges[index];
     const value = displayProfile[displayFields[index]];
     const focused = selectedSetting === index;
-    if (focused) line(drawing, [[-454,rowY-52],[65,rowY-52],[65,rowY+35],[-454,rowY+35],[-454,rowY-52]], amber, 1);
+    if (focused) line(drawing, [[-454,rowY-37],[65,rowY-37],[65,rowY+30],[-454,rowY+30],[-454,rowY-37]], amber, 1);
     settingsLabel(labels[index], -420, rowY + 3, focused ? amber : white, 17);
     settingsLabel(value.toFixed(1), -20, rowY + 3, focused ? amber : cyan, 17);
     drawing.setColor(blue); drawing.setIntensity(0.75);
@@ -160,6 +182,24 @@ function drawSettings(): void {
     drawCircle(drawing, [handleX, trackY], 8);
   }
 
+  const soundRow = settingsRows[4];
+  const volumeRow = settingsRows[5];
+  for (const [index, rowY, name, value] of [
+    [4, soundRow, "SOUND", audioPreferences.enabled ? "ON" : "OFF"],
+    [5, volumeRow, "MASTER VOLUME", audioPreferences.volume.toFixed(1)],
+  ] as const) {
+    const focused = selectedSetting === index;
+    if (focused) line(drawing, [[-454,rowY-24],[65,rowY-24],[65,rowY+23],[-454,rowY+23],[-454,rowY-24]], amber, 1);
+    settingsLabel(name, -420, rowY, focused ? amber : white, 15);
+    settingsLabel(value, -20, rowY, focused ? amber : cyan, 15);
+    if (index === 5) {
+      drawing.setColor(blue); drawing.setIntensity(0.75);
+      drawing.moveTo(-420, rowY - 17); drawing.lineTo(24, rowY - 17);
+      drawing.setColor(focused ? amber : cyan); drawing.setIntensity(1.2);
+      drawCircle(drawing, [-420 + audioPreferences.volume * 444, rowY - 17], 6);
+    }
+  }
+
   line(drawing, [[105,-125],[454,-125],[454,220],[105,220],[105,-125]], blue, 0.7);
   settingsLabel("ROOM PREVIEW", 125, 181, blue, 15);
   line(drawing, [[145,-95],[414,-95],[414,145],[145,145],[145,-95]], blue, 0.85);
@@ -172,12 +212,12 @@ function drawSettings(): void {
   drawing.popTransform();
   line(drawing, [[348,104],[365,104],[365,121],[348,121],[348,104]], red, 1);
   line(drawing, [[179,-42],[196,-42],[196,-25],[179,-25],[179,-42]], red, 1);
-  line(drawing, [[-95,-240],[-5,-240],[-5,-196],[-95,-196],[-95,-240]], selectedSetting === 4 ? amber : blue, 1);
-  line(drawing, [[25,-240],[115,-240],[115,-196],[25,-196],[25,-240]], selectedSetting === 5 ? amber : blue, 1);
-  settingsLabel("RESET", -79, -226, selectedSetting === 4 ? amber : white, 15);
-  settingsLabel("CLOSE", 42, -226, selectedSetting === 5 ? amber : white, 15);
-  settingsLabel("UP / DOWN OR D-PAD: SELECT   LEFT / RIGHT: ADJUST", -448, -285, blue, 12);
-  settingsLabel("ENTER / A: ACTIVATE   X: RESET   ESC / B: CLOSE", -448, -311, blue, 12);
+  line(drawing, [[-95,-300],[-5,-300],[-5,-256],[-95,-256],[-95,-300]], selectedSetting === 6 ? amber : blue, 1);
+  line(drawing, [[25,-300],[115,-300],[115,-256],[25,-256],[25,-300]], selectedSetting === 7 ? amber : blue, 1);
+  settingsLabel("RESET", -79, -286, selectedSetting === 6 ? amber : white, 15);
+  settingsLabel("CLOSE", 42, -286, selectedSetting === 7 ? amber : white, 15);
+  settingsLabel("UP / DOWN OR D-PAD: SELECT   LEFT / RIGHT: ADJUST", -448, -320, blue, 12);
+  settingsLabel("ENTER / A: ACTIVATE   X: RESET   ESC / B: CLOSE", -448, -344, blue, 12);
   drawing.endFrame();
 }
 
@@ -187,22 +227,34 @@ function settingsPointerPosition(event: PointerEvent): Point {
     384 - (event.clientY - rect.top) / rect.height * 768];
 }
 
-function handleSettingsPointer(event: PointerEvent): void {
+function handleSettingsPointer(event: PointerEvent, activate = true): void {
   if (!settingsOpen) return;
   const [x, y] = settingsPointerPosition(event);
-  for (let index = 0; index < displayRows.length; index += 1) {
-    const rowY = displayRows[index];
+  for (let index = 0; index < settingsRows.length; index += 1) {
+    const rowY = settingsRows[index];
+    if (index >= 4) {
+      if (x >= -454 && x <= 65 && y >= rowY - 24 && y <= rowY + 23) {
+        selectedSetting = index;
+        if (activate && index === 4) setAudioPreferences({ ...audioPreferences, enabled: !audioPreferences.enabled });
+      }
+      if (index === 5 && x >= -430 && x <= 34 && y >= rowY - 23 && y <= rowY - 10) {
+        selectedSetting = index;
+        setAudioPreferences({ ...audioPreferences, volume: Math.round(Math.max(0, Math.min(1, (x + 420) / 444)) * 10) / 10 });
+      }
+      continue;
+    }
     const trackY = rowY - 29;
-    if (x >= -454 && x <= 65 && y >= rowY - 52 && y <= rowY + 35) selectedSetting = index;
+    if (x >= -454 && x <= 65 && y >= rowY - 37 && y <= rowY + 30) selectedSetting = index;
     if (x >= -430 && x <= 34 && y >= trackY - 12 && y <= trackY + 12) {
       selectedSetting = index;
       const [minimum, maximum] = displayRanges[index];
       setDisplayField(index, minimum + Math.max(0, Math.min(1, (x + 420) / 444)) * (maximum - minimum));
+      audio.playEffects(["interface"]);
       return;
     }
   }
-  if (x >= -95 && x <= -5 && y >= -240 && y <= -196) { selectedSetting = 4; resetDisplayProfile(); }
-  else if (x >= 25 && x <= 115 && y >= -240 && y <= -196) closeSettings();
+  if (x >= -95 && x <= -5 && y >= -300 && y <= -256) { selectedSetting = 6; resetDisplayProfile(); audio.playEffects(["interface"]); }
+  else if (x >= 25 && x <= 115 && y >= -300 && y <= -256) closeSettings();
 }
 
 function line(context: DrawingContext, points: readonly Point[], color: Color, intensity = 1): void {
@@ -615,6 +667,7 @@ function draw(time: number, wallClockTime: number): void {
 
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
+  audio.unlock();
   if (settingsOpen) {
     event.preventDefault();
     if (event.key === "Escape") { if (!event.repeat) closeSettings(); }
@@ -630,12 +683,13 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("keyup", (event) => input.keyUp(event.key));
 screen.addEventListener("pointerdown", (event) => {
+  audio.unlock();
   if (!settingsOpen) return;
   event.preventDefault();
   screen.setPointerCapture(event.pointerId);
   handleSettingsPointer(event);
 });
-screen.addEventListener("pointermove", (event) => { if (settingsOpen && event.buttons) handleSettingsPointer(event); });
+screen.addEventListener("pointermove", (event) => { if (settingsOpen && event.buttons) handleSettingsPointer(event, false); });
 screen.addEventListener("pointerup", (event) => { if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId); });
 function pauseForFocusLoss(): void {
   input.clearKeyboard();
@@ -674,6 +728,9 @@ function frame(time: number): void {
   const controls = input.read(latestGamepadState);
   const pausePressed = input.takePauseAction();
   const settingsPressed = input.takeSettingsAction();
+  if (controls.startPressed || controls.screenAdvancePressed || pausePressed || settingsPressed) audio.unlock();
+  audio.setGameplayState(screenFlow.screen === "playing", paused || settingsOpen);
+  audio.update(delta);
   if (shouldAdvanceSceneTime(screenFlow.screen, paused, settingsOpen)) sceneTime += delta * 1000;
   const buttonDown = (index: number) => pad?.buttons[index]?.pressed ?? false;
   if (settingsOpen) {
@@ -684,7 +741,7 @@ function frame(time: number): void {
       const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
       if (isNewPress(1)) closeSettings();
       else if (isNewPress(0)) activateSetting();
-      if (settingsOpen && isNewPress(3)) resetDisplayProfile();
+      if (settingsOpen && isNewPress(3)) { resetDisplayProfile(); audio.playEffects(["interface"]); }
       const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
         : Math.abs(pad.axes[1] ?? 0) > 0.45 ? Math.sign(pad.axes[1]!) : 0;
       const horizontal = buttonDown(15) ? 1 : buttonDown(14) ? -1
@@ -706,8 +763,18 @@ function frame(time: number): void {
     const previousX = game.player.x, previousY = game.player.y;
     const previousRobotPositions = new Map(game.robots.map((robot) => [robot.id, { x: robot.x, y: robot.y }]));
     const simulationDelta = reducedMotion.matches && game.transition ? game.transition.duration : delta;
+    const wasInTransition = game.transition !== null;
     const events = updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
       fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
+    const audioActions = gameAudioActions(events);
+    if (audioActions.stopTaunts) audio.stopTaunts();
+    else if (!wasInTransition && game.transition) audio.stopTaunts();
+    if (audioActions.tauntSet) runTauntSet = audioActions.tauntSet;
+    if (audioActions.effects.length) audio.playEffects(audioActions.effects);
+    for (const voice of audioActions.voices) audio.playVoice(voice);
+    if (events.some((event) => event.type === "room-entered" || event.type === "player-respawned")) {
+      audio.startTaunts(runTauntSet);
+    }
     walkingRobots = game.transition ? new Set() : new Set(game.robots
       .filter((robot) => {
         const previous = previousRobotPositions.get(robot.id);
@@ -763,8 +830,13 @@ function frame(time: number): void {
     clearParticleEffects(particleEffects);
     initialsEntry = createInitialsEntry();
     screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
+    runTauntSet = "standard";
+    audio.setGameplayState(true, false);
+    audio.playEffects(["interface"]);
+    audio.startTaunts(runTauntSet);
   } else if (screenFlow.screen !== "playing" && controls.screenAdvancePressed) {
     screenFlow = updateScreenFlow(screenFlow, { type: "advance" });
+    audio.playEffects(["interface"]);
   } else if (shouldTickAttractScreen(screenFlow.screen, settingsOpen)) {
     screenFlow = updateScreenFlow(screenFlow, { type: "tick", elapsedMs: delta * 1000 });
   }

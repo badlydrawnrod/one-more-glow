@@ -120,7 +120,33 @@ export interface ShotImpactEvent {
   target: "wall" | "robot" | "player" | "captain";
 }
 
-export type GameEvent = RobotDestroyedEvent | PlayerDefeatedEvent | ShotImpactEvent;
+export interface AudioCueEvent {
+  type: "player-shot" | "robot-shot" | "room-cleared" | "player-hazard" | "robot-hazard"
+    | "extra-life" | "player-respawned";
+  roomX: number;
+  roomY: number;
+}
+
+export interface RoomEnteredEvent {
+  type: "room-entered";
+  roomX: number;
+  roomY: number;
+}
+
+export interface RoomRetreatedEvent {
+  type: "room-retreated";
+  roomX: number;
+  roomY: number;
+}
+
+export interface CaptainEnteredEvent {
+  type: "captain-entered";
+  roomX: number;
+  roomY: number;
+}
+
+export type GameEvent = RobotDestroyedEvent | PlayerDefeatedEvent | ShotImpactEvent | AudioCueEvent
+  | RoomEnteredEvent | RoomRetreatedEvent | CaptainEnteredEvent;
 
 export interface RoomSnapshot {
   difficulty: Difficulty;
@@ -271,7 +297,10 @@ export function updateGame(game: Game, dt: number, input: InputFrame = IDLE): Ga
   }
   if (game.transition) {
     game.transition.progress = Math.min(1, game.transition.progress + Math.max(0, dt) / game.transition.duration);
-    if (game.transition.progress >= 1) game.transition = null;
+    if (game.transition.progress >= 1) {
+      game.transition = null;
+      events.push({ type: "room-entered", roomX: game.roomX, roomY: game.roomY });
+    }
     return events;
   }
   if (game.outcome === "lost") return events;
@@ -399,8 +428,9 @@ function findExit(game: Game, x: number, y: number): Direction | null {
   return null;
 }
 
-function beginTransition(game: Game, direction: Direction): void {
+function beginTransition(game: Game, direction: Direction, events: GameEvent[]): void {
   const from = snapshot(game);
+  if (game.robots.length > 0) events.push({ type: "room-retreated", roomX: game.roomX, roomY: game.roomY });
   const roomX = game.roomX + (direction === "right" ? 1 : direction === "left" ? -1 : 0);
   const roomY = game.roomY + (direction === "down" ? 1 : direction === "up" ? -1 : 0);
   const tier = difficultyForScore(game.score);
@@ -419,20 +449,20 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
   const startingPositions = captureActorPositions(game);
   game.elapsed += dt;
   if (game.outcome === "dying") {
-    updateCaptain(game, dt);
+    updateCaptain(game, dt, events);
     updateRobots(game, dt, events);
     updateShots(game, dt, events, startingPositions);
     resolveContacts(game, events);
     game.deathTimeRemaining = Math.max(0, game.deathTimeRemaining - dt);
     if (game.deathTimeRemaining < 1e-9) {
       game.deathTimeRemaining = 0;
-      if (game.lives > 0) respawn(game);
+      if (game.lives > 0) respawn(game, events);
       else game.outcome = "lost";
     }
     return;
   }
 
-  updateCaptain(game, dt);
+  updateCaptain(game, dt, events);
   const player = game.player;
   player.fireCooldown = Math.max(0, player.fireCooldown - dt);
   const move = normalized(input.moveX, input.moveY);
@@ -440,6 +470,7 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
   const nextPlayerY = player.y + move.y * PLAYER_SPEED * dt;
   const exit = findExit(game, nextPlayerX, nextPlayerY);
   if (!exit && touchesPlayerHazard(game, nextPlayerX, nextPlayerY)) {
+    events.push({ type: "player-hazard", roomX: game.roomX, roomY: game.roomY });
     defeatPlayer(game, events, nextPlayerX, nextPlayerY);
   }
   if (exit) {
@@ -453,6 +484,7 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
     const aim = normalized(input.aimX, input.aimY);
     if (aim.x !== 0 || aim.y !== 0) {
       spawnShot(game, "player", player.x, player.y, aim.x * PLAYER_SHOT_SPEED, aim.y * PLAYER_SHOT_SPEED);
+      events.push({ type: "player-shot", roomX: game.roomX, roomY: game.roomY });
       player.fireCooldown = PLAYER_FIRE_INTERVAL;
     }
   }
@@ -462,7 +494,7 @@ function tick(game: Game, dt: number, input: InputFrame, events: GameEvent[]): v
   resolveContacts(game, events);
   game.fireAmnestyRemaining = Math.max(0, game.fireAmnestyRemaining - dt);
   // A lethal collision takes precedence over leaving, even if the last robot also dies.
-  if (game.outcome === "playing" && exit) beginTransition(game, exit);
+  if (game.outcome === "playing" && exit) beginTransition(game, exit, events);
 }
 
 function defeatPlayer(game: Game, events: GameEvent[], x = game.player.x, y = game.player.y): void {
@@ -473,7 +505,7 @@ function defeatPlayer(game: Game, events: GameEvent[], x = game.player.x, y = ga
   events.push({ type: "player-defeated", roomX: game.roomX, roomY: game.roomY, x, y });
 }
 
-function respawn(game: Game): void {
+function respawn(game: Game, events: GameEvent[]): void {
   game.player.x = game.player.spawnX;
   game.player.y = game.player.spawnY;
   game.player.fireCooldown = 0;
@@ -485,6 +517,7 @@ function respawn(game: Game): void {
   game.captain = createCaptain(game.entrance, game.robots.length);
   game.fireAmnestyRemaining = FIRE_AMNESTY;
   game.outcome = "playing";
+  events.push({ type: "player-respawned", roomX: game.roomX, roomY: game.roomY });
 }
 
 function updateRobots(game: Game, dt: number, events: GameEvent[]): void {
@@ -499,6 +532,7 @@ function updateRobots(game: Game, dt: number, events: GameEvent[]): void {
       const nextX = robot.x + direction.x * robot.moveSpeed * dt;
       const nextY = robot.y + direction.y * robot.moveSpeed * dt;
       if (touchesHazard(nextX, nextY, ROBOT_WALL_CLEARANCE, game.walls)) {
+        events.push({ type: "robot-hazard", roomX: game.roomX, roomY: game.roomY });
         destroyRobots(game, new Set([robot.id]), events);
         continue;
       }
@@ -511,18 +545,20 @@ function updateRobots(game: Game, dt: number, events: GameEvent[]): void {
       const aim = normalized(player.x - robot.x, player.y - robot.y);
       spawnShot(game, "robot", robot.x + aim.x * (robot.radius + SHOT_RADIUS + 1),
         robot.y + aim.y * (robot.radius + SHOT_RADIUS + 1), aim.x * game.difficulty.shotSpeed, aim.y * game.difficulty.shotSpeed);
+      events.push({ type: "robot-shot", roomX: game.roomX, roomY: game.roomY });
       robot.fireCooldown = ROBOT_FIRE_INTERVAL;
     }
   }
 }
 
-function updateCaptain(game: Game, dt: number): void {
+function updateCaptain(game: Game, dt: number, events: GameEvent[]): void {
   const captain = game.captain;
   if (captain.state === "lurking") {
     captain.lurkTimeRemaining = Math.max(0, captain.lurkTimeRemaining - dt);
     if (captain.lurkTimeRemaining <= 1e-9) {
       captain.lurkTimeRemaining = 0;
       captain.state = "chasing";
+      if (game.outcome === "playing") events.push({ type: "captain-entered", roomX: game.roomX, roomY: game.roomY });
     }
   }
   if (captain.state !== "chasing") return;
@@ -633,9 +669,13 @@ function shotImpactEvent(game: Game, shot: Shot, target: ShotImpactEvent["target
 }
 
 function resolveContacts(game: Game, events: GameEvent[]): void {
-  if (game.outcome === "playing" && playerTouchesHazard(game)) defeatPlayer(game, events);
+  if (game.outcome === "playing" && playerTouchesHazard(game)) {
+    events.push({ type: "player-hazard", roomX: game.roomX, roomY: game.roomY });
+    defeatPlayer(game, events);
+  }
   for (const robot of game.robots) {
     if (entityTouchesHazard(robot, game.walls)) {
+      events.push({ type: "robot-hazard", roomX: game.roomX, roomY: game.roomY });
       destroyRobots(game, new Set([robot.id]), events);
     }
   }
@@ -675,6 +715,7 @@ function destroyRobots(game: Game, ids: ReadonlySet<number>, events: GameEvent[]
   const oldScore = game.score;
   game.robots = game.robots.filter((robot) => !ids.has(robot.id));
   const roomClearBonus = game.robots.length === 0 ? 100 : 0;
+  if (roomClearBonus > 0) events.push({ type: "room-cleared", roomX: game.roomX, roomY: game.roomY });
   game.score += destroyedRobots.length * 50 + roomClearBonus;
   destroyedRobots.forEach((robot, index) => {
     events.push({
@@ -688,7 +729,10 @@ function destroyRobots(game: Game, ids: ReadonlySet<number>, events: GameEvent[]
     });
   });
   for (const threshold of [10_000, 50_000]) {
-    if (oldScore < threshold && game.score >= threshold) game.lives += 1;
+    if (oldScore < threshold && game.score >= threshold) {
+      game.lives += 1;
+      events.push({ type: "extra-life", roomX: game.roomX, roomY: game.roomY });
+    }
   }
 }
 

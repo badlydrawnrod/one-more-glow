@@ -35,7 +35,8 @@ player to leave a room, including one that has been cleared.
   Captain's drawing to the current room boundary, including while entering
   from outside and while rooms scroll; no part of its vector geometry should
   appear outside its room. This is a drawing constraint and does not change
-  movement or collisions. Sound and taunts remain deferred.
+  movement or collisions. The Captain's entrance speech is specified in
+  [Audio](audio.md).
 - The Captain does not follow the player between rooms. On each room entry,
   reset it outside the new entrance and start a new lurk timer. After a death,
   also reset it outside the current entrance and calculate a fresh delay from

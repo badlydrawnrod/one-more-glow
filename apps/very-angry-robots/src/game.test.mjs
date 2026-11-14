@@ -125,6 +125,68 @@ test("transition pauses movement and combat until the new room is in place", () 
   assert.equal(game.fireAmnestyRemaining, 2);
 });
 
+test("audio events are emitted only for resolved shots, room transitions, and respawns", () => {
+  const firing = emptyGame();
+  const shotEvents = updateGame(firing, 0.01, { ...idle, aimX: 1, fire: true });
+  assert.equal(shotEvents.filter((event) => event.type === "player-shot").length, 1);
+  assert.equal(updateGame(firing, 0.01, { ...idle, aimX: 1, fire: true })
+    .some((event) => event.type === "player-shot"), false, "cooldown prevents a second shot event");
+
+  const robotsFiring = emptyGame();
+  robotsFiring.fireAmnestyRemaining = 0;
+  robotsFiring.difficulty = difficultyForScore(300);
+  robotsFiring.robots = [robot(robotsFiring, 300, 100, { fireCooldown: 0 })];
+  assert.equal(updateGame(robotsFiring, 0.01, idle).filter((event) => event.type === "robot-shot").length, 1);
+
+  const travelling = createGame(seedRandom(73));
+  const started = [];
+  travelling.player.x = 970;
+  travelling.player.y = 300;
+  for (let i = 0; i < 24 && !travelling.transition; i += 1) started.push(...updateGame(travelling, 0.05, { ...idle, moveX: 1 }));
+  assert.equal(started.some((event) => event.type === "room-retreated"), true);
+  assert.equal(started.some((event) => event.type === "room-entered"), false);
+  const halfway = updateGame(travelling, travelling.transition.duration / 2);
+  assert.equal(halfway.some((event) => event.type === "room-entered"), false);
+  const entered = updateGame(travelling, travelling.transition.duration);
+  assert.deepEqual(entered.filter((event) => event.type === "room-entered").map(({ roomX, roomY }) => [roomX, roomY]), [[1, 0]]);
+
+  const respawning = createGame();
+  respawning.outcome = "dying";
+  respawning.deathTimeRemaining = 0.01;
+  const respawnEvents = updateGame(respawning, 0.02);
+  assert.equal(respawnEvents.filter((event) => event.type === "player-respawned").length, 1);
+
+  const captain = emptyGame();
+  captain.captain.lurkTimeRemaining = 0.01;
+  assert.equal(updateGame(captain, 0.02).filter((event) => event.type === "captain-entered").length, 1);
+  assert.equal(updateGame(captain, 0.02).some((event) => event.type === "captain-entered"), false);
+});
+
+test("hazard, room-clear, and extra-life cues accompany their resolved outcomes once", () => {
+  const player = emptyGame();
+  player.walls = [{ x: 120, y: 80, width: 20, height: 40, electrified: true }];
+  const playerEvents = updateGame(player, 0.1, { ...idle, moveX: 1 });
+  assert.equal(playerEvents.filter((event) => event.type === "player-hazard").length, 1);
+  assert.equal(playerEvents.filter((event) => event.type === "player-defeated").length, 1);
+
+  const robots = emptyGame();
+  robots.player.x = 700;
+  robots.player.y = 500;
+  robots.walls = [{ x: 120, y: 80, width: 20, height: 40, electrified: true }];
+  robots.robots = [robot(robots, 100, 100, { moveSpeed: 100 })];
+  let robotHazardCount = 0;
+  for (let i = 0; i < 20; i += 1) robotHazardCount += updateGame(robots, 0.1).filter((event) => event.type === "robot-hazard").length;
+  assert.equal(robotHazardCount, 1);
+
+  const clear = emptyGame();
+  clear.score = 9_950;
+  clear.robots = [robot(clear, 140, 100)];
+  clear.shots = [shot(clear, "player", 120, 100, 440, 0)];
+  const clearEvents = updateGame(clear, 0.05);
+  assert.equal(clearEvents.filter((event) => event.type === "room-cleared").length, 1);
+  assert.equal(clearEvents.filter((event) => event.type === "extra-life").length, 1);
+});
+
 test("closed entrance and doorway jambs remain hazardous while open gaps are traversable", () => {
   const closed = createGame(seedRandom(52));
   closed.player.x = 30;
