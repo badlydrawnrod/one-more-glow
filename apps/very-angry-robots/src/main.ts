@@ -1,8 +1,8 @@
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
-  type Color, type DrawingContext, type Point } from "one-more-glow";
+  type Color, type DisplayProfile, type DrawingContext, type Point } from "one-more-glow";
 import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
 import { wallOutline } from "./wall-outline.ts";
-import { InputController } from "./input.ts";
+import { InputController, type GamepadState } from "./input.ts";
 import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 import { transitionOffsets } from "./transition-presentation.ts";
 import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores } from "./high-scores.ts";
@@ -12,6 +12,8 @@ import { addScoreFlyup, clearScoreFlyups, createScoreFlyupState, retainPresented
   SCORE_FLYUP_START_OFFSET, scoreFlyupOpacity, scoreFlyupRise, updateScoreFlyups } from "./score-flyups.ts";
 import { addParticleEffect, clearParticleEffects, createParticleEffectState, particleEffectOpacity,
   particleMarkOffset, retainPresentedRoomParticleEffects, updateParticleEffects } from "./particle-effects.ts";
+import { ROBOTS_DEFAULT_DISPLAY_PROFILE, readDisplayProfile, writeDisplayProfile } from "./display-profile.ts";
+import { canOpenDisplaySettings, focusLossOverlayState, shouldAdvanceGame, shouldAdvanceSceneTime, shouldTickAttractScreen } from "./interaction-policy.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
@@ -20,8 +22,11 @@ const screen = canvas;
 const gl = screen.getContext("webgl2");
 if (!gl) throw new Error("WebGL2 is unavailable");
 const drawing = createWebGL2Renderer(gl);
+let displayProfile: DisplayProfile = readDisplayProfile(() => window.localStorage);
+drawing.setDisplayProfile(displayProfile);
 const game = createGame();
 const input = new InputController();
+let latestGamepadState: GamepadState | undefined;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
 let highScores = loadHighScores(() => window.localStorage);
@@ -30,6 +35,15 @@ const scoreFlyups = createScoreFlyupState();
 const particleEffects = createParticleEffectState();
 let aim = { x: 1, y: 0 };
 let walking = false;
+let paused = false;
+let settingsOpen = false;
+let settingsNeedsGamepadNeutral = false;
+let selectedSetting = 0;
+let settingsNavAt = 0;
+let previousSettingsButtons = new Set<number>();
+const displayFields = ["lineWidth", "pointRadius", "glowStrength", "glowSpread"] as const;
+const displayRanges = [[0.5, 4], [0.5, 4], [0, 2], [0.5, 2]] as const;
+const displayRows = [205, 105, 5, -95] as const;
 const cyan: Color = [0.35, 0.95, 1];
 const red: Color = [1, 0.35, 0.36];
 const amber: Color = [1, 0.75, 0.32];
@@ -49,6 +63,139 @@ const textOptions = { font: "segment22", height: 19, spacing: "kerned" } as cons
 function label(text: string, y: number, color: Color = white): void {
   drawing.setColor(color); drawing.setIntensity(1);
   drawText(drawing, text, -measureText(text, textOptions).width / 2, y, textOptions);
+}
+
+function settingsLabel(text: string, x: number, y: number, color: Color = white, height = 18): void {
+  drawing.setColor(color); drawing.setIntensity(1);
+  drawText(drawing, text, x, y, { ...textOptions, height });
+}
+
+function canOpenSettings(): boolean {
+  return canOpenDisplaySettings(screenFlow.screen, paused);
+}
+
+function openSettings(): void {
+  if (settingsOpen || !canOpenSettings()) return;
+  settingsOpen = true;
+  selectedSetting = 0;
+  settingsNeedsGamepadNeutral = true;
+  input.clearKeyboard();
+  input.suppressGamepadWhileHeld(latestGamepadState);
+}
+
+function closeSettings(): void {
+  if (!settingsOpen) return;
+  settingsOpen = false;
+  settingsNeedsGamepadNeutral = true;
+  input.clearKeyboard();
+  input.suppressGamepadWhileHeld(latestGamepadState);
+}
+
+function applyDisplayProfile(): void {
+  drawing.setDisplayProfile(displayProfile);
+  writeDisplayProfile(() => window.localStorage, displayProfile);
+}
+
+function setDisplayField(index: number, value: number): void {
+  if (index < 0 || index >= displayFields.length) return;
+  const [minimum, maximum] = displayRanges[index];
+  const field = displayFields[index];
+  displayProfile = { ...displayProfile, [field]: Math.max(minimum, Math.min(maximum, Math.round(value * 10) / 10)) };
+  applyDisplayProfile();
+}
+
+function adjustSelectedSetting(direction: number): void {
+  if (selectedSetting >= displayFields.length) return;
+  const field = displayFields[selectedSetting];
+  setDisplayField(selectedSetting, displayProfile[field] + direction * 0.1);
+}
+
+function moveSettingSelection(direction: number): void {
+  selectedSetting = (selectedSetting + direction + 6) % 6;
+}
+
+function resetDisplayProfile(): void {
+  displayProfile = { ...ROBOTS_DEFAULT_DISPLAY_PROFILE };
+  applyDisplayProfile();
+}
+
+function activateSetting(): void {
+  if (selectedSetting === 4) resetDisplayProfile();
+  else if (selectedSetting === 5) closeSettings();
+  else adjustSelectedSetting(1);
+}
+
+function drawSettings(): void {
+  drawing.beginFrame();
+  settingsLabel("DISPLAY SETTINGS", -448, 320, amber, 26);
+  settingsLabel("TUNE THE VECTOR DISPLAY", -448, 282, blue, 15);
+
+  const labels = ["LINE WIDTH", "POINT RADIUS", "GLOW STRENGTH", "GLOW SPREAD"];
+  const track = { left: -420, right: 24 };
+  for (let index = 0; index < displayFields.length; index += 1) {
+    const rowY = displayRows[index];
+    const trackY = rowY - 29;
+    const [minimum, maximum] = displayRanges[index];
+    const value = displayProfile[displayFields[index]];
+    const focused = selectedSetting === index;
+    if (focused) line(drawing, [[-454,rowY-52],[65,rowY-52],[65,rowY+35],[-454,rowY+35],[-454,rowY-52]], amber, 1);
+    settingsLabel(labels[index], -420, rowY + 3, focused ? amber : white, 17);
+    settingsLabel(value.toFixed(1), -20, rowY + 3, focused ? amber : cyan, 17);
+    drawing.setColor(blue); drawing.setIntensity(0.75);
+    drawing.moveTo(track.left, trackY); drawing.lineTo(track.right, trackY);
+    for (let tick = 0; tick <= 4; tick += 1) {
+      const x = track.left + (track.right - track.left) * tick / 4;
+      drawing.moveTo(x, trackY - 4); drawing.lineTo(x, trackY + 4);
+    }
+    const ratio = (value - minimum) / (maximum - minimum);
+    const handleX = track.left + ratio * (track.right - track.left);
+    drawing.setColor(focused ? amber : cyan); drawing.setIntensity(1.2);
+    drawCircle(drawing, [handleX, trackY], 8);
+  }
+
+  line(drawing, [[105,-125],[454,-125],[454,220],[105,220],[105,-125]], blue, 0.7);
+  settingsLabel("ROOM PREVIEW", 125, 181, blue, 15);
+  line(drawing, [[145,-95],[414,-95],[414,145],[145,145],[145,-95]], blue, 0.85);
+  line(drawing, [[220,-95],[220,-18],[288,-18]], blue, 0.75);
+  line(drawing, [[320,145],[320,52],[365,52]], blue, 0.75);
+  line(drawing, [[145,28],[190,28],[190,73]], blue, 0.75);
+  drawing.pushTransform(); drawing.translate(273, 32);
+  drawing.setColor(cyan); drawing.setIntensity(1.2); drawCircle(drawing, [0,0], 11);
+  drawing.setColor(amber); drawing.setIntensity(1); drawing.moveTo(0, 8); drawing.lineTo(14, 15);
+  drawing.popTransform();
+  line(drawing, [[348,104],[365,104],[365,121],[348,121],[348,104]], red, 1);
+  line(drawing, [[179,-42],[196,-42],[196,-25],[179,-25],[179,-42]], red, 1);
+  line(drawing, [[-95,-240],[-5,-240],[-5,-196],[-95,-196],[-95,-240]], selectedSetting === 4 ? amber : blue, 1);
+  line(drawing, [[25,-240],[115,-240],[115,-196],[25,-196],[25,-240]], selectedSetting === 5 ? amber : blue, 1);
+  settingsLabel("RESET", -79, -226, selectedSetting === 4 ? amber : white, 15);
+  settingsLabel("CLOSE", 42, -226, selectedSetting === 5 ? amber : white, 15);
+  settingsLabel("UP / DOWN OR D-PAD: SELECT   LEFT / RIGHT: ADJUST", -448, -285, blue, 12);
+  settingsLabel("ENTER / A: ACTIVATE   X: RESET   ESC / B: CLOSE", -448, -311, blue, 12);
+  drawing.endFrame();
+}
+
+function settingsPointerPosition(event: PointerEvent): Point {
+  const rect = screen.getBoundingClientRect();
+  return [(event.clientX - rect.left) / rect.width * 1024 - 512,
+    384 - (event.clientY - rect.top) / rect.height * 768];
+}
+
+function handleSettingsPointer(event: PointerEvent): void {
+  if (!settingsOpen) return;
+  const [x, y] = settingsPointerPosition(event);
+  for (let index = 0; index < displayRows.length; index += 1) {
+    const rowY = displayRows[index];
+    const trackY = rowY - 29;
+    if (x >= -454 && x <= 65 && y >= rowY - 52 && y <= rowY + 35) selectedSetting = index;
+    if (x >= -430 && x <= 34 && y >= trackY - 12 && y <= trackY + 12) {
+      selectedSetting = index;
+      const [minimum, maximum] = displayRanges[index];
+      setDisplayField(index, minimum + Math.max(0, Math.min(1, (x + 420) / 444)) * (maximum - minimum));
+      return;
+    }
+  }
+  if (x >= -95 && x <= -5 && y >= -240 && y <= -196) { selectedSetting = 4; resetDisplayProfile(); }
+  else if (x >= 25 && x <= 115 && y >= -240 && y <= -196) closeSettings();
 }
 
 function line(context: DrawingContext, points: readonly Point[], color: Color, intensity = 1): void {
@@ -226,6 +373,7 @@ function drawAttractScreen(): void {
     label("VERY ANGRY ROBOTS", 105, amber);
     label("PRESS ENTER OR START TO BEGIN", 5, white);
     label("MOVE A DIRECTION TO VIEW TOP SCORES", -55, white);
+    label("S / BACK OR SELECT: SETTINGS", -115, blue);
   } else if (screenFlow.screen === "initials") {
     label("NEW HIGH SCORE", 150, amber);
     label("ENTER UP TO THREE INITIALS", 75, white);
@@ -260,11 +408,16 @@ function drawAttractScreen(): void {
     });
     label("PRESS ENTER OR START TO PLAY", -210, white);
     label("MOVE A DIRECTION TO RETURN TO MAIN MENU", -260, white);
+    label("S / BACK OR SELECT: SETTINGS", -310, blue);
   }
   drawing.endFrame();
 }
 
 function draw(time: number): void {
+  if (settingsOpen) {
+    drawSettings();
+    return;
+  }
   if (screenFlow.screen !== "playing") {
     drawAttractScreen();
     return;
@@ -304,16 +457,55 @@ function draw(time: number): void {
       label(`RESPAWNING IN ${seconds}`, roomCenterY - 14, amber);
     }
   }
+  if (paused) {
+    drawing.setColor([0.02, 0.035, 0.06]); drawing.setIntensity(0.72);
+    drawing.moveTo(-480, 175); drawing.lineTo(480, 175);
+    drawing.moveTo(-480, -175); drawing.lineTo(480, -175);
+    label("PAUSED", 84, amber);
+    label("PRESS P OR GAMEPAD START TO RESUME", 24, white);
+    label("S / BACK OR SELECT: SETTINGS", -36, blue);
+  }
   drawing.endFrame();
 }
 
 window.addEventListener("keydown", (event) => {
   if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (settingsOpen) {
+    event.preventDefault();
+    if (event.key === "Escape") { if (!event.repeat) closeSettings(); }
+    else if (event.key === "Tab") moveSettingSelection(event.shiftKey ? -1 : 1);
+    else if (event.key === "ArrowUp") moveSettingSelection(-1);
+    else if (event.key === "ArrowDown") moveSettingSelection(1);
+    else if (event.key === "ArrowLeft") adjustSelectedSetting(-1);
+    else if (event.key === "ArrowRight") adjustSelectedSetting(1);
+    else if (event.key === "Enter" && !event.repeat) activateSetting();
+    return;
+  }
   if (input.keyDown(event.key, event.repeat)) event.preventDefault();
 });
 window.addEventListener("keyup", (event) => input.keyUp(event.key));
-window.addEventListener("blur", () => input.clearKeyboard());
-document.addEventListener("visibilitychange", () => { if (document.hidden) input.clearKeyboard(); });
+screen.addEventListener("pointerdown", (event) => {
+  if (!settingsOpen) return;
+  event.preventDefault();
+  screen.setPointerCapture(event.pointerId);
+  handleSettingsPointer(event);
+});
+screen.addEventListener("pointermove", (event) => { if (settingsOpen && event.buttons) handleSettingsPointer(event); });
+screen.addEventListener("pointerup", (event) => { if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId); });
+function pauseForFocusLoss(): void {
+  input.clearKeyboard();
+  const pad = Array.from(navigator.getGamepads?.() ?? []).find((candidate) => candidate?.connected && candidate.mapping === "standard");
+  latestGamepadState = pad ? {
+    leftX: pad.axes[0] ?? 0, leftY: pad.axes[1] ?? 0,
+    rightX: pad.axes[2] ?? 0, rightY: pad.axes[3] ?? 0,
+    startPressed: pad.buttons[9]?.pressed ?? false,
+    backPressed: pad.buttons[8]?.pressed ?? false,
+  } : undefined;
+  input.suppressGamepadWhileHeld(latestGamepadState);
+  ({ paused, settingsOpen } = focusLossOverlayState(screenFlow.screen, paused, settingsOpen));
+}
+window.addEventListener("blur", pauseForFocusLoss);
+document.addEventListener("visibilitychange", () => { if (document.hidden) pauseForFocusLoss(); });
 function resize(): void {
   const rect = screen.getBoundingClientRect();
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -323,12 +515,48 @@ function resize(): void {
 window.addEventListener("resize", resize);
 resize();
 let lastTime = 0;
+let sceneTime = 0;
 function frame(time: number): void {
   const delta = lastTime ? Math.min((time-lastTime)/1000, 0.05) : 0;
   lastTime = time;
   const pad = Array.from(navigator.getGamepads?.() ?? []).find((p) => p?.connected && p.mapping === "standard");
-  const controls = input.read(pad ? { leftX: pad.axes[0] ?? 0, leftY: pad.axes[1] ?? 0, rightX: pad.axes[2] ?? 0, rightY: pad.axes[3] ?? 0, startPressed: pad.buttons[9]?.pressed ?? false } : undefined);
-  if (screenFlow.screen === "playing") {
+  latestGamepadState = pad ? {
+    leftX: pad.axes[0] ?? 0, leftY: pad.axes[1] ?? 0,
+    rightX: pad.axes[2] ?? 0, rightY: pad.axes[3] ?? 0,
+    startPressed: pad.buttons[9]?.pressed ?? false,
+    backPressed: pad.buttons[8]?.pressed ?? false,
+  } : undefined;
+  const controls = input.read(latestGamepadState);
+  const pausePressed = input.takePauseAction();
+  const settingsPressed = input.takeSettingsAction();
+  if (shouldAdvanceSceneTime(screenFlow.screen, paused, settingsOpen)) sceneTime += delta * 1000;
+  const buttonDown = (index: number) => pad?.buttons[index]?.pressed ?? false;
+  if (settingsOpen) {
+    const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(pad?.axes[axis] ?? 0) <= 0.2);
+    const buttonsNeutral = Array.from(pad?.buttons ?? []).every((button) => !button.pressed);
+    if (settingsNeedsGamepadNeutral && (!pad || (axesNeutral && buttonsNeutral))) settingsNeedsGamepadNeutral = false;
+    if (!settingsNeedsGamepadNeutral && pad) {
+      const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
+      if (isNewPress(1)) closeSettings();
+      else if (isNewPress(0)) activateSetting();
+      if (settingsOpen && isNewPress(3)) resetDisplayProfile();
+      const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
+        : Math.abs(pad.axes[1] ?? 0) > 0.45 ? Math.sign(pad.axes[1]!) : 0;
+      const horizontal = buttonDown(15) ? 1 : buttonDown(14) ? -1
+        : Math.abs(pad.axes[0] ?? 0) > 0.45 ? Math.sign(pad.axes[0]!) : 0;
+      if (settingsOpen && time >= settingsNavAt && vertical) {
+        moveSettingSelection(vertical); settingsNavAt = time + 220;
+      } else if (settingsOpen && time >= settingsNavAt && horizontal) {
+        adjustSelectedSetting(horizontal); settingsNavAt = time + 160;
+      }
+    }
+  } else if (settingsPressed && canOpenSettings()) {
+    openSettings();
+  } else if (screenFlow.screen === "playing" && pausePressed) {
+    paused = !paused;
+    input.clearKeyboard();
+    input.suppressGamepadWhileHeld(latestGamepadState);
+  } else if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) {
     if (!game.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
     const previousX = game.player.x, previousY = game.player.y;
     const simulationDelta = reducedMotion.matches && game.transition ? game.transition.duration : delta;
@@ -363,18 +591,19 @@ function frame(time: number): void {
       }
       screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
     }
-  } else if (controls.startPressed) {
+  } else if (screenFlow.screen !== "playing" && controls.startPressed) {
     restartGame(game);
     clearScoreFlyups(scoreFlyups);
     clearParticleEffects(particleEffects);
     initialsEntry = createInitialsEntry();
     screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
-  } else if (controls.screenAdvancePressed) {
+  } else if (screenFlow.screen !== "playing" && controls.screenAdvancePressed) {
     screenFlow = updateScreenFlow(screenFlow, { type: "advance" });
-  } else {
+  } else if (shouldTickAttractScreen(screenFlow.screen, settingsOpen)) {
     screenFlow = updateScreenFlow(screenFlow, { type: "tick", elapsedMs: delta * 1000 });
   }
-  draw(time);
+  previousSettingsButtons = new Set([0, 1, 3, 8, 9, 12, 13, 14, 15].filter(buttonDown));
+  draw(sceneTime);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

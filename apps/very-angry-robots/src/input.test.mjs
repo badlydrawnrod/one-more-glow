@@ -152,3 +152,53 @@ test("gamepad initials controls step once and rearm in their neutral dead zones"
   assert.equal(next.initialsSlotDelta, 1);
   assert.equal(next.initialsCharDelta, -1);
 });
+
+test("pause and settings shortcuts are discrete, independent actions", () => {
+  const input = new InputController();
+  input.keyDown("p");
+  input.keyDown("p", true);
+  input.read();
+  assert.equal(input.takePauseAction(), true);
+  assert.equal(input.takePauseAction(), false);
+  input.keyDown("s");
+  input.read();
+  assert.equal(input.takeSettingsAction(), true);
+  assert.equal(input.takePauseAction(), false);
+  input.keyUp("p");
+  input.keyUp("s");
+
+  const pad = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: true, backPressed: false };
+  input.read(pad);
+  assert.equal(input.takePauseAction(), true);
+  assert.equal(input.takePauseAction(), false);
+  input.read({ ...pad, startPressed: false });
+  input.read({ ...pad, startPressed: true, backPressed: true });
+  assert.equal(input.takeSettingsAction(), true);
+  assert.equal(input.takePauseAction(), true);
+});
+
+test("clearing keyboard input discards pending pause and settings actions and held controls", () => {
+  const input = new InputController();
+  input.keyDown("p"); input.keyDown("s"); input.keyDown("w");
+  input.clearKeyboard();
+  assert.equal(input.takePauseAction(), false);
+  assert.equal(input.takeSettingsAction(), false);
+  assert.deepEqual(input.read().move, { x: 0, y: 0 });
+});
+
+test("gamepad controls held across a screen transition stay suppressed until released", () => {
+  const input = new InputController();
+  const held = { leftX: 0.8, leftY: 0, rightX: 0, rightY: 0, startPressed: true, backPressed: true };
+  input.suppressGamepadWhileHeld(held);
+  const state = input.read(held);
+  assert.deepEqual(state.move, { x: 0, y: 0 });
+  assert.equal(state.startPressed, false);
+  assert.equal(input.takePauseAction(), false);
+  assert.equal(input.takeSettingsAction(), false);
+
+  input.read({ ...held, leftX: 0, startPressed: false, backPressed: false });
+  const fresh = input.read({ ...held, leftX: 0.8 });
+  assert.ok(fresh.move.x > 0);
+  assert.equal(fresh.startPressed, true);
+  assert.equal(input.takeSettingsAction(), true);
+});

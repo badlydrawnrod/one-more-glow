@@ -1,10 +1,11 @@
-/** A browser-independent snapshot of the standard gamepad sticks and Start button. */
+/** A browser-independent snapshot of standard gamepad sticks, Start and Back/Select. */
 export interface GamepadState {
   leftX: number;
   leftY: number;
   rightX: number;
   rightY: number;
   startPressed: boolean;
+  backPressed?: boolean;
 }
 
 export interface Direction {
@@ -39,9 +40,18 @@ export class InputController {
   private screenAdvanceKeyEdge = false;
   private readonly keyPressEdges: string[] = [];
   private previousGamepadStart = false;
+  private previousGamepadBack = false;
   private previousGamepadDirection = false;
   private leftStickSlotArmed = true;
   private rightStickCharArmed = true;
+  private pauseKeyEdge = false;
+  private settingsKeyEdge = false;
+  private pauseAction = false;
+  private settingsAction = false;
+  private blockedLeftStick = false;
+  private blockedRightStick = false;
+  private blockedStart = false;
+  private blockedBack = false;
 
   /** Returns whether the key is used by this controller. */
   keyDown(rawKey: string, repeat = false): boolean {
@@ -52,6 +62,8 @@ export class InputController {
     const freshPress = !repeat && !this.keysDown.has(key);
     if (freshPress) {
       if (key === "Enter") this.enterPressedEdge = true;
+      if (key === "p") this.pauseKeyEdge = true;
+      if (key === "s") this.settingsKeyEdge = true;
       if (MOVEMENT_KEYS.has(key) || AIM_KEYS.has(key)) this.screenAdvanceKeyEdge = true;
       if (isLetter) this.keyPressEdges.push(key.toUpperCase());
       if (key === "Backspace") this.keyPressEdges.push("Backspace");
@@ -70,27 +82,69 @@ export class InputController {
     this.enterPressedEdge = false;
     this.screenAdvanceKeyEdge = false;
     this.keyPressEdges.length = 0;
+    this.pauseKeyEdge = false;
+    this.settingsKeyEdge = false;
+    this.pauseAction = false;
+    this.settingsAction = false;
+  }
+
+  /** Consume the latest one-shot pause/resume action. */
+  takePauseAction(): boolean {
+    const pressed = this.pauseAction;
+    this.pauseAction = false;
+    return pressed;
+  }
+
+  /** Consume the latest one-shot settings action. */
+  takeSettingsAction(): boolean {
+    const pressed = this.settingsAction;
+    this.settingsAction = false;
+    return pressed;
+  }
+
+  /** Ignore gamepad controls already held during a modal or pause transition until release. */
+  suppressGamepadWhileHeld(gamepad?: GamepadState): void {
+    if (!gamepad) return;
+    this.blockedLeftStick ||= Math.hypot(gamepad.leftX, gamepad.leftY) > GAMEPAD_DEAD_ZONE;
+    this.blockedRightStick ||= Math.hypot(gamepad.rightX, gamepad.rightY) > GAMEPAD_DEAD_ZONE;
+    this.blockedStart ||= gamepad.startPressed;
+    this.blockedBack ||= Boolean(gamepad.backPressed);
+    if (gamepad.startPressed) this.previousGamepadStart = true;
+    if (gamepad.backPressed) this.previousGamepadBack = true;
   }
 
   read(gamepad?: GamepadState): InputState {
     const moveKeys = directionFromKeys(this.keysDown, "d", "a", "s", "w");
     const aimKeys = directionFromKeys(this.keysDown, "ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp");
-    const move = combineDirections(moveKeys, gamepad ? applyDeadZone(gamepad.leftX, gamepad.leftY) : ZERO);
-    const aim = combineDirections(aimKeys, gamepad ? applyDeadZone(gamepad.rightX, gamepad.rightY) : ZERO);
+    const leftMagnitude = gamepad ? Math.hypot(gamepad.leftX, gamepad.leftY) : 0;
+    const rightMagnitude = gamepad ? Math.hypot(gamepad.rightX, gamepad.rightY) : 0;
+    if (leftMagnitude <= GAMEPAD_DEAD_ZONE) this.blockedLeftStick = false;
+    if (rightMagnitude <= GAMEPAD_DEAD_ZONE) this.blockedRightStick = false;
+    const effectiveLeft = gamepad && !this.blockedLeftStick ? applyDeadZone(gamepad.leftX, gamepad.leftY) : ZERO;
+    const effectiveRight = gamepad && !this.blockedRightStick ? applyDeadZone(gamepad.rightX, gamepad.rightY) : ZERO;
+    const move = combineDirections(moveKeys, effectiveLeft);
+    const aim = combineDirections(aimKeys, effectiveRight);
 
-    const gamepadStartPressed = Boolean(gamepad?.startPressed) && !this.previousGamepadStart;
+    if (!gamepad?.startPressed) this.blockedStart = false;
+    if (!gamepad?.backPressed) this.blockedBack = false;
+    const gamepadStartPressed = Boolean(gamepad?.startPressed) && !this.blockedStart && !this.previousGamepadStart;
     this.previousGamepadStart = Boolean(gamepad?.startPressed);
     const startPressed = this.enterPressedEdge || gamepadStartPressed;
     this.enterPressedEdge = false;
+    const gamepadBackPressed = Boolean(gamepad?.backPressed) && !this.blockedBack && !this.previousGamepadBack;
+    this.previousGamepadBack = Boolean(gamepad?.backPressed);
+    this.pauseAction = this.pauseKeyEdge || gamepadStartPressed;
+    this.settingsAction = this.settingsKeyEdge || gamepadBackPressed;
+    this.pauseKeyEdge = false;
+    this.settingsKeyEdge = false;
 
-    const leftMagnitude = gamepad ? Math.hypot(gamepad.leftX, gamepad.leftY) : 0;
-    const rightMagnitude = gamepad ? Math.hypot(gamepad.rightX, gamepad.rightY) : 0;
-    const gamepadDirectionActive = leftMagnitude > GAMEPAD_DEAD_ZONE || rightMagnitude > GAMEPAD_DEAD_ZONE;
+    const gamepadDirectionActive = (!this.blockedLeftStick && leftMagnitude > GAMEPAD_DEAD_ZONE)
+      || (!this.blockedRightStick && rightMagnitude > GAMEPAD_DEAD_ZONE);
     const gamepadDirectionEdge = gamepadDirectionActive && !this.previousGamepadDirection;
     this.previousGamepadDirection = gamepadDirectionActive;
 
-    const leftX = gamepad?.leftX ?? 0;
-    const rightY = gamepad?.rightY ?? 0;
+    const leftX = this.blockedLeftStick ? 0 : (gamepad?.leftX ?? 0);
+    const rightY = this.blockedRightStick ? 0 : (gamepad?.rightY ?? 0);
     let initialsSlotDelta: -1 | 0 | 1 = 0;
     if (Math.abs(leftX) <= GAMEPAD_DEAD_ZONE) this.leftStickSlotArmed = true;
     else if (this.leftStickSlotArmed) {

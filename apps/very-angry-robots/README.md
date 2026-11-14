@@ -21,5 +21,10 @@ attract screens, use WASD, the arrow keys, or either gamepad stick to switch
 between the Main Menu and Top Scores. Qualifying scores can be saved with up to
 three initials and are kept in browser storage.
 
+During a run, press P or Gamepad Start to pause or resume. Browser focus loss
+pauses the run until you explicitly resume. Open Display Settings from the
+Main Menu, Top Scores or pause screen with S or Gamepad Back/Select; adjust the
+vector line and glow profile, which is saved in browser storage.
+
 The [specification](docs/specs/SPEC.md) describes this slice and deferred features. Run
 `npm run test --workspace=very-angry-robots` for the app's tests.

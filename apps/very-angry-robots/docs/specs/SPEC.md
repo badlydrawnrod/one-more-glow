@@ -18,6 +18,8 @@ organized by capability:
 - [Floating score awards](score-flyups.md) — brief score labels at scoring events.
 - [Lives and respawning](lives.md) — lives, death and respawn rules.
 - [High scores and attract screens](high-scores.md) — accepted and implemented.
+- [Pause and display settings](pause-and-display-settings.md) — pause controls and
+  player-adjustable vector display settings.
 - [The Captain](captain.md) — the persistent pursuer and its presentation.
 
 Sound, the original family-member taunts and other recordings, and achievements
