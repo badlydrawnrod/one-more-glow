@@ -1,6 +1,8 @@
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
   type Color, type DisplayProfile, type DrawingContext, type Point } from "one-more-glow";
 import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION, type RoomSnapshot, type RobotColor } from "./game.ts";
+import { createMaze } from "./maze.ts";
+import { createRoomGeometry } from "./room-geometry.ts";
 import { wallOutline } from "./wall-outline.ts";
 import { InputController, type GamepadState } from "./input.ts";
 import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
@@ -63,6 +65,7 @@ const captainSteel: Color = [0.72, 0.82, 1];
 const captainEyes: Color = [1, 0.25, 0.2];
 const roomCenterY = -60;
 const textOptions = { font: "segment22", height: 19, spacing: "kerned" } as const;
+const attractPromptY = { play: -246, navigation: -288, settings: -330 } as const;
 
 function label(text: string, y: number, color: Color = white): void {
   drawing.setColor(color); drawing.setIntensity(1);
@@ -209,6 +212,17 @@ function line(context: DrawingContext, points: readonly Point[], color: Color, i
 const sceneClip = { left: -ROOM.width / 2 - 4, right: ROOM.width / 2 + 4,
   bottom: roomCenterY - ROOM.height / 2 - 4, top: roomCenterY + ROOM.height / 2 + 4 };
 const wallCache = new WeakMap<RoomSnapshot["walls"], [number, number, number, number][]>();
+function seededRandom(seed: number): () => number {
+  let state = seed >>> 0;
+  return () => {
+    state = (Math.imul(1664525, state) + 1013904223) >>> 0;
+    return state / 0x1_0000_0000;
+  };
+}
+const titleMaze = createMaze(seededRandom(1));
+const titleRoomGeometry = createRoomGeometry("left");
+const titleWalls = [...titleMaze.walls, ...titleRoomGeometry.hazardRects];
+const titleWallEdges = wallOutline(titleWalls.filter((wall) => wall !== titleRoomGeometry.closedDoorRect));
 
 function isClosedDoor(wall: RoomSnapshot["walls"][number], room: RoomSnapshot): boolean {
   const door = room.geometry.closedDoorRect;
@@ -397,23 +411,60 @@ function drawCharacterRobot(
 }
 
 function drawTitleVignette(): void {
-  const left = -315, right = 315, bottom = -55, top = 112;
-  drawing.setColor(blue); drawing.setIntensity(0.72);
-  drawing.moveTo(left, bottom); drawing.lineTo(left, top);
-  drawing.moveTo(left, top); drawing.lineTo(-245, top);
-  drawing.moveTo(-165, top); drawing.lineTo(right, top);
-  drawing.moveTo(right, top); drawing.lineTo(right, bottom);
-  drawing.moveTo(left, bottom); drawing.lineTo(-45, bottom);
-  drawing.moveTo(45, bottom); drawing.lineTo(right, bottom);
-  drawing.moveTo(-95, bottom); drawing.lineTo(-95, 5); drawing.lineTo(-35, 5);
-  drawing.moveTo(90, top); drawing.lineTo(90, 48); drawing.lineTo(165, 48);
-  drawing.moveTo(90, 28); drawing.lineTo(90, 5);
-  drawing.setColor(amber); drawing.setIntensity(0.95);
-  drawing.moveTo(-45, bottom + 7); drawing.lineTo(-45, bottom + 25);
-  drawing.moveTo(45, bottom + 7); drawing.lineTo(45, bottom + 25);
+  drawing.pushTransform();
+  drawing.translate(0, 70);
+  drawing.scale(0.5, -0.5);
+  drawing.translate(-ROOM.width / 2, -ROOM.height / 2);
 
-  drawCharacterRobot(drawing, -205, -7, 1.2, cyan);
-  drawCharacterRobot(drawing, 202, -8, 1.45, captainSteel);
+  drawing.setColor(blue); drawing.setIntensity(1.05);
+  for (const [x1, y1, x2, y2] of titleWallEdges) {
+    drawing.moveTo(x1, y1); drawing.lineTo(x2, y2);
+  }
+  const door = titleRoomGeometry.closedDoorRect;
+  line(drawing, [[door.x, door.y], [door.x + door.width, door.y],
+    [door.x + door.width, door.y + door.height], [door.x, door.y + door.height]], amber);
+  const doorLine = titleRoomGeometry.doors.find((entry) => entry.doorLine)?.doorLine;
+  if (doorLine) {
+    drawing.setColor(amber); drawing.setIntensity(0.95);
+    drawing.moveTo(doorLine[0], doorLine[1]); drawing.lineTo(doorLine[2], doorLine[3]);
+  }
+
+  const hostile = robotColors.red;
+  const hostileScale = 0.8;
+  drawCharacterRobot(drawing, 700, 300, hostileScale, hostile, -1, 0, -0.8, 0);
+  drawCharacterRobot(drawing, 300, 100, hostileScale, hostile, -1, 0, -0.7, 0.7);
+  drawCharacterRobot(drawing, 900, 100, hostileScale, hostile, -1, 0, -0.8, 0.2);
+  drawCharacterRobot(drawing, 500, 500, hostileScale, hostile, -1, 0, -0.6, -0.6);
+  drawTitlePlayer(75, 300, 1.5);
+
+  drawing.setColor(cyan); drawing.setIntensity(1.2);
+  for (const x of [180, 390, 600]) {
+    drawing.moveTo(x, 300); drawing.lineTo(x + 24, 300);
+  }
+  drawing.setColor(amber); drawing.setIntensity(1.2);
+  for (const [x, y] of [[280, 118], [245, 150]]) {
+    drawing.moveTo(x, y); drawing.lineTo(x - 12, y + 11);
+  }
+  drawing.popTransform();
+}
+
+function drawTitlePlayer(x: number, y: number, scale: number): void {
+  drawing.pushTransform();
+  drawing.translate(x, y);
+  drawing.scale(scale, scale);
+  drawing.setColor(cyan); drawing.setIntensity(1);
+  drawCircle(drawing, [0, -8], 6);
+  drawing.setColor(white); drawing.setIntensity(0.85);
+  drawing.point(-2, -8); drawing.point(2, -8);
+  line(drawing, [[-5,-1],[5,-1],[6,8],[-6,8]], cyan);
+  drawing.setColor(cyan); drawing.setIntensity(0.9);
+  drawing.moveTo(-3, 8); drawing.lineTo(-4, 14);
+  drawing.moveTo(3, 8); drawing.lineTo(4, 14);
+  drawing.moveTo(-5, 1); drawing.lineTo(-9, 5);
+  drawing.moveTo(5, -1); drawing.lineTo(10, 2);
+  drawing.setColor(amber); drawing.setIntensity(1.1);
+  drawing.moveTo(10, 2); drawing.lineTo(19, 3);
+  drawing.popTransform();
 }
 
 function menuText(text: string, x: number, y: number, color: Color, height = 17): void {
@@ -421,28 +472,36 @@ function menuText(text: string, x: number, y: number, color: Color, height = 17)
   drawText(drawing, text, x, y, { ...textOptions, height });
 }
 
+function drawBrand(time: number, y: number): void {
+  const options = { font: "segment16", height: 24, spacing: "kerned" } as const;
+  const prefix = "ONE MORE ";
+  const glow = "GLOW";
+  const brandWidth = measureText(`${prefix}${glow}`, options).width;
+  const x = -brandWidth / 2;
+  drawing.setColor(white); drawing.setIntensity(0.9);
+  drawText(drawing, prefix, x, y, options);
+  const pulse = reducedMotion.matches ? 0 : (1 + Math.sin(time * Math.PI * 2 / 3000)) / 2;
+  drawing.setColor([
+    white[0] + (amber[0] - white[0]) * pulse,
+    white[1] + (amber[1] - white[1]) * pulse,
+    white[2] + (amber[2] - white[2]) * pulse,
+  ]);
+  drawing.setIntensity(1 + 0.3 * pulse);
+  drawText(drawing, glow, x + measureText(prefix, options).width, y, options);
+}
+
+function drawGameTitle(y: number, height: number): void {
+  const options = { font: "segment16", height, spacing: "kerned" } as const;
+  const title = "VERY ANGRY ROBOTS";
+  drawing.setColor(amber); drawing.setIntensity(1.25);
+  drawText(drawing, title, -measureText(title, options).width / 2, y, options);
+}
+
 function drawAttractScreen(time: number): void {
   drawing.beginFrame();
   if (screenFlow.screen === "main-menu") {
-    const brandOptions = { font: "segment16", height: 24, spacing: "kerned" } as const;
-    const prefix = "ONE MORE ";
-    const glow = "GLOW";
-    const brandWidth = measureText(`${prefix}${glow}`, brandOptions).width;
-    const brandX = -brandWidth / 2;
-    drawing.setColor(white); drawing.setIntensity(0.9);
-    drawText(drawing, prefix, brandX, 326, brandOptions);
-    const pulse = reducedMotion.matches ? 0 : (1 + Math.sin(time * Math.PI * 2 / 3000)) / 2;
-    drawing.setColor([
-      white[0] + (amber[0] - white[0]) * pulse,
-      white[1] + (amber[1] - white[1]) * pulse,
-      white[2] + (amber[2] - white[2]) * pulse,
-    ]);
-    drawing.setIntensity(1 + 0.3 * pulse);
-    drawText(drawing, glow, brandX + measureText(prefix, brandOptions).width, 326, brandOptions);
-    const titleOptions = { font: "segment16", height: 46, spacing: "kerned" } as const;
-    const title = "VERY ANGRY ROBOTS";
-    drawing.setColor(amber); drawing.setIntensity(1.25);
-    drawText(drawing, title, -measureText(title, titleOptions).width / 2, 242, titleOptions);
+    drawBrand(time, 326);
+    drawGameTitle(242, 46);
     drawTitleVignette();
 
     menuText("KEYBOARD", -330, -139, cyan, 15);
@@ -451,9 +510,9 @@ function drawAttractScreen(time: number): void {
     menuText("GAMEPAD", 55, -139, cyan, 15);
     menuText("LEFT STICK MOVE   RIGHT STICK FIRE", 55, -166, white);
     menuText("START PLAY / PAUSE", 55, -192, white);
-    label("PRESS ENTER OR START TO BEGIN", -246, amber);
-    label("MOVE A DIRECTION TO VIEW TOP SCORES", -288, white);
-    label("S / BACK OR SELECT: SETTINGS", -330, blue);
+    label("PRESS ENTER OR START TO PLAY", attractPromptY.play, amber);
+    label("MOVE A DIRECTION TO VIEW TOP SCORES", attractPromptY.navigation, white);
+    label("S / BACK OR SELECT: SETTINGS", attractPromptY.settings, blue);
   } else if (screenFlow.screen === "initials") {
     label("NEW HIGH SCORE", 150, amber);
     label("ENTER UP TO THREE INITIALS", 75, white);
@@ -472,14 +531,16 @@ function drawAttractScreen(time: number): void {
     label("RIGHT STICK CHANGES LETTERS", -80, white);
     label("BACKSPACE CORRECTS - ENTER OR START SUBMITS", -125, white);
   } else {
-    label("TOP SCORES", 230, amber);
+    drawBrand(time, 326);
+    drawGameTitle(242, 46);
+    label("TOP SCORES", 178, amber);
     drawing.setColor(white); drawing.setIntensity(0.7);
-    drawText(drawing, "RANK", -300, 175, textOptions);
-    drawText(drawing, "INITIALS", -90, 175, textOptions);
-    drawText(drawing, "SCORE", 150, 175, textOptions);
-    if (highScores.length === 0) label("NO SCORES YET", 95, white);
+    drawText(drawing, "RANK", -300, 123, textOptions);
+    drawText(drawing, "INITIALS", -90, 123, textOptions);
+    drawText(drawing, "SCORE", 150, 123, textOptions);
+    if (highScores.length === 0) label("NO SCORES YET", 43, white);
     highScores.forEach((entry, index) => {
-      const y = 135 - index * 28;
+      const y = 83 - index * 28;
       const isNewEntry = index === highlightedHighScoreIndex;
       drawing.setColor(isNewEntry ? amber : white); drawing.setIntensity(isNewEntry ? 1.3 : 1);
       if (isNewEntry) {
@@ -490,9 +551,9 @@ function drawAttractScreen(time: number): void {
       const value = String(entry.score);
       drawText(drawing, value, 150, y, textOptions);
     });
-    label("PRESS ENTER OR START TO PLAY", -210, white);
-    label("MOVE A DIRECTION TO RETURN TO MAIN MENU", -260, white);
-    label("S / BACK OR SELECT: SETTINGS", -310, blue);
+    label("PRESS ENTER OR START TO PLAY", attractPromptY.play, amber);
+    label("MOVE A DIRECTION TO RETURN TO MAIN MENU", attractPromptY.navigation, white);
+    label("S / BACK OR SELECT: SETTINGS", attractPromptY.settings, blue);
   }
   drawing.endFrame();
 }

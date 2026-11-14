@@ -1,14 +1,16 @@
 # High scores and attract screens
 
 **Status: Accepted. Implementation: Present.** The branded Main Menu title and
-robot-and-room vignette are implemented; the supplied wide-canvas screenshot
-confirms the composition and prompt readability, while narrow-viewport review
-remains outstanding. Automated tests cover the score table, screen flow,
-initials editor and input handling. The new-entry highlight is implemented but
-has no dedicated automated coverage. The user reports manual verification of
-the existing behavior. The original game's exact high-score rules are not
-recalled; this capability uses a conventional arcade top-ten table and the
-flow described for this port.
+gameplay vignette, and the animated brand above the Top Scores heading, are
+implemented. The supplied wide-canvas screenshots confirm the title composition,
+earlier combat vignette, score table and prompt readability. The updated room
+geometry, added game title on Top Scores and narrow-viewport layout need review.
+Automated tests cover the score table, screen flow, initials editor and input
+handling. The new-entry highlight is implemented but has no dedicated
+automated coverage. The user reports
+manual verification of the existing behavior. The original game's exact
+high-score rules are not recalled; this capability uses a conventional arcade
+top-ten table and the flow described for this port.
 
 - Keep the ten highest scores, ordered from highest to lowest. When a run ends,
   qualify its final score if it would appear in the top ten. If it qualifies,
@@ -29,18 +31,27 @@ flow described for this port.
   Backspace. Store the score and the initials as entered only when the player
   submits; then show the Top Scores screen.
 - The Top Scores screen shows the ten entries in rank order, with rank,
-  initials and score. On app startup, show the Main Menu screen. Give it strong,
-  prominent One More Glow branding and make VERY ANGRY ROBOTS the main title.
-  Animate only the word GLOW in the brand with a repeating pale-cyan-to-amber
+  initials and score. Show prominent One More Glow branding and the VERY ANGRY
+  ROBOTS game title above its heading, using the same title size as the Main
+  Menu. Place the score table and prompts lower to make room while keeping them
+  clear of one another.
+  On app startup, show the Main Menu screen. Give it strong, prominent One More
+  Glow branding and make VERY ANGRY ROBOTS the main title. On both screens,
+  animate only the word GLOW in the brand with a repeating pale-cyan-to-amber
   color cycle, matching the Asteroids title treatment; keep it static when
-  reduced motion is preferred. Include decorative vector imagery recognizable
-  as this game, such as a robot and room elements, arranged as a title vignette.
-  Keep the title, start prompt and controls easy to read. These screens replace
-  the playfield and gameplay HUD. Draw all high-score and attract screens in the
-  existing canvas using the app's current drawing API; do not build their UI
-  with HTML. Highlight a score just submitted through initials entry on the Top
-  Scores screen so the player can identify their row. Keep it highlighted
-  while the attract screens alternate, until the next game starts.
+  reduced motion is preferred. Use the available title space for a gameplay
+  vignette showing the player firing at several same-sized red hostile robots,
+  with robot return fire. Use the game's room proportions, outlined double-line
+  maze walls and doorway treatment. Keep the vignette free of a HUD and
+  independent of game state.
+  Keep the title, start prompt and controls easy to read. Align the play,
+  navigation and settings prompts vertically across the Main Menu and Top
+  Scores screens. These screens replace the playfield and gameplay HUD. Draw all
+  high-score and attract screens in the existing canvas using the app's current
+  drawing API; do not build their UI with HTML. Highlight a score just submitted
+  through initials entry on the Top Scores screen so the player can identify
+  their row. Keep it highlighted while the attract screens alternate, until
+  the next game starts.
 - After Game Over, keep the player on the initials-entry screen until they
   submit, if their score qualified. The Top Scores and Main Menu screens then
   alternate every 30 seconds. A screen-advance input switches to the other
