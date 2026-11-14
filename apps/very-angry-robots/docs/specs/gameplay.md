@@ -2,10 +2,13 @@
 
 ## Scope and status
 
-**Status: Accepted. Implementation: Present.** The user considers the
-single-room work complete and has playtested room navigation. Gamepad and
-reduced-motion behavior have not yet been playtested; checks at varied viewport
-sizes and broader combat and control playtesting remain unconfirmed.
+**Status: Accepted. Implementation: Present.** The in-game robot character
+design, walking gait, scale, movement-directed eye gaze and wall clearance are
+based on the title vignette. The user has reviewed and accepted the gameplay
+robot design. The user considers the single-room work complete and has
+playtested room navigation. Gamepad and reduced-motion behavior have not yet
+been playtested; checks at varied viewport sizes and broader combat and control
+playtesting remain unconfirmed.
 
 Create a playable vector interpretation of Rod Hyde's
 [Very Angry Robots](https://github.com/libgdx/libgdx-demo-very-angry-robots).
@@ -55,6 +58,12 @@ practical; adjust them to make this slice readable and enjoyable.
   vector shapes. Make walls visibly hazardous and show the direction of fire.
   The designs should evoke the original without requiring its raster sprites.
   The room and controls should remain legible at different viewport sizes.
+- Give hostile robots the angular outlined humanoid design shown in the title
+  vignette, scaled for gameplay. Their eyes follow their direction of travel,
+  and their limbs use an alternating walking gait while they move. Wall
+  clearance must contain the complete animated outline so no part appears to
+  pass through a wall. Keep the combat hit radius centered on the robot's core
+  body rather than expanding it to the full decorative silhouette.
 - Use the library's public drawing API for the scene and text. Gameplay,
   input and presentation belong to the app; the library should not acquire
   game-specific rules or a new renderer interface for this demo.

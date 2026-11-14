@@ -36,6 +36,8 @@ const scoreFlyups = createScoreFlyupState();
 const particleEffects = createParticleEffectState();
 let aim = { x: 1, y: 0 };
 let walking = false;
+let walkingRobots = new Set<number>();
+let robotGaze = new Map<number, { x: number; y: number }>();
 let paused = false;
 let settingsOpen = false;
 let settingsNeedsGamepadNeutral = false;
@@ -54,6 +56,7 @@ const robotColors: Record<RobotColor, Color> = {
   "dark purple": [0.65, 0.3, 0.85], "light yellow": [1, 0.95, 0.5],
   white: [1, 1, 1], "light purple": [0.85, 0.6, 1], grey: [0.7, 0.7, 0.7],
 };
+const robotVisualScale = 2 / 3;
 const blue: Color = [0.28, 0.63, 1];
 const white: Color = [0.8, 0.96, 1];
 const captainSteel: Color = [0.72, 0.82, 1];
@@ -332,11 +335,9 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
   scene.translate(-ROOM.width / 2, -ROOM.height / 2);
   drawWalls(scene, room, time, doorProgress);
   for (const robot of room.robots) {
-    const { x, y, radius: r } = robot;
-    line(scene, [[x-r,y-r*.8],[x+r,y-r*.8],[x+r,y+r*.6],[x+r*.5,y+r*.6],
-      [x+r*.5,y+r],[x-r*.5,y+r],[x-r*.5,y+r*.6],[x-r,y+r*.6]], robotColors[room.difficulty.color]);
-    scene.setColor(amber); scene.setIntensity(1);
-    scene.point(x-r*.45,y-r*.25); scene.point(x+r*.45,y-r*.25);
+    const stride = walkingRobots.has(robot.id) ? Math.sin(game.elapsed * 14 + robot.id * 0.73) * 4 : 0;
+    const gaze = robotGaze.get(robot.id) ?? { x: 0, y: 0 };
+    drawCharacterRobot(scene, robot.x, robot.y, robotVisualScale, robotColors[room.difficulty.color], -1, stride, gaze.x, -gaze.y);
   }
   if (showPlayer && game.outcome === "playing") drawPlayer(scene, room);
   for (const shot of room.shots) {
@@ -368,20 +369,31 @@ function drawRoom(room: RoomSnapshot, time: number, offsetX = 0, offsetY = 0, do
   drawRoomCaptain(room, offsetX, offsetY);
 }
 
-function drawTitleRobot(x: number, y: number, scale: number, color: Color): void {
-  drawing.pushTransform();
-  drawing.translate(x, y);
-  drawing.scale(scale, scale);
-  line(drawing, [[-11,15],[-15,24],[-10,35],[10,35],[15,24],[11,15]], color, 0.9);
-  line(drawing, [[-15,13],[15,13],[18,-9],[11,-15],[-11,-15],[-18,-9]], color, 0.9);
-  drawing.setColor(amber); drawing.setIntensity(1.1);
-  drawing.point(-6, 25); drawing.point(6, 25);
-  drawing.setColor(color); drawing.setIntensity(0.9);
-  drawing.moveTo(-11, -12); drawing.lineTo(-15, -25); drawing.lineTo(-8, -29);
-  drawing.moveTo(11, -12); drawing.lineTo(15, -25); drawing.lineTo(8, -29);
-  drawing.moveTo(-16, 7); drawing.lineTo(-25, 0); drawing.lineTo(-22, -8);
-  drawing.moveTo(16, 7); drawing.lineTo(25, 0); drawing.lineTo(22, -8);
-  drawing.popTransform();
+function drawCharacterRobot(
+  context: DrawingContext,
+  x: number,
+  y: number,
+  scale: number,
+  color: Color,
+  verticalDirection = 1,
+  stride = 0,
+  gazeX = 0,
+  gazeY = 0,
+): void {
+  context.pushTransform();
+  context.translate(x, y);
+  context.scale(scale, scale * verticalDirection);
+  line(context, [[-11,15],[-15,24],[-10,35],[10,35],[15,24],[11,15]], color, 0.9);
+  line(context, [[-15,13],[15,13],[18,-9],[11,-15],[-11,-15],[-18,-9]], color, 0.9);
+  context.setColor(amber); context.setIntensity(1.1);
+  context.point(-6 + gazeX * 2.5, 25 + gazeY * 2.5);
+  context.point(6 + gazeX * 2.5, 25 + gazeY * 2.5);
+  context.setColor(color); context.setIntensity(0.9);
+  context.moveTo(-11, -12); context.lineTo(-15 - stride * 0.35, -25); context.lineTo(-8 - stride, -29);
+  context.moveTo(11, -12); context.lineTo(15 + stride * 0.35, -25); context.lineTo(8 + stride, -29);
+  context.moveTo(-16, 7); context.lineTo(-25 + stride * 0.35, 0); context.lineTo(-22 + stride, -8);
+  context.moveTo(16, 7); context.lineTo(25 - stride * 0.35, 0); context.lineTo(22 - stride, -8);
+  context.popTransform();
 }
 
 function drawTitleVignette(): void {
@@ -400,8 +412,8 @@ function drawTitleVignette(): void {
   drawing.moveTo(-45, bottom + 7); drawing.lineTo(-45, bottom + 25);
   drawing.moveTo(45, bottom + 7); drawing.lineTo(45, bottom + 25);
 
-  drawTitleRobot(-205, -7, 1.2, cyan);
-  drawTitleRobot(202, -8, 1.45, captainSteel);
+  drawCharacterRobot(drawing, -205, -7, 1.2, cyan);
+  drawCharacterRobot(drawing, 202, -8, 1.45, captainSteel);
 }
 
 function menuText(text: string, x: number, y: number, color: Color, height = 17): void {
@@ -631,9 +643,26 @@ function frame(time: number): void {
   } else if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) {
     if (!game.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
     const previousX = game.player.x, previousY = game.player.y;
+    const previousRobotPositions = new Map(game.robots.map((robot) => [robot.id, { x: robot.x, y: robot.y }]));
     const simulationDelta = reducedMotion.matches && game.transition ? game.transition.duration : delta;
     const events = updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
       fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
+    walkingRobots = game.transition ? new Set() : new Set(game.robots
+      .filter((robot) => {
+        const previous = previousRobotPositions.get(robot.id);
+        return previous !== undefined && Math.hypot(robot.x - previous.x, robot.y - previous.y) > 0.001;
+      })
+      .map((robot) => robot.id));
+    robotGaze = new Map(game.robots.map((robot) => {
+      const previous = previousRobotPositions.get(robot.id);
+      const dx = previous ? robot.x - previous.x : 0;
+      const dy = previous ? robot.y - previous.y : 0;
+      const distance = Math.hypot(dx, dy);
+      const previousGaze = robotGaze.get(robot.id) ?? { x: 0, y: 0 };
+      return [robot.id, distance > 0.001
+        ? { x: dx / distance, y: dy / distance }
+        : previousGaze];
+    }));
     for (const event of events) {
       if (event.type === "robot-destroyed") addScoreFlyup(scoreFlyups, event);
       addParticleEffect(particleEffects, event);

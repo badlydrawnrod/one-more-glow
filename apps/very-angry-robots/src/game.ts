@@ -166,7 +166,8 @@ const STEP = 1 / 120;
 export const ROOM_SCROLL_DURATION = 0.45;
 export const DOOR_CLOSE_DURATION = 0.35;
 
-const ROBOT_RADIUS = 14;
+const ROBOT_RADIUS = 16;
+const ROBOT_WALL_CLEARANCE = 24;
 const CAPTAIN_RADIUS = 22;
 const CAPTAIN_SPEED = PLAYER_SPEED * 0.5;
 const CAPTAIN_BOUNCE_SPEED = 20;
@@ -334,7 +335,7 @@ function chooseRobotCells(cells: readonly { x: number; y: number }[], player: { 
   const candidates = cells.map((_, index) => index).filter((index) => {
     const cell = cells[index];
     return Math.hypot(cell.x - player.x, cell.y - player.y) >= 190
-      && !circleHitsWall(cell.x, cell.y, ROBOT_RADIUS + 10, walls);
+      && !circleHitsWall(cell.x, cell.y, ROBOT_WALL_CLEARANCE + 10, walls);
   });
   for (let i = candidates.length - 1; i > 0; i -= 1) {
     const j = Math.floor(random() * (i + 1));
@@ -497,11 +498,11 @@ function updateRobots(game: Game, dt: number, events: GameEvent[]): void {
       const direction = chooseRobotDirection(robot, dx / distance, dy / distance, game.walls);
       const nextX = robot.x + direction.x * robot.moveSpeed * dt;
       const nextY = robot.y + direction.y * robot.moveSpeed * dt;
-      if (touchesHazard(nextX, nextY, robot.radius, game.walls)) {
+      if (touchesHazard(nextX, nextY, ROBOT_WALL_CLEARANCE, game.walls)) {
         destroyRobots(game, new Set([robot.id]), events);
         continue;
       }
-      moveCircle(robot, nextX, nextY, robot.radius, game.walls);
+      moveCircle(robot, nextX, nextY, ROBOT_WALL_CLEARANCE, game.walls);
     }
 
     if (game.outcome === "playing" && game.fireAmnestyRemaining <= 1e-9
@@ -545,7 +546,7 @@ function chooseRobotDirection(robot: Robot, dx: number, dy: number, walls: reado
     const angle = direct + offset;
     const x = Math.cos(angle);
     const y = Math.sin(angle);
-    if (!circleHitsWall(robot.x + x * 24, robot.y + y * 24, robot.radius, walls)) return { x, y };
+    if (!circleHitsWall(robot.x + x * 24, robot.y + y * 24, ROBOT_WALL_CLEARANCE, walls)) return { x, y };
   }
   return { x: 0, y: 0 };
 }
