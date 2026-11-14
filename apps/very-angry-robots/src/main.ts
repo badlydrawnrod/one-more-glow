@@ -30,6 +30,7 @@ let latestGamepadState: GamepadState | undefined;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
 let highScores = loadHighScores(() => window.localStorage);
+let highlightedHighScoreIndex: number | null = null;
 let initialsEntry = createInitialsEntry();
 const scoreFlyups = createScoreFlyupState();
 const particleEffects = createParticleEffectState();
@@ -400,7 +401,11 @@ function drawAttractScreen(): void {
     if (highScores.length === 0) label("NO SCORES YET", 95, white);
     highScores.forEach((entry, index) => {
       const y = 135 - index * 28;
-      drawing.setColor(white); drawing.setIntensity(1);
+      const isNewEntry = index === highlightedHighScoreIndex;
+      drawing.setColor(isNewEntry ? amber : white); drawing.setIntensity(isNewEntry ? 1.3 : 1);
+      if (isNewEntry) {
+        drawText(drawing, "NEW", -240, y, { ...textOptions, height: 13 });
+      }
       drawText(drawing, String(index + 1).padStart(2, "0"), -300, y, textOptions);
       if (entry.initials) drawText(drawing, entry.initials, -90, y, textOptions);
       const value = String(entry.score);
@@ -585,13 +590,17 @@ function frame(time: number): void {
     });
     if (controls.startPressed) {
       const submittedInitials = initialsEntry.characters.join("");
-      if (screenFlow.runScore !== null) {
-        highScores = insertHighScore(highScores, { initials: submittedInitials, score: screenFlow.runScore });
+      const finalScore = screenFlow.runScore;
+      if (finalScore !== null) {
+        const lowerScoreIndex = highScores.findIndex((entry) => entry.score < finalScore);
+        highlightedHighScoreIndex = lowerScoreIndex < 0 ? highScores.length : lowerScoreIndex;
+        highScores = insertHighScore(highScores, { initials: submittedInitials, score: finalScore });
         saveHighScores(() => window.localStorage, highScores);
       }
       screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
     }
   } else if (screenFlow.screen !== "playing" && controls.startPressed) {
+    highlightedHighScoreIndex = null;
     restartGame(game);
     clearScoreFlyups(scoreFlyups);
     clearParticleEffects(particleEffects);

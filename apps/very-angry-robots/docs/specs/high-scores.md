@@ -1,10 +1,11 @@
 # High scores and attract screens
 
-**Status: Accepted. Implementation: Complete.** Automated tests cover the score
-table, screen flow, initials editor and input handling. The user reports manual
-verification of the behavior. The original game's exact high-score rules are
-not recalled; this capability uses a conventional arcade top-ten table and the
-flow described for this port.
+**Status: Accepted. Implementation: Present.** Automated tests cover the score
+table, screen flow, initials editor and input handling. The new-entry highlight
+is implemented but has no dedicated automated coverage. The user reports
+manual verification of the behavior. The original game's exact high-score
+rules are not recalled; this capability uses a conventional arcade top-ten
+table and the flow described for this port.
 
 - Keep the ten highest scores, ordered from highest to lowest. When a run ends,
   qualify its final score if it would appear in the top ten. If it qualifies,
@@ -29,6 +30,9 @@ flow described for this port.
   game title and a clear prompt to start. These screens replace the playfield
   and gameplay HUD. Draw all high-score and attract screens in the existing
   canvas using the app's current drawing API; do not build their UI with HTML.
+  Highlight a score just submitted through initials entry on the Top Scores
+  screen so the player can identify their row. Keep it highlighted while the
+  attract screens alternate, until the next game starts.
 - After Game Over, keep the player on the initials-entry screen until they
   submit, if their score qualified. The Top Scores and Main Menu screens then
   alternate every 30 seconds. A screen-advance input switches to the other
@@ -51,5 +55,8 @@ flow described for this port.
 - Verify Top Scores and Main Menu alternate after 30 seconds, advance
   immediately on the screen-advance input, and each starts a fresh run on
   Enter or Gamepad Start.
+- Verify a newly submitted score is highlighted on Top Scores and stays
+  highlighted when returning from Main Menu, then clears when the next game
+  starts.
 - Verify entries survive a page reload and that missing, malformed or
   unavailable storage does not prevent play.
