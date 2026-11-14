@@ -26,7 +26,7 @@ test("loads defaults when no profile exists and returns an independent value", (
   const profile = readDisplayProfile(() => storageWith());
   assert.deepEqual(profile, ROBOTS_DEFAULT_DISPLAY_PROFILE);
   profile.lineWidth = 4;
-  assert.equal(ROBOTS_DEFAULT_DISPLAY_PROFILE.lineWidth, 1.5);
+  assert.equal(ROBOTS_DEFAULT_DISPLAY_PROFILE.lineWidth, 1.0);
 });
 
 test("loads a valid saved profile and falls back to defaults for invalid or malformed data", () => {

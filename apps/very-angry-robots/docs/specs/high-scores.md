@@ -1,15 +1,12 @@
 # High scores and attract screens
 
-**Status: Accepted. Implementation: Present.** The branded Main Menu title and
-gameplay vignette, and the animated brand above the Top Scores heading, are
-implemented. The supplied wide-canvas screenshots confirm the title composition,
-earlier combat vignette, score table and prompt readability. The updated room
-geometry, added game title on Top Scores and narrow-viewport layout need review.
-Automated tests cover the score table, screen flow, initials editor and input
-handling. The new-entry highlight is implemented but has no dedicated
-automated coverage. The user reports
-manual verification of the existing behavior. The original game's exact
-high-score rules are not recalled; this capability uses a conventional arcade
+**Status: Accepted. Implementation: Present.** The user has accepted the
+current branded Main Menu and Top Scores screens, including the animated brand,
+game title, red-robot gameplay vignette and screen layout. Automated tests for
+the score table, screen flow and initials editor pass (13 tests). The full app
+suite has one unrelated display-profile default test failure. The new-entry
+highlight is implemented but has no dedicated automated coverage. The
+original game's exact high-score rules are not recalled; this capability uses a conventional arcade
 top-ten table and the flow described for this port.
 
 - Keep the ten highest scores, ordered from highest to lowest. When a run ends,

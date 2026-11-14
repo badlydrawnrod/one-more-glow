@@ -37,9 +37,9 @@ display-profile field:
 
 | Control | Range | Default |
 | --- | --- | --- |
-| Line width (CSS pixels) | 0.5–4 | 1.5 |
-| Point radius (CSS pixels) | 0.5–4 | 1.5 |
-| Glow strength | 0–2 | 1 |
+| Line width (CSS pixels) | 0.5–4 | 1 |
+| Point radius (CSS pixels) | 0.5–4 | 1 |
+| Glow strength | 0–2 | 0.2 |
 | Glow spread | 0.5–2 | 1 |
 
 Use adjustments fine enough for practical visual tuning; 0.1 increments are a
