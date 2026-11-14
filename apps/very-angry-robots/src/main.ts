@@ -1,11 +1,11 @@
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
-  type Color, type DisplayProfile, type DrawingContext, type Point } from "one-more-glow";
+  type Color, type DrawingContext, type Point } from "one-more-glow";
 import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION,
-  type GameView, type RoomView, type RobotColor } from "./game.ts";
+  type GameEvent, type GameView, type RoomView, type RobotColor } from "./game.ts";
 import { createMaze } from "./maze.ts";
 import { createRoomGeometry } from "./room-geometry.ts";
 import { wallOutline } from "./wall-outline.ts";
-import { InputController, type GamepadState } from "./input.ts";
+import { InputController, type GamepadState, type InputState } from "./input.ts";
 import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 import { transitionOffsets } from "./transition-presentation.ts";
 import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores } from "./high-scores.ts";
@@ -16,8 +16,9 @@ import { addScoreFlyup, clearScoreFlyups, createScoreFlyupState, retainPresented
 import { addParticleEffect, clearParticleEffects, createParticleEffectState, particleEffectOpacity,
   particleMarkOffset, retainPresentedRoomParticleEffects, updateParticleEffects } from "./particle-effects.ts";
 import { ROBOTS_DEFAULT_DISPLAY_PROFILE, readDisplayProfile, writeDisplayProfile } from "./display-profile.ts";
+import { createSettings } from "./settings.ts";
 import { canOpenDisplaySettings, focusLossOverlayState, shouldAdvanceGame, shouldAdvanceSceneTime, shouldTickAttractScreen } from "./interaction-policy.ts";
-import { createAudioController, type AudioPreferences, type TauntSet } from "./audio.ts";
+import { createAudioController, type TauntSet } from "./audio.ts";
 import { gameAudioActions } from "./game-audio.ts";
 import "./style.css";
 
@@ -28,8 +29,19 @@ const gl = screen.getContext("webgl2");
 if (!gl) throw new Error("WebGL2 is unavailable");
 const drawing = createWebGL2Renderer(gl);
 const audio = createAudioController();
-let displayProfile: DisplayProfile = readDisplayProfile(() => window.localStorage);
+const displayProfile = readDisplayProfile(() => window.localStorage);
 drawing.setDisplayProfile(displayProfile);
+const settings = createSettings({
+  drawing,
+  displayProfile,
+  audioPreferences: audio.preferences,
+  audio,
+  resetDisplayProfile: ROBOTS_DEFAULT_DISPLAY_PROFILE,
+  applyDisplayProfile(profile) {
+    drawing.setDisplayProfile({ ...profile });
+    writeDisplayProfile(() => window.localStorage, profile);
+  },
+});
 const game = createGame();
 const gameView: GameView = game;
 const input = new InputController();
@@ -48,14 +60,9 @@ let robotGaze = new Map<number, { x: number; y: number }>();
 let paused = false;
 let settingsOpen = false;
 let settingsNeedsGamepadNeutral = false;
-let selectedSetting = 0;
-let audioPreferences: AudioPreferences = { ...audio.preferences };
 let runTauntSet: TauntSet = "standard";
 let settingsNavAt = 0;
 let previousSettingsButtons = new Set<number>();
-const displayFields = ["lineWidth", "pointRadius", "glowStrength", "glowSpread"] as const;
-const displayRanges = [[0.5, 4], [0.5, 4], [0, 2], [0.5, 2]] as const;
-const settingsRows = [205, 125, 45, -35, -115, -195] as const;
 const cyan: Color = [0.35, 0.95, 1];
 const red: Color = [1, 0.35, 0.36];
 const amber: Color = [1, 0.75, 0.32];
@@ -79,11 +86,6 @@ function label(text: string, y: number, color: Color = white): void {
   drawText(drawing, text, -measureText(text, textOptions).width / 2, y, textOptions);
 }
 
-function settingsLabel(text: string, x: number, y: number, color: Color = white, height = 18): void {
-  drawing.setColor(color); drawing.setIntensity(1);
-  drawText(drawing, text, x, y, { ...textOptions, height });
-}
-
 function canOpenSettings(): boolean {
   return canOpenDisplaySettings(screenFlow.screen, paused);
 }
@@ -91,172 +93,25 @@ function canOpenSettings(): boolean {
 function openSettings(): void {
   if (settingsOpen || !canOpenSettings()) return;
   settingsOpen = true;
-  selectedSetting = 0;
+  settings.open();
   settingsNeedsGamepadNeutral = true;
   input.clearKeyboard();
   input.suppressGamepadWhileHeld(latestGamepadState);
-  audio.playEffects(["interface"]);
 }
 
 function closeSettings(): void {
   if (!settingsOpen) return;
   settingsOpen = false;
+  settings.close();
   settingsNeedsGamepadNeutral = true;
   input.clearKeyboard();
   input.suppressGamepadWhileHeld(latestGamepadState);
-  audio.playEffects(["interface"]);
-}
-
-function applyDisplayProfile(): void {
-  drawing.setDisplayProfile(displayProfile);
-  writeDisplayProfile(() => window.localStorage, displayProfile);
-}
-
-function setDisplayField(index: number, value: number): void {
-  if (index < 0 || index >= displayFields.length) return;
-  const [minimum, maximum] = displayRanges[index];
-  const field = displayFields[index];
-  displayProfile = { ...displayProfile, [field]: Math.max(minimum, Math.min(maximum, Math.round(value * 10) / 10)) };
-  applyDisplayProfile();
-}
-
-function adjustSelectedSetting(direction: number): void {
-  if (selectedSetting < displayFields.length) {
-    const field = displayFields[selectedSetting];
-    setDisplayField(selectedSetting, displayProfile[field] + direction * 0.1);
-    audio.playEffects(["interface"]);
-  } else if (selectedSetting === 4) {
-    setAudioPreferences({ ...audioPreferences, enabled: !audioPreferences.enabled });
-  } else if (selectedSetting === 5) {
-    setAudioPreferences({ ...audioPreferences, volume: Math.max(0, Math.min(1, Math.round((audioPreferences.volume + direction * 0.1) * 10) / 10)) });
-  }
-}
-
-function moveSettingSelection(direction: number): void {
-  selectedSetting = (selectedSetting + direction + 8) % 8;
-  audio.playEffects(["interface"]);
-}
-
-function setAudioPreferences(next: AudioPreferences): void {
-  if (next.enabled === audioPreferences.enabled && next.volume === audioPreferences.volume) return;
-  audioPreferences = next;
-  audio.setPreferences(audioPreferences);
-  audio.playEffects(["interface"]);
-}
-
-function resetDisplayProfile(): void {
-  displayProfile = { ...ROBOTS_DEFAULT_DISPLAY_PROFILE };
-  applyDisplayProfile();
-}
-
-function activateSetting(): void {
-  if (selectedSetting === 4) setAudioPreferences({ ...audioPreferences, enabled: !audioPreferences.enabled });
-  else if (selectedSetting === 6) { resetDisplayProfile(); audio.playEffects(["interface"]); }
-  else if (selectedSetting === 7) closeSettings();
-  else adjustSelectedSetting(1);
-}
-
-function drawSettings(): void {
-  drawing.beginFrame();
-  settingsLabel("DISPLAY & AUDIO SETTINGS", -448, 320, amber, 26);
-  settingsLabel("TUNE THE VECTOR DISPLAY", -448, 282, blue, 15);
-
-  const labels = ["LINE WIDTH", "POINT RADIUS", "GLOW STRENGTH", "GLOW SPREAD"];
-  const track = { left: -420, right: 24 };
-  for (let index = 0; index < displayFields.length; index += 1) {
-    const rowY = settingsRows[index];
-    const trackY = rowY - 29;
-    const [minimum, maximum] = displayRanges[index];
-    const value = displayProfile[displayFields[index]];
-    const focused = selectedSetting === index;
-    if (focused) line(drawing, [[-454,rowY-37],[65,rowY-37],[65,rowY+30],[-454,rowY+30],[-454,rowY-37]], amber, 1);
-    settingsLabel(labels[index], -420, rowY + 3, focused ? amber : white, 17);
-    settingsLabel(value.toFixed(1), -20, rowY + 3, focused ? amber : cyan, 17);
-    drawing.setColor(blue); drawing.setIntensity(0.75);
-    drawing.moveTo(track.left, trackY); drawing.lineTo(track.right, trackY);
-    for (let tick = 0; tick <= 4; tick += 1) {
-      const x = track.left + (track.right - track.left) * tick / 4;
-      drawing.moveTo(x, trackY - 4); drawing.lineTo(x, trackY + 4);
-    }
-    const ratio = (value - minimum) / (maximum - minimum);
-    const handleX = track.left + ratio * (track.right - track.left);
-    drawing.setColor(focused ? amber : cyan); drawing.setIntensity(1.2);
-    drawCircle(drawing, [handleX, trackY], 8);
-  }
-
-  const soundRow = settingsRows[4];
-  const volumeRow = settingsRows[5];
-  for (const [index, rowY, name, value] of [
-    [4, soundRow, "SOUND", audioPreferences.enabled ? "ON" : "OFF"],
-    [5, volumeRow, "MASTER VOLUME", audioPreferences.volume.toFixed(1)],
-  ] as const) {
-    const focused = selectedSetting === index;
-    if (focused) line(drawing, [[-454,rowY-24],[65,rowY-24],[65,rowY+23],[-454,rowY+23],[-454,rowY-24]], amber, 1);
-    settingsLabel(name, -420, rowY, focused ? amber : white, 15);
-    settingsLabel(value, -20, rowY, focused ? amber : cyan, 15);
-    if (index === 5) {
-      drawing.setColor(blue); drawing.setIntensity(0.75);
-      drawing.moveTo(-420, rowY - 17); drawing.lineTo(24, rowY - 17);
-      drawing.setColor(focused ? amber : cyan); drawing.setIntensity(1.2);
-      drawCircle(drawing, [-420 + audioPreferences.volume * 444, rowY - 17], 6);
-    }
-  }
-
-  line(drawing, [[105,-125],[454,-125],[454,220],[105,220],[105,-125]], blue, 0.7);
-  settingsLabel("ROOM PREVIEW", 125, 181, blue, 15);
-  line(drawing, [[145,-95],[414,-95],[414,145],[145,145],[145,-95]], blue, 0.85);
-  line(drawing, [[220,-95],[220,-18],[288,-18]], blue, 0.75);
-  line(drawing, [[320,145],[320,52],[365,52]], blue, 0.75);
-  line(drawing, [[145,28],[190,28],[190,73]], blue, 0.75);
-  drawing.pushTransform(); drawing.translate(273, 32);
-  drawing.setColor(cyan); drawing.setIntensity(1.2); drawCircle(drawing, [0,0], 11);
-  drawing.setColor(amber); drawing.setIntensity(1); drawing.moveTo(0, 8); drawing.lineTo(14, 15);
-  drawing.popTransform();
-  line(drawing, [[348,104],[365,104],[365,121],[348,121],[348,104]], red, 1);
-  line(drawing, [[179,-42],[196,-42],[196,-25],[179,-25],[179,-42]], red, 1);
-  line(drawing, [[-95,-300],[-5,-300],[-5,-256],[-95,-256],[-95,-300]], selectedSetting === 6 ? amber : blue, 1);
-  line(drawing, [[25,-300],[115,-300],[115,-256],[25,-256],[25,-300]], selectedSetting === 7 ? amber : blue, 1);
-  settingsLabel("RESET", -79, -286, selectedSetting === 6 ? amber : white, 15);
-  settingsLabel("CLOSE", 42, -286, selectedSetting === 7 ? amber : white, 15);
-  settingsLabel("UP / DOWN OR D-PAD: SELECT   LEFT / RIGHT: ADJUST", -448, -320, blue, 12);
-  settingsLabel("ENTER / A: ACTIVATE   X: RESET   ESC / B: CLOSE", -448, -344, blue, 12);
-  drawing.endFrame();
 }
 
 function settingsPointerPosition(event: PointerEvent): Point {
   const rect = screen.getBoundingClientRect();
   return [(event.clientX - rect.left) / rect.width * 1024 - 512,
     384 - (event.clientY - rect.top) / rect.height * 768];
-}
-
-function handleSettingsPointer(event: PointerEvent, activate = true): void {
-  if (!settingsOpen) return;
-  const [x, y] = settingsPointerPosition(event);
-  for (let index = 0; index < settingsRows.length; index += 1) {
-    const rowY = settingsRows[index];
-    if (index >= 4) {
-      if (x >= -454 && x <= 65 && y >= rowY - 24 && y <= rowY + 23) {
-        selectedSetting = index;
-        if (activate && index === 4) setAudioPreferences({ ...audioPreferences, enabled: !audioPreferences.enabled });
-      }
-      if (index === 5 && x >= -430 && x <= 34 && y >= rowY - 23 && y <= rowY - 10) {
-        selectedSetting = index;
-        setAudioPreferences({ ...audioPreferences, volume: Math.round(Math.max(0, Math.min(1, (x + 420) / 444)) * 10) / 10 });
-      }
-      continue;
-    }
-    const trackY = rowY - 29;
-    if (x >= -454 && x <= 65 && y >= rowY - 37 && y <= rowY + 30) selectedSetting = index;
-    if (x >= -430 && x <= 34 && y >= trackY - 12 && y <= trackY + 12) {
-      selectedSetting = index;
-      const [minimum, maximum] = displayRanges[index];
-      setDisplayField(index, minimum + Math.max(0, Math.min(1, (x + 420) / 444)) * (maximum - minimum));
-      audio.playEffects(["interface"]);
-      return;
-    }
-  }
-  if (x >= -95 && x <= -5 && y >= -300 && y <= -256) { selectedSetting = 6; resetDisplayProfile(); audio.playEffects(["interface"]); }
-  else if (x >= 25 && x <= 115 && y >= -300 && y <= -256) closeSettings();
 }
 
 function line(context: DrawingContext, points: readonly Point[], color: Color, intensity = 1): void {
@@ -614,7 +469,7 @@ function drawAttractScreen(time: number): void {
 
 function draw(time: number, wallClockTime: number): void {
   if (settingsOpen) {
-    drawSettings();
+    settings.draw();
     return;
   }
   if (screenFlow.screen !== "playing") {
@@ -673,12 +528,12 @@ window.addEventListener("keydown", (event) => {
   if (settingsOpen) {
     event.preventDefault();
     if (event.key === "Escape") { if (!event.repeat) closeSettings(); }
-    else if (event.key === "Tab") moveSettingSelection(event.shiftKey ? -1 : 1);
-    else if (event.key === "ArrowUp") moveSettingSelection(-1);
-    else if (event.key === "ArrowDown") moveSettingSelection(1);
-    else if (event.key === "ArrowLeft") adjustSelectedSetting(-1);
-    else if (event.key === "ArrowRight") adjustSelectedSetting(1);
-    else if (event.key === "Enter" && !event.repeat) activateSetting();
+    else if (event.key === "Tab") settings.moveSelection(event.shiftKey ? -1 : 1);
+    else if (event.key === "ArrowUp") settings.moveSelection(-1);
+    else if (event.key === "ArrowDown") settings.moveSelection(1);
+    else if (event.key === "ArrowLeft") settings.adjustSelection(-1);
+    else if (event.key === "ArrowRight") settings.adjustSelection(1);
+    else if (event.key === "Enter" && !event.repeat && settings.activateSelection() === "close") closeSettings();
     return;
   }
   if (input.keyDown(event.key, event.repeat)) event.preventDefault();
@@ -689,19 +544,16 @@ screen.addEventListener("pointerdown", (event) => {
   if (!settingsOpen) return;
   event.preventDefault();
   screen.setPointerCapture(event.pointerId);
-  handleSettingsPointer(event);
+  if (settings.pointer(settingsPointerPosition(event)) === "close") closeSettings();
 });
-screen.addEventListener("pointermove", (event) => { if (settingsOpen && event.buttons) handleSettingsPointer(event, false); });
+screen.addEventListener("pointermove", (event) => {
+  if (!settingsOpen || !event.buttons) return;
+  if (settings.pointer(settingsPointerPosition(event), false) === "close") closeSettings();
+});
 screen.addEventListener("pointerup", (event) => { if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId); });
 function pauseForFocusLoss(): void {
   input.clearKeyboard();
-  const pad = Array.from(navigator.getGamepads?.() ?? []).find((candidate) => candidate?.connected && candidate.mapping === "standard");
-  latestGamepadState = pad ? {
-    leftX: pad.axes[0] ?? 0, leftY: pad.axes[1] ?? 0,
-    rightX: pad.axes[2] ?? 0, rightY: pad.axes[3] ?? 0,
-    startPressed: pad.buttons[9]?.pressed ?? false,
-    backPressed: pad.buttons[8]?.pressed ?? false,
-  } : undefined;
+  latestGamepadState = readGamepadState(findStandardGamepad());
   input.suppressGamepadWhileHeld(latestGamepadState);
   ({ paused, settingsOpen } = focusLossOverlayState(screenFlow.screen, paused, settingsOpen));
 }
@@ -717,133 +569,236 @@ window.addEventListener("resize", resize);
 resize();
 let lastTime = 0;
 let sceneTime = 0;
-function frame(time: number): void {
-  const delta = lastTime ? Math.min((time-lastTime)/1000, 0.05) : 0;
-  lastTime = time;
-  const pad = Array.from(navigator.getGamepads?.() ?? []).find((p) => p?.connected && p.mapping === "standard");
-  latestGamepadState = pad ? {
-    leftX: pad.axes[0] ?? 0, leftY: pad.axes[1] ?? 0,
-    rightX: pad.axes[2] ?? 0, rightY: pad.axes[3] ?? 0,
-    startPressed: pad.buttons[9]?.pressed ?? false,
-    backPressed: pad.buttons[8]?.pressed ?? false,
-  } : undefined;
+interface FrameInput {
+  gamepad: Gamepad | undefined;
+  controls: InputState;
+  pausePressed: boolean;
+  settingsPressed: boolean;
+}
+
+function findStandardGamepad(): Gamepad | undefined {
+  const gamepad = Array.from(navigator.getGamepads?.() ?? [])
+    .find((candidate) => candidate?.connected && candidate.mapping === "standard");
+  return gamepad ?? undefined;
+}
+
+function readGamepadState(gamepad: Gamepad | undefined): GamepadState | undefined {
+  if (!gamepad) return undefined;
+  return {
+    leftX: gamepad.axes[0] ?? 0,
+    leftY: gamepad.axes[1] ?? 0,
+    rightX: gamepad.axes[2] ?? 0,
+    rightY: gamepad.axes[3] ?? 0,
+    startPressed: gamepad.buttons[9]?.pressed ?? false,
+    backPressed: gamepad.buttons[8]?.pressed ?? false,
+  };
+}
+
+function readFrameInput(): FrameInput {
+  const gamepad = findStandardGamepad();
+  latestGamepadState = readGamepadState(gamepad);
   const controls = input.read(latestGamepadState);
-  const pausePressed = input.takePauseAction();
-  const settingsPressed = input.takeSettingsAction();
-  if (controls.startPressed || controls.screenAdvancePressed || pausePressed || settingsPressed) audio.unlock();
+  return {
+    gamepad,
+    controls,
+    pausePressed: input.takePauseAction(),
+    settingsPressed: input.takeSettingsAction(),
+  };
+}
+
+function updateFrameAudioAndSceneTime(delta: number): void {
   audio.setGameplayState(screenFlow.screen === "playing", paused || settingsOpen);
   audio.update(delta);
   if (shouldAdvanceSceneTime(screenFlow.screen, paused, settingsOpen)) sceneTime += delta * 1000;
-  const buttonDown = (index: number) => pad?.buttons[index]?.pressed ?? false;
+}
+
+function handleSettingsGamepad(time: number, gamepad: Gamepad | undefined): void {
+  if (!settingsOpen) return;
+
+  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
+  const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(gamepad?.axes[axis] ?? 0) <= 0.2);
+  const buttonsNeutral = Array.from(gamepad?.buttons ?? []).every((button) => !button.pressed);
+  if (settingsNeedsGamepadNeutral && (!gamepad || (axesNeutral && buttonsNeutral))) {
+    settingsNeedsGamepadNeutral = false;
+  }
+  if (settingsNeedsGamepadNeutral || !gamepad) return;
+
+  const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
+  if (isNewPress(1)) closeSettings();
+  else if (isNewPress(0) && settings.activateSelection() === "close") closeSettings();
+  if (settingsOpen && isNewPress(3)) settings.resetDisplay();
+
+  const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
+    : Math.abs(gamepad.axes[1] ?? 0) > 0.45 ? Math.sign(gamepad.axes[1]!) : 0;
+  const horizontal = buttonDown(15) ? 1 : buttonDown(14) ? -1
+    : Math.abs(gamepad.axes[0] ?? 0) > 0.45 ? Math.sign(gamepad.axes[0]!) : 0;
+  if (settingsOpen && time >= settingsNavAt && vertical) {
+    settings.moveSelection(vertical);
+    settingsNavAt = time + 220;
+  } else if (settingsOpen && time >= settingsNavAt && horizontal) {
+    settings.adjustSelection(horizontal);
+    settingsNavAt = time + 160;
+  }
+}
+
+function handleOverlayInput(time: number, frameInput: FrameInput): boolean {
   if (settingsOpen) {
-    const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(pad?.axes[axis] ?? 0) <= 0.2);
-    const buttonsNeutral = Array.from(pad?.buttons ?? []).every((button) => !button.pressed);
-    if (settingsNeedsGamepadNeutral && (!pad || (axesNeutral && buttonsNeutral))) settingsNeedsGamepadNeutral = false;
-    if (!settingsNeedsGamepadNeutral && pad) {
-      const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
-      if (isNewPress(1)) closeSettings();
-      else if (isNewPress(0)) activateSetting();
-      if (settingsOpen && isNewPress(3)) { resetDisplayProfile(); audio.playEffects(["interface"]); }
-      const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
-        : Math.abs(pad.axes[1] ?? 0) > 0.45 ? Math.sign(pad.axes[1]!) : 0;
-      const horizontal = buttonDown(15) ? 1 : buttonDown(14) ? -1
-        : Math.abs(pad.axes[0] ?? 0) > 0.45 ? Math.sign(pad.axes[0]!) : 0;
-      if (settingsOpen && time >= settingsNavAt && vertical) {
-        moveSettingSelection(vertical); settingsNavAt = time + 220;
-      } else if (settingsOpen && time >= settingsNavAt && horizontal) {
-        adjustSelectedSetting(horizontal); settingsNavAt = time + 160;
-      }
-    }
-  } else if (settingsPressed && canOpenSettings()) {
+    handleSettingsGamepad(time, frameInput.gamepad);
+    return true;
+  }
+  if (frameInput.settingsPressed && canOpenSettings()) {
     openSettings();
-  } else if (screenFlow.screen === "playing" && pausePressed) {
+    return true;
+  }
+  if (screenFlow.screen === "playing" && frameInput.pausePressed) {
     paused = !paused;
     input.clearKeyboard();
     input.suppressGamepadWhileHeld(latestGamepadState);
-  } else if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) {
-    if (!gameView.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
-    const previousX = gameView.player.x, previousY = gameView.player.y;
-    const previousRobotPositions = new Map(gameView.robots.map((robot) => [robot.id, { x: robot.x, y: robot.y }]));
-    const simulationDelta = reducedMotion.matches && gameView.transition ? gameView.transition.duration : delta;
-    const wasInTransition = gameView.transition !== null;
-    const events = updateGame(game, simulationDelta, { moveX: controls.move.x, moveY: controls.move.y, aimX: controls.aim.x, aimY: controls.aim.y,
-      fire: !!(controls.aim.x || controls.aim.y), restartPressed: false });
-    const audioActions = gameAudioActions(events);
-    if (audioActions.stopTaunts) audio.stopTaunts();
-    else if (!wasInTransition && gameView.transition) audio.stopTaunts();
-    if (audioActions.tauntSet) runTauntSet = audioActions.tauntSet;
-    if (audioActions.effects.length) audio.playEffects(audioActions.effects);
-    for (const voice of audioActions.voices) audio.playVoice(voice);
-    if (events.some((event) => event.type === "room-entered" || event.type === "player-respawned")) {
-      audio.startTaunts(runTauntSet);
-    }
-    walkingRobots = gameView.transition ? new Set() : new Set(gameView.robots
-      .filter((robot) => {
-        const previous = previousRobotPositions.get(robot.id);
-        return previous !== undefined && Math.hypot(robot.x - previous.x, robot.y - previous.y) > 0.001;
-      })
-      .map((robot) => robot.id));
-    robotGaze = new Map(gameView.robots.map((robot) => {
-      const previous = previousRobotPositions.get(robot.id);
-      const dx = previous ? robot.x - previous.x : 0;
-      const dy = previous ? robot.y - previous.y : 0;
-      const distance = Math.hypot(dx, dy);
-      const previousGaze = robotGaze.get(robot.id) ?? { x: 0, y: 0 };
-      return [robot.id, distance > 0.001
-        ? { x: dx / distance, y: dy / distance }
-        : previousGaze];
-    }));
-    for (const event of events) {
-      if (event.type === "robot-destroyed") addScoreFlyup(scoreFlyups, event);
-      addParticleEffect(particleEffects, event);
-    }
-    updateScoreFlyups(scoreFlyups, delta, reducedMotion.matches);
-    updateParticleEffects(particleEffects, delta, reducedMotion.matches);
-    walking = !gameView.transition && gameView.outcome === "playing"
-      && (gameView.player.x !== previousX || gameView.player.y !== previousY);
-    if (gameView.outcome === "lost") {
-      screenFlow = updateScreenFlow(screenFlow, {
-        type: "run-ended",
-        score: gameView.score,
-        qualifies: qualifiesForHighScore(highScores, gameView.score),
-      });
-      initialsEntry = createInitialsEntry();
-    }
-  } else if (screenFlow.screen === "initials") {
+    return true;
+  }
+  return false;
+}
+
+function playGameEventAudio(events: readonly GameEvent[], enteredTransition: boolean): void {
+  const audioActions = gameAudioActions(events);
+  if (audioActions.stopTaunts) audio.stopTaunts();
+  else if (enteredTransition) audio.stopTaunts();
+  if (audioActions.tauntSet) runTauntSet = audioActions.tauntSet;
+  if (audioActions.effects.length) audio.playEffects(audioActions.effects);
+  for (const voice of audioActions.voices) audio.playVoice(voice);
+  if (events.some((event) => event.type === "room-entered" || event.type === "player-respawned")) {
+    audio.startTaunts(runTauntSet);
+  }
+}
+
+function updateRobotMovementPresentation(
+  previousPositions: ReadonlyMap<number, { x: number; y: number }>,
+): void {
+  walkingRobots = gameView.transition ? new Set() : new Set(gameView.robots
+    .filter((robot) => {
+      const previous = previousPositions.get(robot.id);
+      return previous !== undefined && Math.hypot(robot.x - previous.x, robot.y - previous.y) > 0.001;
+    })
+    .map((robot) => robot.id));
+  robotGaze = new Map(gameView.robots.map((robot) => {
+    const previous = previousPositions.get(robot.id);
+    const dx = previous ? robot.x - previous.x : 0;
+    const dy = previous ? robot.y - previous.y : 0;
+    const distance = Math.hypot(dx, dy);
+    const previousGaze = robotGaze.get(robot.id) ?? { x: 0, y: 0 };
+    return [robot.id, distance > 0.001
+      ? { x: dx / distance, y: dy / distance }
+      : previousGaze];
+  }));
+}
+
+function addGameEventEffects(events: readonly GameEvent[]): void {
+  for (const event of events) {
+    if (event.type === "robot-destroyed") addScoreFlyup(scoreFlyups, event);
+    addParticleEffect(particleEffects, event);
+  }
+}
+
+function finishLostRun(): void {
+  screenFlow = updateScreenFlow(screenFlow, {
+    type: "run-ended",
+    score: gameView.score,
+    qualifies: qualifiesForHighScore(highScores, gameView.score),
+  });
+  initialsEntry = createInitialsEntry();
+}
+
+function advanceGameFrame(delta: number, controls: InputState): void {
+  if (!gameView.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
+  const previousX = gameView.player.x;
+  const previousY = gameView.player.y;
+  const previousRobotPositions = new Map(gameView.robots.map((robot) => [robot.id, { x: robot.x, y: robot.y }]));
+  const simulationDelta = reducedMotion.matches && gameView.transition ? gameView.transition.duration : delta;
+  const wasInTransition = gameView.transition !== null;
+  const events = updateGame(game, simulationDelta, {
+    moveX: controls.move.x,
+    moveY: controls.move.y,
+    aimX: controls.aim.x,
+    aimY: controls.aim.y,
+    fire: !!(controls.aim.x || controls.aim.y),
+    restartPressed: false,
+  });
+
+  playGameEventAudio(events, !wasInTransition && gameView.transition !== null);
+  updateRobotMovementPresentation(previousRobotPositions);
+  addGameEventEffects(events);
+  updateScoreFlyups(scoreFlyups, delta, reducedMotion.matches);
+  updateParticleEffects(particleEffects, delta, reducedMotion.matches);
+  walking = !gameView.transition && gameView.outcome === "playing"
+    && (gameView.player.x !== previousX || gameView.player.y !== previousY);
+  if (gameView.outcome === "lost") finishLostRun();
+}
+
+function submitInitials(): void {
+  const submittedInitials = initialsEntry.characters.join("");
+  const finalScore = screenFlow.runScore;
+  if (finalScore !== null) {
+    const lowerScoreIndex = highScores.findIndex((entry) => entry.score < finalScore);
+    highlightedHighScoreIndex = lowerScoreIndex < 0 ? highScores.length : lowerScoreIndex;
+    highScores = insertHighScore(highScores, { initials: submittedInitials, score: finalScore });
+    saveHighScores(() => window.localStorage, highScores);
+  }
+  screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
+}
+
+function startRun(): void {
+  highlightedHighScoreIndex = null;
+  restartGame(game);
+  clearScoreFlyups(scoreFlyups);
+  clearParticleEffects(particleEffects);
+  initialsEntry = createInitialsEntry();
+  screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
+  runTauntSet = "standard";
+  audio.setGameplayState(true, false);
+  audio.playEffects(["interface"]);
+  audio.startTaunts(runTauntSet);
+}
+
+function advanceScreenFlowFrame(delta: number, controls: InputState): void {
+  if (screenFlow.screen === "initials") {
     initialsEntry = updateInitialsEntry(initialsEntry, {
       keyPresses: controls.keyPresses,
       slotDelta: controls.initialsSlotDelta,
       charDelta: controls.initialsCharDelta,
     });
-    if (controls.startPressed) {
-      const submittedInitials = initialsEntry.characters.join("");
-      const finalScore = screenFlow.runScore;
-      if (finalScore !== null) {
-        const lowerScoreIndex = highScores.findIndex((entry) => entry.score < finalScore);
-        highlightedHighScoreIndex = lowerScoreIndex < 0 ? highScores.length : lowerScoreIndex;
-        highScores = insertHighScore(highScores, { initials: submittedInitials, score: finalScore });
-        saveHighScores(() => window.localStorage, highScores);
-      }
-      screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
-    }
+    if (controls.startPressed) submitInitials();
   } else if (screenFlow.screen !== "playing" && controls.startPressed) {
-    highlightedHighScoreIndex = null;
-    restartGame(game);
-    clearScoreFlyups(scoreFlyups);
-    clearParticleEffects(particleEffects);
-    initialsEntry = createInitialsEntry();
-    screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
-    runTauntSet = "standard";
-    audio.setGameplayState(true, false);
-    audio.playEffects(["interface"]);
-    audio.startTaunts(runTauntSet);
+    startRun();
   } else if (screenFlow.screen !== "playing" && controls.screenAdvancePressed) {
     screenFlow = updateScreenFlow(screenFlow, { type: "advance" });
     audio.playEffects(["interface"]);
   } else if (shouldTickAttractScreen(screenFlow.screen, settingsOpen)) {
     screenFlow = updateScreenFlow(screenFlow, { type: "tick", elapsedMs: delta * 1000 });
   }
+}
+
+function rememberSettingsGamepadButtons(gamepad: Gamepad | undefined): void {
+  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
   previousSettingsButtons = new Set([0, 1, 3, 8, 9, 12, 13, 14, 15].filter(buttonDown));
+}
+
+function frame(time: number): void {
+  const delta = lastTime ? Math.min((time - lastTime) / 1000, 0.05) : 0;
+  lastTime = time;
+  const frameInput = readFrameInput();
+  const { controls } = frameInput;
+
+  if (controls.startPressed || controls.screenAdvancePressed || frameInput.pausePressed || frameInput.settingsPressed) {
+    audio.unlock();
+  }
+  updateFrameAudioAndSceneTime(delta);
+
+  if (!handleOverlayInput(time, frameInput)) {
+    if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) advanceGameFrame(delta, controls);
+    else advanceScreenFlowFrame(delta, controls);
+  }
+
+  rememberSettingsGamepadButtons(frameInput.gamepad);
   draw(sceneTime, time);
   requestAnimationFrame(frame);
 }

@@ -2,9 +2,12 @@
 
 **Status: Accepted. Implementation: Present. Automated coverage: Passed for
 pause and focus state gates, transition and death interval suspension, attract
-timer suspension, input isolation, and display-profile validation and storage.
-The user reports manual checking as far as they can; exact coverage is not
-recorded.** The shared display profile and its valid values are defined by the
+timer suspension, input isolation, display-profile validation and storage, and
+settings selection, bounded value adjustment, reset, pointer interaction, and
+audio preference updates. Keyboard and gamepad browser-event integration and
+responsive viewport behavior are not covered by automated tests. The user
+reports manual checking as far as they can; exact coverage is not recorded.**
+The shared display profile and its valid values are defined by the
 [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md#global-display-profile-options).
 
 ## Pause

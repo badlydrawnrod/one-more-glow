@@ -27,3 +27,17 @@ This boundary is intended to reduce accidental data coupling, not to hide game
 state from the main loop or require a separate rendering model. If the app
 later needs stronger runtime isolation, it should be introduced for a concrete
 need and measured against the frame loop.
+
+## Settings boundary
+
+`src/settings.ts` owns the app's settings control state, value adjustments,
+pointer hit testing and settings-screen drawing. It receives the drawing
+context, initial preferences and small callbacks for applying display and
+audio changes. It does not import from `main.ts` or read browser globals.
+
+`main.ts` remains the integration point for canvas and browser events, app
+screen and focus policy, gamepad polling, and input clearing at screen
+transitions. It translates those inputs into settings operations and handles
+close requests so settings cannot change screen-flow or pause policy. Browser
+storage and renderer configuration stay behind callbacks supplied by the app
+loop; the settings module uses the renderer-independent drawing API.
