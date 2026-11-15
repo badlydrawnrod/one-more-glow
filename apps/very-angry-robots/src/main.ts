@@ -114,6 +114,40 @@ function settingsPointerPosition(event: PointerEvent): Point {
     384 - (event.clientY - rect.top) / rect.height * 768];
 }
 
+function handleSettingsGamepad(time: number, gamepad: Gamepad | undefined): void {
+  if (!settingsOpen) return;
+
+  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
+  const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(gamepad?.axes[axis] ?? 0) <= 0.2);
+  const buttonsNeutral = Array.from(gamepad?.buttons ?? []).every((button) => !button.pressed);
+  if (settingsNeedsGamepadNeutral && (!gamepad || (axesNeutral && buttonsNeutral))) {
+    settingsNeedsGamepadNeutral = false;
+  }
+  if (settingsNeedsGamepadNeutral || !gamepad) return;
+
+  const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
+  if (isNewPress(1)) closeSettings();
+  else if (isNewPress(0) && settings.activateSelection() === "close") closeSettings();
+  if (settingsOpen && isNewPress(3)) settings.resetDisplay();
+
+  const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
+    : Math.abs(gamepad.axes[1] ?? 0) > 0.45 ? Math.sign(gamepad.axes[1]!) : 0;
+  const horizontal = buttonDown(15) ? 1 : buttonDown(14) ? -1
+    : Math.abs(gamepad.axes[0] ?? 0) > 0.45 ? Math.sign(gamepad.axes[0]!) : 0;
+  if (settingsOpen && time >= settingsNavAt && vertical) {
+    settings.moveSelection(vertical);
+    settingsNavAt = time + 220;
+  } else if (settingsOpen && time >= settingsNavAt && horizontal) {
+    settings.adjustSelection(horizontal);
+    settingsNavAt = time + 160;
+  }
+}
+
+function rememberSettingsGamepadButtons(gamepad: Gamepad | undefined): void {
+  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
+  previousSettingsButtons = new Set([0, 1, 3, 8, 9, 12, 13, 14, 15].filter(buttonDown));
+}
+
 function line(context: DrawingContext, points: readonly Point[], color: Color, intensity = 1): void {
   context.setColor(color); context.setIntensity(intensity); drawPolygonOutline(context, points);
 }
@@ -613,35 +647,6 @@ function updateFrameAudioAndSceneTime(delta: number): void {
   if (shouldAdvanceSceneTime(screenFlow.screen, paused, settingsOpen)) sceneTime += delta * 1000;
 }
 
-function handleSettingsGamepad(time: number, gamepad: Gamepad | undefined): void {
-  if (!settingsOpen) return;
-
-  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
-  const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(gamepad?.axes[axis] ?? 0) <= 0.2);
-  const buttonsNeutral = Array.from(gamepad?.buttons ?? []).every((button) => !button.pressed);
-  if (settingsNeedsGamepadNeutral && (!gamepad || (axesNeutral && buttonsNeutral))) {
-    settingsNeedsGamepadNeutral = false;
-  }
-  if (settingsNeedsGamepadNeutral || !gamepad) return;
-
-  const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
-  if (isNewPress(1)) closeSettings();
-  else if (isNewPress(0) && settings.activateSelection() === "close") closeSettings();
-  if (settingsOpen && isNewPress(3)) settings.resetDisplay();
-
-  const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
-    : Math.abs(gamepad.axes[1] ?? 0) > 0.45 ? Math.sign(gamepad.axes[1]!) : 0;
-  const horizontal = buttonDown(15) ? 1 : buttonDown(14) ? -1
-    : Math.abs(gamepad.axes[0] ?? 0) > 0.45 ? Math.sign(gamepad.axes[0]!) : 0;
-  if (settingsOpen && time >= settingsNavAt && vertical) {
-    settings.moveSelection(vertical);
-    settingsNavAt = time + 220;
-  } else if (settingsOpen && time >= settingsNavAt && horizontal) {
-    settings.adjustSelection(horizontal);
-    settingsNavAt = time + 160;
-  }
-}
-
 function handleOverlayInput(time: number, frameInput: FrameInput): boolean {
   if (settingsOpen) {
     handleSettingsGamepad(time, frameInput.gamepad);
@@ -777,11 +782,6 @@ function advanceScreenFlowFrame(delta: number, controls: InputState): void {
   } else if (shouldTickAttractScreen(screenFlow.screen, settingsOpen)) {
     screenFlow = updateScreenFlow(screenFlow, { type: "tick", elapsedMs: delta * 1000 });
   }
-}
-
-function rememberSettingsGamepadButtons(gamepad: Gamepad | undefined): void {
-  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
-  previousSettingsButtons = new Set([0, 1, 3, 8, 9, 12, 13, 14, 15].filter(buttonDown));
 }
 
 function frame(time: number): void {
