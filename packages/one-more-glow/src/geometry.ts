@@ -85,7 +85,11 @@ export function drawEllipse(
   drawPolygonOutline(drawing, points);
 }
 
-/** Draw an open circular arc, including both endpoint positions. */
+/**
+ * Draw an open circular arc, including both endpoints. Sweep is
+ * `endAngleDegrees - startAngleDegrees`: positive is counter-clockwise,
+ * negative is clockwise, and angles are not normalized across 360 degrees.
+ */
 export function drawArc(
   drawing: DrawingContext,
   center: Point,
@@ -97,7 +101,11 @@ export function drawArc(
   drawArcSegments(drawing, center, radius, radius, startAngleDegrees, endAngleDegrees);
 }
 
-/** Draw an open elliptical arc, including both endpoint positions. */
+/**
+ * Draw an open elliptical arc, including both endpoints. Sweep is
+ * `endAngleDegrees - startAngleDegrees`: positive is counter-clockwise,
+ * negative is clockwise, and angles are not normalized across 360 degrees.
+ */
 export function drawEllipseArc(
   drawing: DrawingContext,
   center: Point,

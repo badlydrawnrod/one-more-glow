@@ -71,7 +71,7 @@ drawEllipseArc(
 ): void
 ```
 
-Angles are in degrees, measured counter-clockwise from positive X in the logical coordinate system, where positive Y points up. Both endpoint positions are included. The arc is an open curve: it does not add lines from its endpoints to the centre. The segment count is selected internally, using the same maximum chord error of 0.5 logical units as circles and ellipses; for an ellipse, use the larger radius to bound the error.
+Angles are in degrees, measured counter-clockwise from positive X in the logical coordinate system, where positive Y points up. The signed sweep is `endAngleDegrees - startAngleDegrees`: a positive sweep runs counter-clockwise and a negative sweep runs clockwise. Angles are not normalized or wrapped, so callers can choose the sweep across zero explicitly. For example, `350` to `370` is a 20-degree counter-clockwise arc; `350` to `10` is a 340-degree clockwise arc. Both endpoint positions are included. The arc is an open curve: it does not add lines from its endpoints to the centre. The segment count is selected internally, using the same maximum chord error of 0.5 logical units as circles and ellipses; for an ellipse, use the larger radius to bound the error.
 
 For circular arcs, a nonpositive radius produces no drawing operations. For elliptical arcs, either nonpositive radius produces no drawing operations. Invalid dimensions do not throw. Full circles remain the responsibility of `drawCircle` and `drawEllipse`.
 
