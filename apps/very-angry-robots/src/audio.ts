@@ -39,6 +39,7 @@ export interface AudioController {
 interface AudioControllerOptions {
   getStorage?: () => AudioStorage | undefined;
   createAudio?: (source: string) => HTMLAudioElement;
+  baseUrl?: string;
   random?: () => number;
   now?: () => number;
 }
@@ -139,8 +140,8 @@ export function writeAudioPreferences(
   }
 }
 
-function audioUrl(source: string): string {
-  return `/audio/${source}`;
+function audioUrl(source: string, baseUrl: string): string {
+  return `${baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`}audio/${source}`;
 }
 
 function tauntInterval(random: () => number): number {
@@ -156,6 +157,7 @@ function voiceSource(clip: SpokenClip): string {
 export function createAudioController(options: AudioControllerOptions = {}): AudioController {
   const getStorage = options.getStorage ?? browserStorage;
   const createAudio = options.createAudio ?? ((source) => new Audio(source));
+  const baseUrl = options.baseUrl ?? "/";
   const random = options.random ?? Math.random;
   const now = options.now ?? (() => performance.now());
 
@@ -210,7 +212,7 @@ export function createAudioController(options: AudioControllerOptions = {}): Aud
     if (!canPlay()) return null;
     let audio: HTMLAudioElement;
     try {
-      audio = createAudio(audioUrl(source));
+      audio = createAudio(audioUrl(source, baseUrl));
       audio.preload = "auto";
       audio.volume = Math.max(0, Math.min(1, preferences.volume * volume));
       audio.onended = ended;

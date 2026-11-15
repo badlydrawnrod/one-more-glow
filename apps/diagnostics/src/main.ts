@@ -14,6 +14,9 @@ import {
   type DisplayRenderer,
 } from "one-more-glow";
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
+import { registerAppServiceWorker } from "./pwa.ts";
+
+registerAppServiceWorker();
 
 let screen = requireElement(document.querySelector<HTMLCanvasElement>("#screen"), "#screen");
 const menuToggle = requireElement(document.querySelector<HTMLButtonElement>("#menu-toggle"), "#menu-toggle");
@@ -29,9 +32,10 @@ let orientation: DisplayOrientation = params.get("orientation") === "portrait"
   ? "portrait"
   : "landscape";
 const requestedScene = params.get("scene");
-let scene = requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing" || requestedScene === "profile"
+const defaultScene = import.meta.env.VITE_DEFAULT_SCENE === "testcard" ? "testcard" : "game";
+let scene = requestedScene === "game" || requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing" || requestedScene === "profile"
   ? requestedScene
-  : "game";
+  : defaultScene;
 let animate = params.get("animate") === "1" && scene === "game";
 let renderer: DisplayRenderer;
 

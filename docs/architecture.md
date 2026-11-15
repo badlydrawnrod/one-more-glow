@@ -38,6 +38,12 @@ lives in the package's or app's `README.md` when needed. App-specific active
 plans live under the app's `plans/active/`; shared and cross-app plans live
 under the root `plans/`.
 
+The GitHub Pages deployment builds one static artifact with separate paths and
+PWA scopes for explicitly selected apps. Its selection and initial publication
+set are specified in
+[`docs/specs/github-pages-pwa.md`](specs/github-pages-pwa.md). Discovering a
+workspace does not publish it automatically.
+
 The root `package.json` declares npm workspaces and the commands documented in
 the root README. Each workspace owns its package manifest and local build
 configuration. The root package remains private; each library package is the

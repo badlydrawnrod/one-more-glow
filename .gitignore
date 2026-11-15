@@ -5,6 +5,7 @@ node_modules/
 dist/
 dist-ssr/
 .vite/
+.pages-output/
 
 # Local environment files (keep examples such as .env.example)
 .env

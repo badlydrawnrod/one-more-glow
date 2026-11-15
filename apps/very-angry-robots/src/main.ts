@@ -20,7 +20,10 @@ import { createSettings } from "./settings.ts";
 import { canOpenDisplaySettings, focusLossOverlayState, shouldAdvanceGame, shouldAdvanceSceneTime, shouldTickAttractScreen } from "./interaction-policy.ts";
 import { createAudioController, type TauntSet } from "./audio.ts";
 import { gameAudioActions } from "./game-audio.ts";
+import { registerAppServiceWorker } from "./pwa.ts";
 import "./style.css";
+
+registerAppServiceWorker();
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing game canvas");
@@ -28,7 +31,7 @@ const screen = canvas;
 const gl = screen.getContext("webgl2");
 if (!gl) throw new Error("WebGL2 is unavailable");
 const drawing = createWebGL2Renderer(gl);
-const audio = createAudioController();
+const audio = createAudioController({ baseUrl: import.meta.env.BASE_URL });
 const displayProfile = readDisplayProfile(() => window.localStorage);
 drawing.setDisplayProfile(displayProfile);
 const settings = createSettings({

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090b18" />
+    <title>One More Glow</title>
+    <style>
+      :root { color-scheme: dark; font-family: ui-monospace, "SFMono-Regular", Consolas, monospace; background: #090b18; color: #e8f5ff; }
+      * { box-sizing: border-box; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 2rem; background: radial-gradient(ellipse at 50% 12%, #17223b 0, #090b18 62%); }
+      main { width: min(52rem, 100%); }
+      .eyebrow { color: #72f6d0; letter-spacing: .2em; font-size: .8rem; text-transform: uppercase; }
+      h1 { margin: .7rem 0; color: #f4fbff; font-size: clamp(2.5rem, 8vw, 5.5rem); line-height: .95; text-shadow: 0 0 24px #52e4dc55; }
+      .intro { max-width: 38rem; color: #a9bbd5; line-height: 1.7; }
+      nav { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin-top: 2.5rem; }
+      a { min-height: 8rem; display: flex; flex-direction: column; justify-content: space-between; padding: 1.3rem; border: 1px solid #34445f; border-radius: .5rem; background: #11182acc; color: #e8f5ff; text-decoration: none; transition: border-color .15s ease, transform .15s ease, box-shadow .15s ease; }
+      a:hover, a:focus-visible { transform: translateY(-2px); border-color: #72f6d0; box-shadow: 0 0 24px #52e4dc22; outline: none; }
+      a strong { font-size: 1.15rem; }
+      a span { color: #72f6d0; font-size: .85rem; }
+      footer { margin-top: 3rem; color: #71819b; font-size: .78rem; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="eyebrow">One More Glow · Vector Arcade</div>
+      <h1>Pick a screen.</h1>
+      <p class="intro">A collection of bright vector graphics, playable experiments, and tools for exploring the glow.</p>
+      <nav aria-label="Published apps">
+        <a href="./very-angry-robots/"><strong>Very Angry Robots</strong><span>ENTER THE ARENA ↗</span></a>
+        <a href="./test-card/"><strong>Test Card</strong><span>OPEN THE DISPLAY LAB ↗</span></a>
+      </nav>
+      <footer>Best enjoyed with the lights turned down.</footer>
+    </main>
+  </body>
+</html>
