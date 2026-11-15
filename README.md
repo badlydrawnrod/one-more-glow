@@ -69,10 +69,40 @@ Repository checks belong in `tools/`, and every root npm command is listed here.
 | `npm run preview:asteroids` | Preview the production Asteroids app. |
 | `npm run preview:gyruss` | Preview the production orbital shooter. |
 | `npm run preview:robots` | Preview the production Very Angry Robots app. |
+| `npm run build:pages` | Build and assemble the explicitly selected GitHub Pages apps into `.pages-output/`. |
 
 Each workspace has its own manifest and configuration. The root is private;
 the library package is the independent package boundary. Library builds emit
 JavaScript and TypeScript declarations into its ignored `dist/` directory.
+
+## GitHub Pages site
+
+The combined Pages site publishes the landing page, Very Angry Robots at
+`/very-angry-robots/`, and diagnostics as Test Card at `/test-card/`. The
+publication allowlist is maintained in `tools/pages-publication.mjs`; adding a
+workspace to npm does not publish it. A future app needs an explicit entry
+there and app-owned route/PWA assets before it is included.
+
+Build and preview the assembled site locally from the repository root:
+
+```sh
+PAGES_BASE=/ npm run build:pages
+npm exec vite -- preview --outDir .pages-output
+```
+
+Open the preview URL's `/`, `/very-angry-robots/`, and `/test-card/` paths.
+`PAGES_BASE` defaults to `/`. The Pages workflow sets it to the repository
+project path (for example `/one-more-glow/`); set the repository Actions
+variable `PAGES_BASE` to `/` when publishing at a custom domain root. Each app
+build also receives its own `APP_ROUTE`, and its Vite base combines that route
+with `PAGES_BASE`.
+
+Before the first deployment, set the repository's Pages publishing source to
+**GitHub Actions** in Settings → Pages.
+
+Pull requests build and upload an artifact for validation only. Pushes to the
+default branch deploy automatically. A manual workflow run deploys the branch
+selected for that run.
 
 ## Display profile
 

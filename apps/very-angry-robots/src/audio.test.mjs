@@ -93,6 +93,20 @@ test("effect playback waits for gesture unlock and uses the stored master volume
   controller.dispose();
 });
 
+test("audio files resolve under the configured app base path", () => {
+  const harness = audioHarness();
+  const controller = createAudioController({
+    getStorage: () => storageWith(),
+    createAudio: harness.createAudio,
+    baseUrl: "/project/robots/",
+  });
+  controller.unlock();
+  controller.setGameplayState(true, false);
+  controller.playEffects(["robot-destroyed"]);
+  assert.equal(harness.audios[0].src, "/project/robots/audio/hit01.ogg");
+  controller.dispose();
+});
+
 test("changing preferences applies mute and volume immediately and persists the valid selection", () => {
   const store = storageWith();
   const { controller, harness } = makeController({ store });
