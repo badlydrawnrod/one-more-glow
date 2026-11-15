@@ -36,6 +36,7 @@ const GAMEPAD_DEAD_ZONE = 0.2;
 /** Tracks controls without touching DOM or navigator APIs. */
 export class InputController {
   private readonly keysDown = new Set<string>();
+  private readonly blockedKeys = new Set<string>();
   private enterPressedEdge = false;
   private screenAdvanceKeyEdge = false;
   private readonly keyPressEdges: string[] = [];
@@ -56,9 +57,10 @@ export class InputController {
   /** Returns whether the key is used by this controller. */
   keyDown(rawKey: string, repeat = false): boolean {
     const key = normalizeKey(rawKey);
-    const isLetter = /^[a-z]$/.test(key);
-    if (!INPUT_KEYS.has(key) && !isLetter) return false;
+    if (!isInputKey(key)) return false;
+    if (this.blockedKeys.has(key)) return true;
 
+    const isLetter = /^[a-z]$/.test(key);
     const freshPress = !repeat && !this.keysDown.has(key);
     if (freshPress) {
       if (key === "Enter") this.enterPressedEdge = true;
@@ -73,11 +75,20 @@ export class InputController {
   }
 
   keyUp(rawKey: string): void {
-    this.keysDown.delete(normalizeKey(rawKey));
+    const key = normalizeKey(rawKey);
+    this.keysDown.delete(key);
+    this.blockedKeys.delete(key);
+  }
+
+  /** Prevent a key used by a modal from leaking into gameplay until it is released. */
+  blockKey(rawKey: string): void {
+    const key = normalizeKey(rawKey);
+    if (isInputKey(key)) this.blockedKeys.add(key);
   }
 
   /** Call on window blur or document visibility loss to release held keys. */
   clearKeyboard(): void {
+    for (const key of this.keysDown) this.blockedKeys.add(key);
     this.keysDown.clear();
     this.enterPressedEdge = false;
     this.screenAdvanceKeyEdge = false;
@@ -167,6 +178,10 @@ export class InputController {
 
 function normalizeKey(key: string): string {
   return key.length === 1 ? key.toLowerCase() : key;
+}
+
+function isInputKey(key: string): boolean {
+  return INPUT_KEYS.has(key) || /^[a-z]$/.test(key);
 }
 
 const ZERO: Direction = { x: 0, y: 0 };

@@ -527,6 +527,7 @@ window.addEventListener("keydown", (event) => {
   audio.unlock();
   if (settingsOpen) {
     event.preventDefault();
+    input.blockKey(event.key);
     if (event.key === "Escape") { if (!event.repeat) closeSettings(); }
     else if (event.key === "Tab") settings.moveSelection(event.shiftKey ? -1 : 1);
     else if (event.key === "ArrowUp") settings.moveSelection(-1);
