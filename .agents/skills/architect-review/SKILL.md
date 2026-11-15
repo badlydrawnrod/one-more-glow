@@ -1,18 +1,24 @@
 ---
 name: architect-review
 description: >
-  Review changes for compliance with the repository's
-  intended architecture, component boundaries, and
-  public contracts. Use for architectural reviews.
+  Review the requested scope for compliance with the repository's
+  intended architecture, component boundaries, and public contracts. Use for
+  architectural reviews.
 ---
 
 # Architect Review
 
-Review changes against the repository's documented
-architectural intent.
+Review against the repository's documented architectural intent.
 
-Your role is to detect architectural drift, not to
-redesign the system.
+Your role is to detect architectural drift, not to redesign the system.
+
+## Scope
+
+Review the scope the user specifies. A repository-wide request means the whole
+repository, even when current changes exist. Review changes, a PR, directories,
+or files in their relevant context. If no scope is specified, review current
+changes, including staged, unstaged, and relevant untracked work; if there are
+none, ask what to review. Report material limits on review coverage.
 
 ## Sources of authority
 
@@ -31,7 +37,7 @@ architectural requirements without supporting evidence.
 
 ## Review
 
-Examine the changes for:
+Examine the scope for:
 
 - **Boundaries:** Components depend only on permitted
   components and interfaces.
@@ -39,19 +45,17 @@ Examine the changes for:
   appropriate component or layer.
 - **Contracts:** Public APIs preserve documented
   semantics and invariants.
-- **Dependencies:** Changes do not introduce unwanted
+- **Dependencies:** Dependencies avoid unwanted
   coupling or dependency direction.
 - **Encapsulation:** Implementation details do not
   leak across architectural boundaries.
-- **Consistency:** New code follows established
+- **Consistency:** Code follows established
   architectural patterns where applicable.
-- **Enforcement:** Identify established architectural
-  constraints that are not adequately enforced by
-  existing mechanical checks.
 
 ## Review discipline
 
-- Evaluate the architecture actually documented.
+- Evaluate the architecture actually documented. Include behavioural contract
+  violations at documented component or public interface boundaries.
 - Do not impose preferred patterns or abstractions.
 - Do not invent requirements for undecided features.
 - Distinguish architectural violations from suggestions.
@@ -90,15 +94,15 @@ Report actionable findings only.
 
 For each finding:
 - Location: relevant files and lines.
-- Constraint: the documented architectural requirement.
-- Violation: how the change conflicts with it.
+- Constraint: the documented architectural requirement and its reference.
+- Violation: how the work conflicts with it.
 - Consequence: why the deviation matters.
 - Remedy: the smallest reasonable correction.
 
 ### Enforcement gaps
 
 For each finding:
-- Constraint: the established architectural requirement.
+- Constraint: the established architectural requirement and its reference.
 - Gap: why existing mechanisms do not enforce it.
 - Recommendation: the simplest reliable check.
 
