@@ -745,6 +745,7 @@ function submitInitials(): void {
     saveHighScores(() => window.localStorage, highScores);
   }
   screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
+  input.suppressGamepadWhileHeld(latestGamepadState);
 }
 
 function startRun(): void {
