@@ -19,6 +19,12 @@ All consumer apps depend on the library by package name. Keep game or app
 behavior in apps; place code in a shared package when a concrete reuse need appears. See
 [`docs/architecture.md`](docs/architecture.md) for the dependency rules.
 
+## Repository skills
+
+The repository includes focused skills for API, architecture, complexity and
+correctness reviews, and for adding automated safeguards. See the
+[`skills catalog`](docs/skills.md) for descriptions and instructions.
+
 ## Getting started
 
 Requires Node.js and npm. From the repository root:
