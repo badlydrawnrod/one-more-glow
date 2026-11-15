@@ -10,7 +10,7 @@
     "dev": "npm run build --workspace=one-more-glow && npm run dev --workspace=diagnostics",
     "dev:asteroids": "npm run build --workspace=one-more-glow && npm run dev --workspace=asteroids-demo",
     "dev:gyruss": "npm run build --workspace=one-more-glow && npm run dev --workspace=gyruss-demo",
-    "check": "npm run build --workspace=one-more-glow && npm run check --workspace=diagnostics && npm run check --workspace=asteroids-demo && npm run check --workspace=gyruss-demo && npm run check --workspace=very-angry-robots",
+    "check": "npm run check:repo-conventions && npm run check:boundaries && npm run build --workspace=one-more-glow && npm run check --workspace=diagnostics && npm run check --workspace=asteroids-demo && npm run check --workspace=gyruss-demo && npm run check --workspace=very-angry-robots",
     "check:asteroids": "npm run build --workspace=one-more-glow && npm run check --workspace=asteroids-demo",
     "check:gyruss": "npm run build --workspace=one-more-glow && npm run check --workspace=gyruss-demo",
     "build": "npm run build --workspace=one-more-glow && npm run build --workspace=diagnostics && npm run build --workspace=asteroids-demo && npm run build --workspace=gyruss-demo && npm run build --workspace=very-angry-robots",
@@ -23,7 +23,9 @@
     "dev:robots": "npm run build --workspace=one-more-glow && npm run dev --workspace=very-angry-robots",
     "check:robots": "npm run build --workspace=one-more-glow && npm run check --workspace=very-angry-robots",
     "build:robots": "npm run build --workspace=one-more-glow && npm run build --workspace=very-angry-robots",
-    "preview:robots": "npm run preview --workspace=very-angry-robots"
+    "preview:robots": "npm run preview --workspace=very-angry-robots",
+    "check:boundaries": "node tools/check-app-imports.mjs",
+    "check:repo-conventions": "node tools/check-repo-conventions.mjs"
   },
   "devDependencies": {
     "typescript": "~7.0.2",

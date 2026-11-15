@@ -37,6 +37,8 @@ Run `npm run dev:robots` to play Very Angry Robots.
 ## Workspace commands
 
 Run these from the repository root:
+Repository checks belong in `tools/`, and every root npm command is listed here.
+`npm run check` verifies both conventions.
 
 | Command | Purpose |
 | --- | --- |
@@ -45,6 +47,8 @@ Run these from the repository root:
 | `npm run dev:gyruss` | Build the library and start the orbital shooter demo. |
 | `npm run dev:robots` | Build the library and start Very Angry Robots. |
 | `npm run check` | Build the library, then type-check all apps against its package API. |
+| `npm run check:repo-conventions` | Check that root npm commands are listed here and repository-check scripts live in `tools/`. |
+| `npm run check:boundaries` | Check that apps import the library through its public entry point and do not depend on other apps. |
 | `npm run check:asteroids` | Build the library and type-check the Asteroids app. |
 | `npm run check:gyruss` | Build the library and type-check the orbital shooter demo. |
 | `npm run check:robots` | Build the library and type-check Very Angry Robots. |
