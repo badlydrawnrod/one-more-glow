@@ -275,6 +275,7 @@ function drawRoomCaptain(room: RoomView, offsetX: number, offsetY: number): void
   };
   const bounds = intersectClipBounds(sceneClip, roomBounds);
   if (!bounds) return;
+  // This wrapper targets the base drawing context, so bounds are in scene coordinates.
   const captainScene = clippedDrawing(drawing, bounds);
   captainScene.pushTransform();
   captainScene.translate(offsetX, roomCenterY + offsetY);
@@ -303,6 +304,7 @@ function drawRoom(room: RoomView, time: number, offsetX = 0, offsetY = 0, doorPr
     scene.moveTo(shot.x, shot.y);
     scene.lineTo(shot.x - shot.velocityX / length * 10, shot.y - shot.velocityY / length * 10);
   }
+  // The target scene wrapper accepts room coordinates before applying its room transform.
   const roomEffectsScene = clippedDrawing(scene, { left: 0, right: ROOM.width, bottom: 0, top: ROOM.height });
   for (let index = 0; index < scoreFlyups.items.length; index += 1) {
     const flyup = scoreFlyups.items[index];
@@ -607,8 +609,6 @@ let sceneTime = 0;
 interface FrameInput {
   gamepad: Gamepad | undefined;
   controls: InputState;
-  pausePressed: boolean;
-  settingsPressed: boolean;
 }
 
 function findStandardGamepad(): Gamepad | undefined {
@@ -633,12 +633,7 @@ function readFrameInput(): FrameInput {
   const gamepad = findStandardGamepad();
   latestGamepadState = readGamepadState(gamepad);
   const controls = input.read(latestGamepadState);
-  return {
-    gamepad,
-    controls,
-    pausePressed: input.takePauseAction(),
-    settingsPressed: input.takeSettingsAction(),
-  };
+  return { gamepad, controls };
 }
 
 function updateFrameAudioAndSceneTime(delta: number): void {
@@ -652,11 +647,11 @@ function handleOverlayInput(time: number, frameInput: FrameInput): boolean {
     handleSettingsGamepad(time, frameInput.gamepad);
     return true;
   }
-  if (frameInput.settingsPressed && canOpenSettings()) {
+  if (frameInput.controls.settingsPressed && canOpenSettings()) {
     openSettings();
     return true;
   }
-  if (screenFlow.screen === "playing" && frameInput.pausePressed) {
+  if (screenFlow.screen === "playing" && frameInput.controls.pausePressed) {
     paused = !paused;
     input.clearKeyboard();
     input.suppressGamepadWhileHeld(latestGamepadState);
@@ -790,7 +785,7 @@ function frame(time: number): void {
   const frameInput = readFrameInput();
   const { controls } = frameInput;
 
-  if (controls.startPressed || controls.screenAdvancePressed || frameInput.pausePressed || frameInput.settingsPressed) {
+  if (controls.startPressed || controls.screenAdvancePressed || controls.pausePressed || controls.settingsPressed) {
     audio.unlock();
   }
   updateFrameAudioAndSceneTime(delta);

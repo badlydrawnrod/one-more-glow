@@ -22,7 +22,14 @@ export function intersectClipBounds(first: ClipBounds, second: ClipBounds): Clip
 type Transform = { a: number; b: number; c: number; d: number; e: number; f: number };
 type Point = { x: number; y: number };
 
-/** Applies transforms locally and clips emitted geometry before it reaches the renderer. */
+/**
+ * Applies transforms to local points, then clips in the resulting coordinate
+ * space before forwarding geometry to `target`. Thus `bounds` are expressed
+ * in the coordinates this wrapper passes to its immediate target, not in the
+ * wrapper's untransformed local coordinates. For nested wrappers, those are
+ * the inner wrapper's output coordinates; the target applies its own
+ * transforms afterward.
+ */
 export function clippedDrawing(target: DrawingContext, bounds: ClipBounds): DrawingContext {
   let transform: Transform = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
   const stack: Transform[] = [];

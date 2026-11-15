@@ -2,11 +2,12 @@
 
 **Status: Accepted. Implementation: Present. Automated coverage: Passed for
 pause and focus state gates, transition and death interval suspension, attract
-timer suspension, input isolation, display-profile validation and storage, and
-settings selection, bounded value adjustment, reset, pointer interaction, and
-audio preference updates. Keyboard and gamepad browser-event integration and
-responsive viewport behavior are not covered by automated tests. The user
-reports manual checking as far as they can; exact coverage is not recorded.**
+timer suspension, input isolation and one-read input action edges,
+display-profile validation and storage, and settings selection, bounded value
+adjustment, reset, pointer interaction, and audio preference updates. Keyboard
+and gamepad browser-event integration and responsive viewport behavior are not
+covered by automated tests. The user reports manual checking as far as they
+can; exact coverage is not recorded.**
 The shared display profile and its valid values are defined by the
 [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md#global-display-profile-options).
 
@@ -15,6 +16,9 @@ The shared display profile and its valid values are defined by the
 - During a run, let the player pause and resume with P on the keyboard or
   Gamepad Start. Ignore keyboard auto-repeat; treat Start as a discrete press.
   Show the pause and resume controls on the applicable screens.
+- Read pause and settings press edges in the same per-frame input snapshot as
+  movement, aiming and other controls. Each edge is true for one read only;
+  keyboard repeats and a continuously held gamepad button do not retrigger it.
 - Pausing freezes the room, player, robots, shots, effects, score and all
   gameplay timers. This includes the Captain's lurk and pursuit, death and
   respawn intervals, and room scroll and door animations. Resuming continues

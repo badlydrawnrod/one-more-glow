@@ -10,6 +10,8 @@ test("keyboard movement and aiming are independent and support diagonals", () =>
     move: { x: 0, y: -1 },
     aim: { x: 1, y: 0 },
     startPressed: false,
+    pausePressed: false,
+    settingsPressed: false,
     keyPresses: ["W"],
     screenAdvancePressed: true,
     initialsSlotDelta: 0,
@@ -141,6 +143,8 @@ test("gamepad initials controls step once and rearm in their neutral dead zones"
     move: { x: -1, y: 0 },
     aim: { x: 0, y: 1 },
     startPressed: false,
+    pausePressed: false,
+    settingsPressed: false,
     keyPresses: [],
     screenAdvancePressed: true,
     initialsSlotDelta: -1,
@@ -153,37 +157,39 @@ test("gamepad initials controls step once and rearm in their neutral dead zones"
   assert.equal(next.initialsCharDelta, -1);
 });
 
-test("pause and settings shortcuts are discrete, independent actions", () => {
+test("pause and settings shortcuts are one-read edges in the input snapshot", () => {
   const input = new InputController();
   input.keyDown("p");
   input.keyDown("p", true);
-  input.read();
-  assert.equal(input.takePauseAction(), true);
-  assert.equal(input.takePauseAction(), false);
+  assert.equal(input.read().pausePressed, true);
+  assert.equal(input.read().pausePressed, false);
   input.keyDown("s");
-  input.read();
-  assert.equal(input.takeSettingsAction(), true);
-  assert.equal(input.takePauseAction(), false);
+  assert.equal(input.read().settingsPressed, true);
+  assert.equal(input.read().settingsPressed, false);
   input.keyUp("p");
   input.keyUp("s");
 
   const pad = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: true, backPressed: false };
-  input.read(pad);
-  assert.equal(input.takePauseAction(), true);
-  assert.equal(input.takePauseAction(), false);
+  let state = input.read(pad);
+  assert.equal(state.pausePressed, true);
+  assert.equal(state.startPressed, true);
+  state = input.read(pad);
+  assert.equal(state.pausePressed, false);
+  assert.equal(state.startPressed, false);
   input.read({ ...pad, startPressed: false });
-  input.read({ ...pad, startPressed: true, backPressed: true });
-  assert.equal(input.takeSettingsAction(), true);
-  assert.equal(input.takePauseAction(), true);
+  state = input.read({ ...pad, startPressed: true, backPressed: true });
+  assert.equal(state.pausePressed, true);
+  assert.equal(state.settingsPressed, true);
 });
 
 test("clearing keyboard input discards pending pause and settings actions and held controls", () => {
   const input = new InputController();
   input.keyDown("p"); input.keyDown("s"); input.keyDown("w");
   input.clearKeyboard();
-  assert.equal(input.takePauseAction(), false);
-  assert.equal(input.takeSettingsAction(), false);
-  assert.deepEqual(input.read().move, { x: 0, y: 0 });
+  const state = input.read();
+  assert.equal(state.pausePressed, false);
+  assert.equal(state.settingsPressed, false);
+  assert.deepEqual(state.move, { x: 0, y: 0 });
 });
 
 test("gamepad controls held across a screen transition stay suppressed until released", () => {
@@ -193,12 +199,12 @@ test("gamepad controls held across a screen transition stay suppressed until rel
   const state = input.read(held);
   assert.deepEqual(state.move, { x: 0, y: 0 });
   assert.equal(state.startPressed, false);
-  assert.equal(input.takePauseAction(), false);
-  assert.equal(input.takeSettingsAction(), false);
+  assert.equal(state.pausePressed, false);
+  assert.equal(state.settingsPressed, false);
 
   input.read({ ...held, leftX: 0, startPressed: false, backPressed: false });
   const fresh = input.read({ ...held, leftX: 0.8 });
   assert.ok(fresh.move.x > 0);
   assert.equal(fresh.startPressed, true);
-  assert.equal(input.takeSettingsAction(), true);
+  assert.equal(fresh.settingsPressed, true);
 });

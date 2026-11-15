@@ -18,6 +18,10 @@ export interface InputState {
   aim: Direction;
   /** True for one read only when Enter or gamepad Start has just been pressed. */
   startPressed: boolean;
+  /** True for one read only when P or gamepad Start has just been pressed. */
+  pausePressed: boolean;
+  /** True for one read only when S or gamepad Back/Select has just been pressed. */
+  settingsPressed: boolean;
   /** One-shot keyboard events: uppercase A–Z or Backspace. */
   keyPresses: string[];
   /** True once when a gameplay direction is pressed or a stick leaves neutral. */
@@ -47,8 +51,6 @@ export class InputController {
   private rightStickCharArmed = true;
   private pauseKeyEdge = false;
   private settingsKeyEdge = false;
-  private pauseAction = false;
-  private settingsAction = false;
   private blockedLeftStick = false;
   private blockedRightStick = false;
   private blockedStart = false;
@@ -95,22 +97,6 @@ export class InputController {
     this.keyPressEdges.length = 0;
     this.pauseKeyEdge = false;
     this.settingsKeyEdge = false;
-    this.pauseAction = false;
-    this.settingsAction = false;
-  }
-
-  /** Consume the latest one-shot pause/resume action. */
-  takePauseAction(): boolean {
-    const pressed = this.pauseAction;
-    this.pauseAction = false;
-    return pressed;
-  }
-
-  /** Consume the latest one-shot settings action. */
-  takeSettingsAction(): boolean {
-    const pressed = this.settingsAction;
-    this.settingsAction = false;
-    return pressed;
   }
 
   /** Ignore gamepad controls already held during a modal or pause transition until release. */
@@ -144,8 +130,8 @@ export class InputController {
     this.enterPressedEdge = false;
     const gamepadBackPressed = Boolean(gamepad?.backPressed) && !this.blockedBack && !this.previousGamepadBack;
     this.previousGamepadBack = Boolean(gamepad?.backPressed);
-    this.pauseAction = this.pauseKeyEdge || gamepadStartPressed;
-    this.settingsAction = this.settingsKeyEdge || gamepadBackPressed;
+    const pausePressed = this.pauseKeyEdge || gamepadStartPressed;
+    const settingsPressed = this.settingsKeyEdge || gamepadBackPressed;
     this.pauseKeyEdge = false;
     this.settingsKeyEdge = false;
 
@@ -172,7 +158,17 @@ export class InputController {
     const keyPresses = this.keyPressEdges.splice(0);
     const screenAdvancePressed = this.screenAdvanceKeyEdge || gamepadDirectionEdge;
     this.screenAdvanceKeyEdge = false;
-    return { move, aim, startPressed, keyPresses, screenAdvancePressed, initialsSlotDelta, initialsCharDelta };
+    return {
+      move,
+      aim,
+      startPressed,
+      pausePressed,
+      settingsPressed,
+      keyPresses,
+      screenAdvancePressed,
+      initialsSlotDelta,
+      initialsCharDelta,
+    };
   }
 }
 
