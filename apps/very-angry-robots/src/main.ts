@@ -606,6 +606,8 @@ function resize(): void {
   screen.height = Math.max(1, Math.round(rect.height * ratio));
 }
 window.addEventListener("resize", resize);
+const canvasResizeObserver = new ResizeObserver(resize);
+canvasResizeObserver.observe(screen);
 resize();
 let lastTime = 0;
 let sceneTime = 0;
