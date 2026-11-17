@@ -19,10 +19,15 @@ Do not duplicate durable requirements here.
 
 ## Scope
 
+Name the affected workspace and any behavior to preserve. Link the accepted
+capability when changing specified behavior.
+
 **In scope:**
+
 - ...
 
 **Out of scope:**
+
 - ...
 
 ## Decisions
@@ -35,13 +40,14 @@ Decisions that remain relevant after completion must be reflected in durable doc
 
 ## Work
 
-Keep steps small enough to show meaningful progress.
+Order the steps by dependency. Repeat this shape for each meaningful step.
 
-- [ ] ...
-- [ ] ...
-- [ ] ...
+- [ ] **Step and observable outcome.** Name the entry point or code to start
+  from, the specific change, and any prerequisite.
+  **Checkpoint.** Give the command or manual action, setup or input, and
+  expected result.
 
-Update checkboxes as work progresses. Do not mark work complete without verification.
+Check off a step once its checkpoint passes.
 
 ## Verification
 
@@ -51,15 +57,19 @@ Record the checks performed and their actual results.
 - Type checking: Not run
 - Build: Not run
 
-Include relevant failures or limitations.
+Record failures and pending checks separately from passes. For a pending
+check, name the browser, device, fixture, or other prerequisite needed.
 
 ## Open questions
 
 - None currently.
 
+For a blocking question, state what would resolve it and which step depends
+on the answer.
+
 ## Next action
 
-Describe the **single next concrete action** required to continue work.
+Describe the **single next feasible action** and where to start.
 
 This section must remain current so another developer or agent can resume without relying on conversation history.
 
