@@ -5,6 +5,11 @@ claim that every scene detail is an accepted design decision. See [README.md](..
 for how to run it and select views. Shared display requirements remain in the
 [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md).
 
+## Proposed capabilities
+
+- [Diagnostics workbench](diagnostics-workbench.md) introduces two screens for
+  canvas and browser measurements, renderer studies, and frame timing.
+
 ## Purpose and current behavior
 
 The diagnostic is a consumer of the public library API for inspecting the
