@@ -1,7 +1,9 @@
 # Diagnostics workbench
 
-**Status: Proposed.** The [diagnostics app specification](SPEC.md) describes the
-current implementation. This draft describes the proposed redesign.
+**Status: Accepted.**
+
+**Implementation: Not yet implemented.** The [diagnostics app specification](SPEC.md)
+describes the current app and its existing studies.
 
 ## Purpose
 
