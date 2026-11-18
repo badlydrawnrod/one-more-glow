@@ -35,18 +35,56 @@
         </div>
         <div class="environment-layout">
           <section class="calibration-stage" aria-label="Calibration canvas preview">
-            <div class="stage-caption"><span>CALIBRATION STAGE</span><span>SETUP</span></div>
-            <div class="stage-placeholder" aria-live="polite">
-              <span class="placeholder-mark" aria-hidden="true">＋</span>
-              <strong>Canvas calibration</strong>
-              <span>Sizing controls and display measurements are next.</span>
+            <div class="stage-caption"><span>CALIBRATION STAGE</span><span id="calibration-mode-label">OMG-1 / LANDSCAPE</span></div>
+            <div id="calibration-viewport" class="calibration-viewport" aria-label="Available canvas area">
+              <canvas id="calibration-generic" class="calibration-canvas" aria-label="Generic calibration pattern"></canvas>
+              <canvas id="calibration-omg" class="calibration-canvas" aria-label="OMG-1 calibration pattern"></canvas>
+              <button id="resize-handle" class="resize-handle" type="button" aria-label="Drag to resize calibration canvas" title="Drag to resize"></button>
             </div>
+            <p class="stage-footnote">The outlined stage is the available area. The bright pattern shows the mapped content.</p>
           </section>
           <aside class="environment-readout panel">
-            <p class="eyebrow">ENVIRONMENT SUMMARY</p>
-            <h3>Ready to measure</h3>
-            <p>The calibration stage will report fit, shape, and backing scale.</p>
-            <dl><div><dt>Display</dt><dd>Browser window</dd></div><div><dt>Canvas</dt><dd>Calibration</dd></div></dl>
+            <div class="panel-heading"><p class="eyebrow">CALIBRATION SETUP</p><h3>Canvas &amp; mapping</h3></div>
+            <label class="field-control">Preset
+              <select id="calibration-preset"><option value="robots">Very Angry Robots · 4:3</option><option value="manual">Custom setup</option></select>
+            </label>
+            <div class="choice-pair" role="group" aria-label="Canvas mode">
+              <button type="button" data-cal-mode="omg1" aria-pressed="true">OMG-1</button>
+              <button type="button" data-cal-mode="generic" aria-pressed="false">Generic</button>
+            </div>
+            <label class="check-control"><input id="auto-fit" type="checkbox" checked /><span>Fit to available stage</span></label>
+            <label class="field-control">Canvas width <span class="unit">CSS px</span><input id="manual-width" type="number" min="64" max="4096" step="1" value="1024" /></label>
+            <label class="field-control">Target aspect ratio</label>
+            <div class="choice-pair ratio-choices" role="group" aria-label="Target aspect ratio">
+              <button type="button" data-ratio="4:3" aria-pressed="true">4:3</button><button type="button" data-ratio="16:9" aria-pressed="false">16:9</button><button type="button" data-ratio="1:1" aria-pressed="false">1:1</button><button type="button" data-ratio="3:4" aria-pressed="false">3:4</button><button type="button" data-ratio="custom" aria-pressed="false">Custom</button>
+            </div>
+            <div id="custom-ratio" class="inline-fields" hidden>
+              <label class="field-control">Width<input id="ratio-width" type="number" min="1" max="10000" step="1" value="4" /></label>
+              <span aria-hidden="true">:</span>
+              <label class="field-control">Height<input id="ratio-height" type="number" min="1" max="10000" step="1" value="3" /></label>
+            </div>
+            <div id="orientation-control" class="control-block">
+              <p class="control-title">OMG-1 orientation</p>
+              <div class="choice-pair" role="group" aria-label="OMG-1 orientation"><button type="button" data-cal-orientation="landscape" aria-pressed="true">Landscape</button><button type="button" data-cal-orientation="portrait" aria-pressed="false">Portrait</button></div>
+            </div>
+            <div id="generic-controls" class="generic-controls" hidden>
+              <p class="control-title">Generic virtual size</p>
+              <div class="inline-fields"><label class="field-control">Width<input id="virtual-width" type="number" min="1" max="10000" step="1" value="1024" /></label><span aria-hidden="true">×</span><label class="field-control">Height<input id="virtual-height" type="number" min="1" max="10000" step="1" value="768" /></label></div>
+              <div class="choice-pair" role="group" aria-label="Generic mapping"><button type="button" data-mapping="fit" aria-pressed="true">Fit</button><button type="button" data-mapping="stretch" aria-pressed="false">Stretch</button></div>
+            </div>
+            <label class="field-control">Backing scale
+              <select id="backing-scale"><option value="robots">Device scale · max 2</option><option value="device">Device scale</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option>
+              </select>
+            </label>
+            <input id="resize-handle-range" class="size-range" type="range" min="64" max="4096" step="1" value="1024" aria-label="Canvas width in CSS pixels" />
+            <p id="calibration-error" class="field-error" role="status" aria-live="polite"></p>
+            <dl class="environment-values">
+              <div><dt>Requested size</dt><dd id="requested-size-value">—</dd></div>
+              <div><dt>Canvas size</dt><dd id="canvas-size-value">—</dd></div>
+              <div><dt>Backing buffer</dt><dd id="backing-size-value">—</dd></div>
+              <div><dt>Pattern map</dt><dd id="mapping-value">—</dd></div>
+              <div><dt>Scale</dt><dd id="scale-value">—</dd></div>
+            </dl>
           </aside>
         </div>
       </section>

@@ -15,6 +15,7 @@ import {
 } from "one-more-glow";
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 import { registerAppServiceWorker } from "./pwa.ts";
+import { backingSize, fitCanvasSize, genericMap, type CanvasSize } from "./calibration-sizing.ts";
 
 registerAppServiceWorker();
 
@@ -27,7 +28,44 @@ const animationControl = requireElement(document.querySelector<HTMLElement>("#an
 const animationToggle = requireElement(document.querySelector<HTMLInputElement>("#animation-toggle"), "#animation-toggle");
 const profileControls = requireElement(document.querySelector<HTMLElement>("#profile-controls"), "#profile-controls");
 const profileReset = requireElement(document.querySelector<HTMLButtonElement>("#profile-reset"), "#profile-reset");
+const calibrationViewport = requireElement(document.querySelector<HTMLElement>("#calibration-viewport"), "#calibration-viewport");
+const genericCanvas = requireElement(document.querySelector<HTMLCanvasElement>("#calibration-generic"), "#calibration-generic");
+let omgCanvas = requireElement(document.querySelector<HTMLCanvasElement>("#calibration-omg"), "#calibration-omg");
+const resizeHandle = requireElement(document.querySelector<HTMLButtonElement>("#resize-handle"), "#resize-handle");
+const widthInput = requireElement(document.querySelector<HTMLInputElement>("#manual-width"), "#manual-width");
+const widthRange = requireElement(document.querySelector<HTMLInputElement>("#resize-handle-range"), "#resize-handle-range");
+const autoFitInput = requireElement(document.querySelector<HTMLInputElement>("#auto-fit"), "#auto-fit");
+const presetSelect = requireElement(document.querySelector<HTMLSelectElement>("#calibration-preset"), "#calibration-preset");
+const backingScaleSelect = requireElement(document.querySelector<HTMLSelectElement>("#backing-scale"), "#backing-scale");
+const ratioWidthInput = requireElement(document.querySelector<HTMLInputElement>("#ratio-width"), "#ratio-width");
+const ratioHeightInput = requireElement(document.querySelector<HTMLInputElement>("#ratio-height"), "#ratio-height");
+const virtualWidthInput = requireElement(document.querySelector<HTMLInputElement>("#virtual-width"), "#virtual-width");
+const virtualHeightInput = requireElement(document.querySelector<HTMLInputElement>("#virtual-height"), "#virtual-height");
+const customRatio = requireElement(document.querySelector<HTMLElement>("#custom-ratio"), "#custom-ratio");
+const genericControls = requireElement(document.querySelector<HTMLElement>("#generic-controls"), "#generic-controls");
+const orientationControl = requireElement(document.querySelector<HTMLElement>("#orientation-control"), "#orientation-control");
+const calibrationError = requireElement(document.querySelector<HTMLElement>("#calibration-error"), "#calibration-error");
+const calibrationModeLabel = requireElement(document.querySelector<HTMLElement>("#calibration-mode-label"), "#calibration-mode-label");
+const canvasSizeValue = requireElement(document.querySelector<HTMLElement>("#canvas-size-value"), "#canvas-size-value");
+const requestedSizeValue = requireElement(document.querySelector<HTMLElement>("#requested-size-value"), "#requested-size-value");
+const backingSizeValue = requireElement(document.querySelector<HTMLElement>("#backing-size-value"), "#backing-size-value");
+const mappingValue = requireElement(document.querySelector<HTMLElement>("#mapping-value"), "#mapping-value");
+const scaleValue = requireElement(document.querySelector<HTMLElement>("#scale-value"), "#scale-value");
 let profile: DisplayProfile = { ...DEFAULT_DISPLAY_PROFILE };
+
+type CalibrationMode = "omg1" | "generic";
+type MappingMode = "fit" | "stretch";
+let calibrationMode: CalibrationMode = "omg1";
+let mappingMode: MappingMode = "fit";
+let calibrationOrientation: DisplayOrientation = "landscape";
+let targetRatio = 4 / 3;
+let ratioLabel = "4:3";
+let virtualSize: CanvasSize = { width: 1024, height: 768 };
+let manualWidth = 1024;
+let lastCssSize: CanvasSize = { width: 1, height: 1 };
+let calibrationRenderer: DisplayRenderer | null = null;
+const omgSurfaces = new Map<DisplayOrientation, { canvas: HTMLCanvasElement; renderer: DisplayRenderer | null }>();
+let resizePointer: { id: number; x: number; width: number } | null = null;
 
 const params = new URLSearchParams(location.search);
 let orientation: DisplayOrientation = params.get("orientation") === "portrait"
@@ -51,7 +89,7 @@ function aspectRatio(): number {
   return orientation === "landscape" ? 4 / 3 : 3 / 4;
 }
 
-function resizeCanvas(): void {
+function resizeStudyCanvas(): void {
   const ratio = aspectRatio();
   const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * ratio);
   const cssWidth = Math.max(1, Math.min(800, maxWidth));
@@ -71,8 +109,194 @@ function createRenderer(canvas: HTMLCanvasElement): DisplayRenderer {
   );
 }
 
-resizeCanvas();
+resizeStudyCanvas();
 renderer = createRenderer(screen);
+
+function ensureCalibrationRenderer(): DisplayRenderer | null {
+  let surface = omgSurfaces.get(calibrationOrientation);
+  if (!surface) {
+    const canvas = calibrationOrientation === "landscape" ? omgCanvas : document.createElement("canvas");
+    canvas.className = "calibration-canvas";
+    canvas.id = calibrationOrientation === "landscape" ? "calibration-omg" : "calibration-omg-portrait";
+    canvas.setAttribute("aria-label", `OMG-1 ${calibrationOrientation} calibration pattern`);
+    let nextRenderer: DisplayRenderer | null = null;
+    try {
+      const context = canvas.getContext("webgl2", { alpha: true });
+      if (context) nextRenderer = createWebGL2Renderer(context, { orientation: calibrationOrientation });
+    } catch {
+      nextRenderer = null;
+    }
+    surface = { canvas, renderer: nextRenderer };
+    omgSurfaces.set(calibrationOrientation, surface);
+  }
+  if (omgCanvas !== surface.canvas) {
+    omgCanvas.replaceWith(surface.canvas);
+    omgCanvas = surface.canvas;
+  }
+  calibrationRenderer = surface.renderer;
+  return calibrationRenderer;
+}
+
+function selectedBackingScale(): number {
+  const dpr = Math.max(0.25, window.devicePixelRatio || 1);
+  const value = backingScaleSelect.value;
+  if (value === "robots") return Math.min(dpr, 2);
+  if (value === "device") return dpr;
+  return Number(value);
+}
+
+function availableCanvasSize(): CanvasSize {
+  return { width: calibrationViewport.clientWidth, height: calibrationViewport.clientHeight };
+}
+
+function setCalibrationError(message = ""): void {
+  calibrationError.textContent = message;
+}
+
+function boundedValue(input: HTMLInputElement, label: string, maximum: number): number | null {
+  const value = Number(input.value);
+  if (!input.value.trim() || !Number.isFinite(value) || value <= 0) {
+    setCalibrationError(`${label} must be a finite positive number. The previous setting is still active.`);
+    return null;
+  }
+  if (value > maximum) {
+    setCalibrationError(`${label} is limited to ${maximum}. The previous setting is still active.`);
+    return null;
+  }
+  return value;
+}
+
+function chooseManualPreset(): void {
+  presetSelect.value = "manual";
+}
+
+function drawGenericCalibration(css: CanvasSize, backing: CanvasSize): void {
+  const ctx = genericCanvas.getContext("2d");
+  if (!ctx) return;
+  const dprX = backing.width / css.width;
+  const dprY = backing.height / css.height;
+  if (genericCanvas.width !== backing.width) genericCanvas.width = backing.width;
+  if (genericCanvas.height !== backing.height) genericCanvas.height = backing.height;
+  ctx.setTransform(dprX, 0, 0, dprY, 0, 0);
+  ctx.fillStyle = "#05080e";
+  ctx.fillRect(0, 0, css.width, css.height);
+  const mapped = genericMap(css, virtualSize, mappingMode);
+  ctx.save();
+  ctx.translate(mapped.offsetX, mapped.offsetY);
+  ctx.scale(mapped.scaleX, mapped.scaleY);
+  ctx.translate(virtualSize.width / 2, virtualSize.height / 2);
+  const halfW = virtualSize.width / 2;
+  const halfH = virtualSize.height / 2;
+  ctx.strokeStyle = "rgba(63, 173, 190, .25)";
+  ctx.lineWidth = Math.max(1, Math.min(virtualSize.width, virtualSize.height) / 900);
+  for (let x = -halfW; x <= halfW; x += virtualSize.width / 8) {
+    ctx.beginPath(); ctx.moveTo(x, -halfH); ctx.lineTo(x, halfH); ctx.stroke();
+  }
+  for (let y = -halfH; y <= halfH; y += virtualSize.height / 8) {
+    ctx.beginPath(); ctx.moveTo(-halfW, y); ctx.lineTo(halfW, y); ctx.stroke();
+  }
+  ctx.strokeStyle = "#54dce9";
+  ctx.lineWidth = Math.max(2, Math.min(virtualSize.width, virtualSize.height) / 220);
+  ctx.beginPath(); ctx.moveTo(-halfW, 0); ctx.lineTo(halfW, 0); ctx.moveTo(0, -halfH); ctx.lineTo(0, halfH); ctx.stroke();
+  const square = Math.min(virtualSize.width, virtualSize.height) * 0.42;
+  ctx.strokeStyle = "#ffd18b";
+  ctx.lineWidth = Math.max(3, Math.min(virtualSize.width, virtualSize.height) / 160);
+  ctx.strokeRect(-square / 2, -square / 2, square, square);
+  ctx.beginPath(); ctx.arc(0, 0, square * 0.34, 0, Math.PI * 2); ctx.stroke();
+  ctx.strokeStyle = "#e477ff";
+  ctx.beginPath(); ctx.moveTo(-halfW * 0.82, -halfH * 0.82); ctx.lineTo(halfW * 0.82, halfH * 0.82); ctx.moveTo(halfW * 0.82, -halfH * 0.82); ctx.lineTo(-halfW * 0.82, halfH * 0.82); ctx.stroke();
+  ctx.strokeStyle = "#baff81";
+  ctx.lineWidth *= 1.5;
+  ctx.strokeRect(-halfW * 0.9, -halfH * 0.9, halfW * 1.8, halfH * 1.8);
+  for (const [x, y] of [[-halfW * 0.9, -halfH * 0.9], [halfW * 0.9, -halfH * 0.9], [-halfW * 0.9, halfH * 0.9], [halfW * 0.9, halfH * 0.9]]) {
+    ctx.fillStyle = "#fff4ce"; ctx.fillRect(x - 5, y - 5, 10, 10);
+  }
+  ctx.restore();
+}
+
+function drawOmgCalibration(backing: CanvasSize): void {
+  const target = ensureCalibrationRenderer();
+  if (!target) return;
+  if (omgCanvas.width !== backing.width) omgCanvas.width = backing.width;
+  if (omgCanvas.height !== backing.height) omgCanvas.height = backing.height;
+  const logical = calibrationOrientation === "landscape" ? { width: 1024, height: 768 } : { width: 768, height: 1024 };
+  const x = logical.width / 2;
+  const y = logical.height / 2;
+  const edgeX = logical.width * 0.44;
+  const edgeY = logical.height * 0.44;
+  target.beginFrame();
+  target.setColor([0.3, 0.75, 0.82]); target.setIntensity(0.25);
+  for (let i = -4; i <= 4; i++) {
+    target.moveTo(i * logical.width / 10, -edgeY); target.lineTo(i * logical.width / 10, edgeY);
+    target.moveTo(-edgeX, i * logical.height / 10); target.lineTo(edgeX, i * logical.height / 10);
+  }
+  target.setColor([0, 0.9, 1]); target.setIntensity(0.95);
+  target.moveTo(-edgeX, 0); target.lineTo(edgeX, 0); target.moveTo(0, -edgeY); target.lineTo(0, edgeY);
+  target.setColor([1, 0.72, 0.3]); target.setIntensity(1);
+  const square = Math.min(logical.width, logical.height) * 0.42;
+  target.moveTo(x - square / 2, y - square / 2); target.lineTo(x + square / 2, y - square / 2);
+  target.lineTo(x + square / 2, y + square / 2); target.lineTo(x - square / 2, y + square / 2); target.lineTo(x - square / 2, y - square / 2);
+  drawCircle(target, [0, 0], square * 0.34);
+  target.setColor([0.9, 0.4, 1]); target.setIntensity(0.9);
+  target.moveTo(-edgeX * 0.88, -edgeY * 0.88); target.lineTo(edgeX * 0.88, edgeY * 0.88);
+  target.moveTo(edgeX * 0.88, -edgeY * 0.88); target.lineTo(-edgeX * 0.88, edgeY * 0.88);
+  target.setColor([0.7, 1, 0.45]);
+  target.moveTo(-edgeX, -edgeY); target.lineTo(edgeX, -edgeY); target.lineTo(edgeX, edgeY); target.lineTo(-edgeX, edgeY); target.lineTo(-edgeX, -edgeY);
+  for (const [px, py] of [[-edgeX, -edgeY], [edgeX, -edgeY], [-edgeX, edgeY], [edgeX, edgeY]]) target.point(px, py);
+  target.endFrame();
+}
+
+function positionResizeHandle(css: CanvasSize): void {
+  const area = availableCanvasSize();
+  const x = Math.max(12, Math.min(area.width - 12, (area.width + css.width) / 2));
+  const y = Math.max(12, Math.min(area.height - 12, (area.height + css.height) / 2));
+  resizeHandle.style.left = `${x}px`;
+  resizeHandle.style.top = `${y}px`;
+}
+
+function renderCalibration(): void {
+  if (environmentScreen.hidden) return;
+  const stage = availableCanvasSize();
+  if (stage.width <= 1 || stage.height <= 1) return;
+  const automatic = autoFitInput.checked;
+  const cap = presetSelect.value === "robots" ? 1024 : 4096;
+  const css = automatic ? fitCanvasSize(stage, targetRatio, cap) : { width: manualWidth, height: manualWidth / targetRatio };
+  const scale = selectedBackingScale();
+  for (const canvas of [genericCanvas, omgCanvas]) {
+    canvas.style.width = `${css.width}px`;
+    canvas.style.height = `${css.height}px`;
+  }
+  genericCanvas.hidden = calibrationMode !== "generic";
+  omgCanvas.hidden = calibrationMode !== "omg1";
+  const measuredRect = (calibrationMode === "generic" ? genericCanvas : omgCanvas).getBoundingClientRect();
+  const measured: CanvasSize = { width: measuredRect.width, height: measuredRect.height };
+  const backing = backingSize(measured, scale);
+  if (backing.width > 8192 || backing.height > 8192 || backing.width * backing.height > 32_000_000) {
+    setCalibrationError("The requested backing buffer exceeds the 32 megapixel allocation limit.");
+    return;
+  }
+  setCalibrationError();
+  lastCssSize = measured;
+  if (calibrationMode === "generic") {
+    drawGenericCalibration(measured, backing);
+  } else {
+    drawOmgCalibration(backing);
+  }
+  positionResizeHandle(measured);
+  requestedSizeValue.textContent = `${css.width.toFixed(1)} × ${css.height.toFixed(1)} CSS px`;
+  canvasSizeValue.textContent = `${measured.width.toFixed(1)} × ${measured.height.toFixed(1)} CSS px`;
+  const activeCanvas = calibrationMode === "generic" ? genericCanvas : omgCanvas;
+  backingSizeValue.textContent = `${activeCanvas.width} × ${activeCanvas.height} px`;
+  mappingValue.textContent = calibrationMode === "omg1" ? `${logicalExtent()} logical · ${ratioLabel} canvas` : `${virtualSize.width} × ${virtualSize.height} · ${mappingMode}`;
+  scaleValue.textContent = `${scale.toFixed(2)}×${backingScaleSelect.value === "robots" ? " · cap 2" : backingScaleSelect.value === "device" ? " · device" : " · manual"}`;
+  widthInput.value = `${Math.round(css.width)}`;
+  widthRange.value = `${Math.max(64, Math.min(4096, Math.round(css.width)))}`;
+  calibrationModeLabel.textContent = `${calibrationMode === "omg1" ? "OMG-1" : "GENERIC"} / ${calibrationOrientation.toUpperCase()}`;
+}
+
+function logicalExtent(): string {
+  return calibrationOrientation === "landscape" ? "1024 × 768" : "768 × 1024";
+}
 
 const cyan: Color = [0, 0.9, 1];
 const amber: Color = [1, 0.55, 0.12];
@@ -410,6 +634,23 @@ function syncControls(): void {
   for (const tab of screenTabs) {
     tab.setAttribute("aria-current", String(tab.dataset.screen === activeScreen ? "page" : "false"));
   }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-mode]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.calMode === calibrationMode));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-orientation]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.calOrientation === calibrationOrientation));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-mapping]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.mapping === mappingMode));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-ratio]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.ratio === ratioLabel));
+  }
+  customRatio.hidden = ratioLabel !== "custom";
+  genericControls.hidden = calibrationMode !== "generic";
+  orientationControl.hidden = calibrationMode !== "omg1";
+  widthInput.disabled = autoFitInput.checked;
+  widthRange.disabled = autoFitInput.checked;
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-scene]")) {
     button.setAttribute("aria-pressed", String(button.dataset.scene === scene));
   }
@@ -437,8 +678,10 @@ for (const tab of screenTabs) {
     activeScreen = next;
     syncControls();
     if (activeScreen === "renderer") {
-      resizeCanvas();
+      resizeStudyCanvas();
       renderCurrentScene();
+    } else {
+      renderCalibration();
     }
   });
 }
@@ -461,13 +704,14 @@ document.addEventListener("click", (event: MouseEvent) => {
   if (selectedOrientation === "landscape" || selectedOrientation === "portrait") {
     if (orientation !== selectedOrientation) {
       orientation = selectedOrientation;
+      calibrationOrientation = selectedOrientation;
       stopAnimation();
       const replacement = document.createElement("canvas");
       replacement.id = "screen";
       replacement.setAttribute("aria-label", "Rendering diagnostic display");
       screen.replaceWith(replacement);
       screen = replacement;
-      resizeCanvas();
+      resizeStudyCanvas();
       renderer = createRenderer(screen);
       renderCurrentScene();
     }
@@ -500,12 +744,155 @@ profileReset.addEventListener("click", () => {
 });
 
 window.addEventListener("resize", () => {
-  resizeCanvas();
+  resizeStudyCanvas();
   if (!animate) drawDiagnostic();
+  renderCalibration();
 });
 
 syncControls();
+renderCalibration();
 renderCurrentScene();
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-mode]")) {
+  button.addEventListener("click", () => {
+    if (button.dataset.calMode !== "omg1" && button.dataset.calMode !== "generic") return;
+    calibrationMode = button.dataset.calMode;
+    chooseManualPreset();
+    syncControls();
+    renderCalibration();
+  });
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-orientation]")) {
+  button.addEventListener("click", () => {
+    if (button.dataset.calOrientation !== "landscape" && button.dataset.calOrientation !== "portrait") return;
+    calibrationOrientation = button.dataset.calOrientation;
+    syncControls();
+    renderCalibration();
+  });
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-ratio]")) {
+  button.addEventListener("click", () => {
+    const value = button.dataset.ratio;
+    const ratios: Record<string, [number, number]> = { "4:3": [4, 3], "16:9": [16, 9], "1:1": [1, 1], "3:4": [3, 4] };
+    if (value === "custom") {
+      const width = boundedValue(ratioWidthInput, "Ratio width", 10000);
+      const height = boundedValue(ratioHeightInput, "Ratio height", 10000);
+      if (width === null || height === null) return;
+      targetRatio = width / height;
+      ratioLabel = "custom";
+    } else if (value && ratios[value]) {
+      targetRatio = ratios[value][0] / ratios[value][1];
+      ratioLabel = value;
+    }
+    chooseManualPreset();
+    renderCalibration();
+    syncControls();
+  });
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-mapping]")) {
+  button.addEventListener("click", () => {
+    if (button.dataset.mapping !== "fit" && button.dataset.mapping !== "stretch") return;
+    mappingMode = button.dataset.mapping;
+    chooseManualPreset();
+    syncControls();
+    renderCalibration();
+  });
+}
+
+autoFitInput.addEventListener("change", () => {
+  if (!autoFitInput.checked) manualWidth = lastCssSize.width;
+  syncControls();
+  renderCalibration();
+});
+
+function acceptManualWidth(input: HTMLInputElement): void {
+  const value = boundedValue(input, "Canvas width", 4096);
+  if (value === null) return;
+  if (value < 64) {
+    setCalibrationError("Canvas width must be at least 64 CSS pixels. The previous setting is still active.");
+    return;
+  }
+  manualWidth = value;
+  autoFitInput.checked = false;
+  chooseManualPreset();
+  syncControls();
+  renderCalibration();
+}
+
+widthInput.addEventListener("input", () => acceptManualWidth(widthInput));
+widthRange.addEventListener("input", () => {
+  widthInput.value = widthRange.value;
+  acceptManualWidth(widthRange);
+});
+
+presetSelect.addEventListener("change", () => {
+  if (presetSelect.value === "robots") {
+    calibrationMode = "omg1";
+    calibrationOrientation = "landscape";
+    orientation = "landscape";
+    targetRatio = 4 / 3;
+    ratioLabel = "4:3";
+    autoFitInput.checked = true;
+    backingScaleSelect.value = "robots";
+    manualWidth = 1024;
+  } else {
+    autoFitInput.checked = false;
+    manualWidth = lastCssSize.width;
+  }
+  syncControls();
+  renderCalibration();
+});
+
+backingScaleSelect.addEventListener("change", renderCalibration);
+
+for (const input of [ratioWidthInput, ratioHeightInput]) {
+  input.addEventListener("change", () => {
+    if (ratioLabel !== "custom") return;
+    const width = boundedValue(ratioWidthInput, "Ratio width", 10000);
+    const height = boundedValue(ratioHeightInput, "Ratio height", 10000);
+    if (width === null || height === null) return;
+    targetRatio = width / height;
+    renderCalibration();
+  });
+}
+
+for (const input of [virtualWidthInput, virtualHeightInput]) {
+  input.addEventListener("change", () => {
+    const width = boundedValue(virtualWidthInput, "Virtual width", 10000);
+    const height = boundedValue(virtualHeightInput, "Virtual height", 10000);
+    if (width === null || height === null) return;
+    virtualSize = { width, height };
+    chooseManualPreset();
+    renderCalibration();
+  });
+}
+
+resizeHandle.addEventListener("pointerdown", (event: PointerEvent) => {
+  event.preventDefault();
+  resizePointer = { id: event.pointerId, x: event.clientX, width: lastCssSize.width };
+  resizeHandle.setPointerCapture(event.pointerId);
+  autoFitInput.checked = false;
+  chooseManualPreset();
+  syncControls();
+});
+resizeHandle.addEventListener("pointermove", (event: PointerEvent) => {
+  if (!resizePointer || resizePointer.id !== event.pointerId) return;
+  manualWidth = Math.max(64, Math.min(4096, resizePointer.width + event.clientX - resizePointer.x));
+  widthInput.value = `${Math.round(manualWidth)}`;
+  widthRange.value = `${Math.round(manualWidth)}`;
+  renderCalibration();
+});
+const stopResize = (event: PointerEvent): void => {
+  if (resizePointer?.id === event.pointerId) resizePointer = null;
+};
+resizeHandle.addEventListener("pointerup", stopResize);
+resizeHandle.addEventListener("pointercancel", stopResize);
+
+const calibrationObserver = new ResizeObserver(() => renderCalibration());
+calibrationObserver.observe(calibrationViewport);
 
 function requireContext<T>(context: T | null, name: string): T {
   if (!context) throw new Error(`${name} is unavailable`);

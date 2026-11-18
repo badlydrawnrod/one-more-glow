@@ -1,6 +1,6 @@
 # Implement the diagnostics workbench
 
-**Status:** Ready to implement
+**Status:** In progress
 
 ## Objective
 
@@ -88,23 +88,23 @@ passed.
 
 ### 2. Build the calibration canvas and its controls
 
-- [ ] Give the calibration area a measurable stage sized by the page layout.
+- [x] Give the calibration area a measurable stage sized by the page layout.
   For auto fit, choose the smallest of stage
   width, stage height multiplied by target ratio, and the active preset's width
   cap. Derive height from width and ratio. The initial Robots preset selects
   OMG-1 landscape, 4:3, a 1024 CSS pixel width cap, and `min(DPR, 2)`.
-- [ ] Add manual sizing, target ratio presets and custom ratio fields, OMG-1
+- [x] Add manual sizing, target ratio presets and custom ratio fields, OMG-1
   orientation, Generic virtual width and height, Fit and Stretch, and backing
   scale selection. Route the resize handle and focusable size control through
   the same manual-size update. Limit pointer capture and `touch-action` to the
   handle. Validate finite positive sizes and scales. Keep the previous valid
   setting while a field is incomplete and show limits or rejected values.
-- [ ] Set the CSS size, measure the visible canvas, then compute target backing
+- [x] Set the CSS size, measure the visible canvas, then compute target backing
   width and height by rounding each measured CSS dimension times selected
   scale. Guard allocations against oversized requests and assign canvas
   attributes only when dimensions change. Skip sizing while the active element
   has no measurable area. Keep requested, applied and measured values distinct.
-- [ ] Draw the calibration geometry in each mode. For Generic Fit, use the
+- [x] Draw the calibration geometry in each mode. For Generic Fit, use the
   smaller of output width divided by virtual width and output height divided
   by virtual height, then centre the result. For Stretch, use each axis's own
   scale. Make the stage, canvas, and mapped content edges distinguishable. In
@@ -115,6 +115,26 @@ passed.
 requests 1024 × 768 CSS px. At DPR 3 it requests 2048 × 1536 backing pixels.
 A 16:9 canvas with 1024 × 768 Generic content shows side bars in Fit and wider
 circles in Stretch. Manual oversizing can visibly leave the available area.
+
+**Step 2 results (2026-11-18).** Added a measurable calibration stage with
+the Robots fit preset, manual sizing, preset and custom ratios, OMG-1
+orientation, Generic virtual dimensions and Fit/Stretch mapping, and backing
+scale choices. The resize handle, width field and range control share the same
+manual-size state. Canvas CSS bounds are measured before backing dimensions are
+rounded; requested CSS size, measured CSS size and applied backing buffer are
+shown separately. Generic Canvas 2D and per-orientation OMG-1 WebGL2 surfaces
+draw the calibration pattern. The canvas allocation is capped at 32 megapixels.
+
+`npm run check --workspace=diagnostics` and `git diff --check` passed. Manual
+browser checks (ChatGPT in-app browser, 2026-11-18) used an 1800 × 1400
+viewport override. The Robots preset requested 1024 × 768 CSS px in its 4:3
+mode. The Generic 16:9 canvas at 1313 × 738.6 CSS px showed side bars and a
+round circle in Fit; Stretch filled the canvas and visibly widened the circle.
+Setting manual width to 1600 CSS px produced a 1600 × 900 canvas that visibly
+extended beyond the stage. The device-scale mode reported 1× with a 1024 × 768
+backing buffer under the viewport override; selecting manual 3× produced a
+3072 × 2304 backing buffer. The viewport override does not expose DPR control,
+so the specific DPR 3 / device-scale-capped-at-2 check remains pending.
 
 ### 3. Add measurements, history and fullscreen
 
@@ -195,8 +215,9 @@ and report. If supported, exercise loss and restoration on the active context.
 
 ## Verification
 
-No implementation checks have run yet. Record command results and the browser,
-device and controller used. Run from the repository root:
+Step 2 type-check and whitespace checks passed. Browser and controller checks
+remain pending. Record command results and the browser, device and controller
+used. Run from the repository root:
 
 ```sh
 npm run check
@@ -229,8 +250,9 @@ the accepted behaviour as they are discovered.
 
 ## Next action
 
-Implement step 2: add the calibration canvas, sizing controls, and mode-specific
-geometry to the Canvas & Environment screen.
+Implement step 3: collect and display browser measurements, change history,
+fullscreen state, and the shared report action. Start in the Canvas &
+Environment screen and build one snapshot for the summary, details and report.
 
 ## Completion criteria
 
