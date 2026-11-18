@@ -7,9 +7,10 @@ for how to run it and select views. Shared display requirements remain in the
 
 ## Workbench redesign
 
-- [Diagnostics workbench](diagnostics-workbench.md) is accepted and not yet
-  implemented. It defines two screens for canvas and browser measurements,
-  renderer studies, and frame timing.
+- [Diagnostics workbench](diagnostics-workbench.md) is accepted and partially
+  implemented. Its two-screen shell, calibration, browser measurements,
+  WebGL2 status and capability details, context recovery, and Game frame timing
+  are implemented; input parity and release-path verification remain.
 
 ## Purpose and current behavior
 

@@ -4,8 +4,9 @@
 
 **Implementation: Partially implemented.** The two-screen shell, canvas
 calibration controls, shared browser measurement snapshot, bounded change
-history, fullscreen action, and report action are implemented. WebGL readiness,
-frame timing, input parity, and release-path verification remain outstanding.
+history, fullscreen action, report action, WebGL2 readiness and capability
+details, context recovery, and animated Game frame timing are implemented.
+Gamepad input parity and release-path verification remain outstanding.
 The [diagnostics app specification](SPEC.md) describes the earlier app and its
 existing studies.
 

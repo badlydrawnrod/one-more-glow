@@ -145,9 +145,27 @@
                 <button type="button" data-orientation="portrait" aria-pressed="false">Portrait</button>
               </div>
             </div>
-            <label id="animation-control" class="check-control" hidden>
-              <input id="animation-toggle" type="checkbox" /><span>Animate craft</span>
-            </label>
+            <section id="workload-controls" class="workload-controls" aria-labelledby="workload-heading" hidden>
+              <div class="panel-heading"><p class="eyebrow">BROWSER FRAME TIMING</p><h3 id="workload-heading">Animated workload</h3></div>
+              <label class="field-control">Backing scale
+                <select id="workload-scale"><option value="device">Device scale</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select>
+              </label>
+              <button id="workload-toggle" class="secondary-button" type="button">Start workload</button>
+              <dl class="environment-values">
+                <div><dt>WebGL2</dt><dd id="webgl-status">Checking…</dd></div>
+                <div><dt>Context</dt><dd id="context-status">Unavailable</dd></div>
+                <div><dt>Drawing buffer</dt><dd id="drawing-buffer-size">—</dd></div>
+                <div><dt>Sample</dt><dd id="timing-status">Idle</dd></div>
+              </dl>
+              <div id="timing-results" class="timing-results" hidden>
+                <dl class="environment-values">
+                  <div><dt>FPS</dt><dd id="timing-fps">—</dd></div>
+                  <div><dt>Median interval</dt><dd id="timing-median">—</dd></div>
+                  <div><dt>95th percentile</dt><dd id="timing-p95">—</dd></div>
+                </dl>
+              </div>
+              <details class="measurement-details"><summary>WebGL2 capabilities</summary><pre id="webgl-capabilities">Unavailable.</pre></details>
+            </section>
             <p class="control-hint">Test Card includes the normal and overdrive comparison samples.</p>
             <details class="measurement-details renderer-measurement-details"><summary>Browser measurements</summary><dl class="environment-values"><div><dt>Fits in view</dt><dd id="renderer-fit-summary">—</dd></div><div><dt>Canvas / stage</dt><dd id="renderer-rect-summary">—</dd></div><div><dt>Page overflow</dt><dd id="renderer-overflow-summary">—</dd></div><div><dt>Page fullscreen</dt><dd id="renderer-fullscreen-summary">—</dd></div></dl><pre id="renderer-raw-measurements">Measurements are unavailable.</pre></details>
             <button type="button" class="secondary-button report-button">Copy report</button>

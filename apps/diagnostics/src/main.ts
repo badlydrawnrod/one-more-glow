@@ -24,8 +24,9 @@ const environmentScreen = requireElement(document.querySelector<HTMLElement>("#e
 const rendererScreen = requireElement(document.querySelector<HTMLElement>("#renderer-screen"), "#renderer-screen");
 const studyStageLabel = requireElement(document.querySelector<HTMLElement>("#study-stage-label"), "#study-stage-label");
 const screenTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-screen]")];
-const animationControl = requireElement(document.querySelector<HTMLElement>("#animation-control"), "#animation-control");
-const animationToggle = requireElement(document.querySelector<HTMLInputElement>("#animation-toggle"), "#animation-toggle");
+const workloadControls = requireElement(document.querySelector<HTMLElement>("#workload-controls"), "#workload-controls");
+const workloadToggle = requireElement(document.querySelector<HTMLButtonElement>("#workload-toggle"), "#workload-toggle");
+const workloadScale = requireElement(document.querySelector<HTMLSelectElement>("#workload-scale"), "#workload-scale");
 const profileControls = requireElement(document.querySelector<HTMLElement>("#profile-controls"), "#profile-controls");
 const profileReset = requireElement(document.querySelector<HTMLButtonElement>("#profile-reset"), "#profile-reset");
 const calibrationViewport = requireElement(document.querySelector<HTMLElement>("#calibration-viewport"), "#calibration-viewport");
@@ -106,7 +107,24 @@ let activeScreen: "environment" | "renderer" = hasExplicitScene || pagesDefault 
   ? "renderer"
   : "environment";
 let animate = params.get("animate") === "1" && scene === "game";
-let renderer: DisplayRenderer;
+let studyContext: WebGL2RenderingContext | null = null;
+let renderer: DisplayRenderer = createNullRenderer();
+let rendererError: string | null = null;
+let contextStatus: "ready" | "lost" | "unavailable" = "unavailable";
+let animationFrame: number | undefined;
+let timingIntervals: number[] = [];
+let timingStart: number | null = null;
+let previousFrameTime: number | null = null;
+let timingResult: { fps: number; median: number; p95: number; duration: number; count: number } | null = null;
+let lastTimingUiUpdate = 0;
+let capabilityDetails = "WebGL2 capability details are unavailable.";
+
+function createNullRenderer(): DisplayRenderer {
+  return {
+    setDisplayProfile() {}, beginFrame() {}, endFrame() {}, setColor() {}, setIntensity() {},
+    pushTransform() {}, popTransform() {}, translate() {}, rotate() {}, scale() {}, moveTo() {}, lineTo() {}, point() {},
+  };
+}
 
 function aspectRatio(): number {
   return orientation === "landscape" ? 4 / 3 : 3 / 4;
@@ -117,23 +135,182 @@ function resizeStudyCanvas(): void {
   const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * ratio);
   const cssWidth = Math.max(1, Math.min(800, maxWidth));
   const cssHeight = cssWidth / ratio;
-  const pixelRatio = window.devicePixelRatio || 1;
+  const configuredScale = workloadScale.value === "device" ? (window.devicePixelRatio || 1) : Number(workloadScale.value);
+  const requestedScale = Number.isFinite(configuredScale) && configuredScale > 0 ? configuredScale : 1;
+  const allocationScale = Math.min(requestedScale, 8192 / cssWidth, 8192 / cssHeight, Math.sqrt(32_000_000 / (cssWidth * cssHeight)));
 
+  const oldWidth = screen.width;
+  const oldHeight = screen.height;
   screen.style.width = `${cssWidth}px`;
   screen.style.height = `${cssHeight}px`;
-  screen.width = Math.round(cssWidth * pixelRatio);
-  screen.height = Math.round(cssHeight * pixelRatio);
+  const backingWidth = Math.max(1, Math.round(cssWidth * allocationScale));
+  const backingHeight = Math.max(1, Math.round(cssHeight * allocationScale));
+  if (screen.width !== backingWidth) screen.width = backingWidth;
+  if (screen.height !== backingHeight) screen.height = backingHeight;
+  if (oldWidth !== screen.width || oldHeight !== screen.height) refreshCapabilityDetails();
+  if (oldWidth !== screen.width || oldHeight !== screen.height) resetTimingSample();
 }
 
-function createRenderer(canvas: HTMLCanvasElement): DisplayRenderer {
-  return createWebGL2Renderer(
-    requireContext(canvas.getContext("webgl2", { alpha: true }), "WebGL2"),
-    { orientation, profile },
-  );
+function resetTimingSample(): void {
+  timingIntervals = [];
+  timingStart = null;
+  previousFrameTime = null;
+  timingResult = null;
+  renderRendererStatus();
+}
+
+function attachStudyCanvas(canvas: HTMLCanvasElement): void {
+  canvas.addEventListener("webglcontextlost", (event) => {
+    event.preventDefault();
+    contextStatus = "lost";
+    rendererError = null;
+    refreshCapabilityDetails();
+    resetTimingSample();
+    stopAnimation();
+    renderRendererStatus();
+  });
+  canvas.addEventListener("webglcontextrestored", () => {
+    const context = canvas.getContext("webgl2", { alpha: true });
+    if (!context) {
+      contextStatus = "unavailable";
+      rendererError = "WebGL2 context restoration failed.";
+      renderer = createNullRenderer();
+    } else {
+      studyContext = context;
+      try {
+        renderer = createWebGL2Renderer(context, { orientation, profile });
+        contextStatus = "ready";
+        rendererError = null;
+      } catch (error) {
+        renderer = createNullRenderer();
+        contextStatus = "unavailable";
+        rendererError = error instanceof Error ? error.message : "WebGL2 renderer could not be restored.";
+      }
+    }
+    resetTimingSample();
+    refreshCapabilityDetails();
+    renderCurrentScene();
+    renderRendererStatus();
+  });
+}
+
+function startRenderer(canvas: HTMLCanvasElement): void {
+  attachStudyCanvas(canvas);
+  try {
+    studyContext = canvas.getContext("webgl2", { alpha: true });
+    if (!studyContext) throw new Error("WebGL2 is unavailable in this browser.");
+    renderer = createWebGL2Renderer(studyContext, { orientation, profile });
+    contextStatus = "ready";
+    rendererError = null;
+  } catch (error) {
+    studyContext = null;
+    renderer = createNullRenderer();
+    contextStatus = "unavailable";
+    rendererError = error instanceof Error ? error.message : "WebGL2 could not be initialized.";
+  }
+  refreshCapabilityDetails();
+  renderRendererStatus();
 }
 
 resizeStudyCanvas();
-renderer = createRenderer(screen);
+startRenderer(screen);
+
+function readWebGLCapabilities(gl: WebGL2RenderingContext): Record<string, unknown> {
+  const precision = (shaderType: number): Record<string, number> => {
+    const value = gl.getShaderPrecisionFormat(shaderType, gl.HIGH_FLOAT);
+    return value ? { rangeMin: value.rangeMin, rangeMax: value.rangeMax, precision: value.precision } : {};
+  };
+  return {
+    contextAttributes: gl.getContextAttributes(),
+    version: gl.getParameter(gl.VERSION),
+    shadingLanguageVersion: gl.getParameter(gl.SHADING_LANGUAGE_VERSION),
+    viewport: Array.from(gl.getParameter(gl.VIEWPORT) as Int32Array),
+    drawingBuffer: { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight },
+    canvasAttributes: { width: gl.canvas.width, height: gl.canvas.height },
+    limits: {
+      maxTextureSize: gl.getParameter(gl.MAX_TEXTURE_SIZE),
+      maxRenderbufferSize: gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),
+      maxViewportDimensions: Array.from(gl.getParameter(gl.MAX_VIEWPORT_DIMS) as Int32Array),
+    },
+    extensions: gl.getSupportedExtensions() ?? [],
+    shaderPrecision: {
+      vertexHighFloat: precision(gl.VERTEX_SHADER),
+      fragmentHighFloat: precision(gl.FRAGMENT_SHADER),
+    },
+    // Renderer and vendor identifiers are intentionally reserved for optional detail.
+  };
+}
+
+function refreshCapabilityDetails(): void {
+  if (!studyContext || contextStatus !== "ready") {
+    capabilityDetails = rendererError ?? (contextStatus === "lost" ? "Context is lost; details will refresh after restoration." : "WebGL2 capability details are unavailable.");
+    return;
+  }
+  try { capabilityDetails = JSON.stringify(readWebGLCapabilities(studyContext), null, 2); }
+  catch (error) { capabilityDetails = `Capability details unavailable: ${error instanceof Error ? error.message : "browser query failed"}`; }
+}
+
+function renderRendererStatus(): void {
+  const webgl = document.querySelector<HTMLElement>("#webgl-status");
+  const context = document.querySelector<HTMLElement>("#context-status");
+  const buffer = document.querySelector<HTMLElement>("#drawing-buffer-size");
+  const status = document.querySelector<HTMLElement>("#timing-status");
+  const results = document.querySelector<HTMLElement>("#timing-results");
+  const capabilities = document.querySelector<HTMLElement>("#webgl-capabilities");
+  if (!webgl || !context || !buffer || !status || !results || !capabilities) return;
+
+  webgl.textContent = contextStatus === "ready" ? "Started" : contextStatus === "lost" ? "Interrupted" : "Unavailable";
+  context.textContent = contextStatus === "ready" ? "Ready" : contextStatus === "lost" ? "Lost · awaiting restoration" : rendererError ?? "Unavailable";
+  buffer.textContent = studyContext
+    ? `${studyContext.drawingBufferWidth} × ${studyContext.drawingBufferHeight} px (requested ${screen.width} × ${screen.height})`
+    : `${screen.width} × ${screen.height} px requested · unavailable`;
+  capabilities.textContent = capabilityDetails;
+
+  workloadToggle.textContent = animate ? "Stop workload" : "Start workload";
+  results.hidden = timingResult === null;
+  if (!animate) status.textContent = "Idle";
+  else if (timingResult) status.textContent = `Results · ${timingResult.duration.toFixed(0)} ms · ${timingResult.count} intervals`;
+  else if (activeScreen !== "renderer" || document.hidden) status.textContent = "Collecting paused · workload not visible";
+  else status.textContent = contextStatus === "ready"
+    ? `Collecting · ${timingIntervals.length} intervals${timingStart === null ? "" : ` · ${Math.max(0, performance.now() - timingStart).toFixed(0)} ms`}`
+    : "Collecting paused · WebGL2 unavailable";
+
+  if (timingResult) {
+    const set = (selector: string, value: string): void => {
+      const item = document.querySelector<HTMLElement>(selector);
+      if (item) item.textContent = value;
+    };
+    set("#timing-fps", timingResult.fps.toFixed(1));
+    set("#timing-median", `${timingResult.median.toFixed(2)} ms`);
+    set("#timing-p95", `${timingResult.p95.toFixed(2)} ms`);
+  }
+}
+
+function updateTimingSample(time: number): void {
+  if (!animate || activeScreen !== "renderer" || document.hidden || contextStatus !== "ready") return;
+  if (timingStart === null) timingStart = time;
+  if (previousFrameTime !== null && timingResult === null) {
+    timingIntervals.push(time - previousFrameTime);
+    if (timingIntervals.length > 600) timingIntervals.shift();
+    const duration = time - timingStart;
+    if (duration >= 2000 && timingIntervals.length >= 30) {
+      const sorted = [...timingIntervals].sort((a, b) => a - b);
+      const mean = sorted.reduce((sum, interval) => sum + interval, 0) / sorted.length;
+      timingResult = {
+        fps: 1000 / mean,
+        median: (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2,
+        p95: sorted[Math.ceil(sorted.length * 0.95) - 1],
+        duration,
+        count: timingIntervals.length,
+      };
+    }
+  }
+  previousFrameTime = time;
+  if (time - lastTimingUiUpdate >= 250 || timingResult) {
+    lastTimingUiUpdate = time;
+    renderRendererStatus();
+  }
+}
 
 function ensureCalibrationRenderer(): DisplayRenderer | null {
   let surface = omgSurfaces.get(calibrationOrientation);
@@ -490,11 +667,26 @@ function createReport(): string {
     previousMeasurement = snapshot;
     renderMeasurement(snapshot);
   }
+  const frameTiming = !animate
+    ? "Idle"
+    : timingResult
+      ? `Results · ${timingResult.fps.toFixed(1)} FPS · median ${timingResult.median.toFixed(2)} ms · p95 ${timingResult.p95.toFixed(2)} ms · ${timingResult.duration.toFixed(0)} ms · ${timingResult.count} intervals`
+      : contextStatus !== "ready" || activeScreen !== "renderer" || document.hidden
+        ? `Collecting paused · ${timingIntervals.length} intervals`
+        : `Collecting · ${timingIntervals.length} intervals`;
   return [
     "One More Glow · Diagnostics report",
     `Captured: ${new Date().toISOString()}`,
     `Screen: ${activeScreen}`,
     `Study: ${scene}${scene === "game" ? ` · animation ${animate ? "on" : "off"}` : ""}`,
+    `Workload backing scale: ${workloadScale.value === "device" ? `device (${(window.devicePixelRatio || 1).toFixed(2)}×)` : `${workloadScale.value}×`}`,
+    `WebGL2: ${contextStatus === "ready" ? "started · context ready" : contextStatus === "lost" ? "context lost" : `unavailable${rendererError ? ` · ${rendererError}` : ""}`}`,
+    `Requested drawing buffer: ${screen.width} × ${screen.height} px`,
+    `Actual drawing buffer: ${studyContext && contextStatus === "ready" ? `${studyContext.drawingBufferWidth} × ${studyContext.drawingBufferHeight} px` : "unavailable"}`,
+    `Workload: ${scene === "game" ? `rotating Game scene · ${animate ? "running" : "stopped"}` : "inactive for selected study"}`,
+    `Frame timing: ${frameTiming}`,
+    "WebGL2 capabilities:",
+    studyContext && contextStatus === "ready" ? JSON.stringify(readWebGLCapabilities(studyContext), null, 2) : "Unavailable.",
     `Calibration: ${calibrationMode} · ${calibrationOrientation} · ${ratioLabel} · ${autoFitInput.checked ? "auto fit" : `manual ${manualWidth} CSS px`}`,
     `Mapping: ${mappingMode} · virtual ${virtualSize.width} × ${virtualSize.height} · backing choice ${backingScaleSelect.value}`,
     `Display profile: beam ${profile.lineWidth}, point ${profile.pointRadius}, glow ${profile.glowStrength}, spread ${profile.glowSpread}`,
@@ -843,26 +1035,31 @@ function drawProfileStudy(): void {
   renderer.endFrame();
 }
 
-let animationFrame: number | undefined;
-
 function stopAnimation(): void {
   if (animationFrame !== undefined) cancelAnimationFrame(animationFrame);
   animationFrame = undefined;
 }
 
 function animateGame(time: number): void {
-  if (!animate || scene !== "game") return;
+  if (!animate || scene !== "game" || activeScreen !== "renderer" || document.hidden || contextStatus !== "ready") return;
   drawGameScene((time * 0.03) % 360);
+  updateTimingSample(time);
   animationFrame = requestAnimationFrame(animateGame);
 }
 
 function renderCurrentScene(): void {
   stopAnimation();
+  if (contextStatus !== "ready") {
+    renderRendererStatus();
+    return;
+  }
+  if (activeScreen !== "renderer" || document.hidden) return;
   if (animate && scene === "game") {
     animationFrame = requestAnimationFrame(animateGame);
   } else {
     drawDiagnostic();
   }
+  renderRendererStatus();
 }
 
 function syncControls(): void {
@@ -894,8 +1091,7 @@ function syncControls(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orientation]")) {
     button.setAttribute("aria-pressed", String(button.dataset.orientation === orientation));
   }
-  animationControl.hidden = scene !== "game";
-  animationToggle.checked = animate;
+  workloadControls.hidden = scene !== "game";
   profileControls.hidden = scene !== "profile";
   studyStageLabel.textContent = `${scene.toUpperCase()} STUDY`;
   for (const input of profileControls.querySelectorAll<HTMLInputElement>("input[data-profile]")) {
@@ -913,6 +1109,10 @@ for (const tab of screenTabs) {
     const next = tab.dataset.screen;
     if (next !== "environment" && next !== "renderer") return;
     activeScreen = next;
+    if (activeScreen !== "renderer") {
+      stopAnimation();
+      resetTimingSample();
+    }
     syncControls();
     if (activeScreen === "renderer") {
       resizeStudyCanvas();
@@ -931,7 +1131,10 @@ document.addEventListener("click", (event: MouseEvent) => {
   const selectedScene = target.dataset.scene;
   if (selectedScene === "game" || selectedScene === "testcard" || selectedScene === "segments" || selectedScene === "spacing" || selectedScene === "profile") {
     scene = selectedScene;
-    if (scene !== "game") animate = false;
+    if (scene !== "game") {
+      animate = false;
+      resetTimingSample();
+    }
     activeScreen = "renderer";
     syncControls();
     renderCurrentScene();
@@ -951,7 +1154,8 @@ document.addEventListener("click", (event: MouseEvent) => {
       screen.replaceWith(replacement);
       screen = replacement;
       resizeStudyCanvas();
-      renderer = createRenderer(screen);
+      startRenderer(screen);
+      resetTimingSample();
       renderCurrentScene();
     }
     activeScreen = "renderer";
@@ -960,10 +1164,19 @@ document.addEventListener("click", (event: MouseEvent) => {
   }
 });
 
-animationToggle.addEventListener("change", () => {
-  animate = animationToggle.checked && scene === "game";
+workloadToggle.addEventListener("click", () => {
+  animate = !animate && scene === "game";
+  resetTimingSample();
   syncControls();
-  renderCurrentScene();
+  if (!animate) drawDiagnostic();
+  else renderCurrentScene();
+});
+
+workloadScale.addEventListener("change", () => {
+  resizeStudyCanvas();
+  resetTimingSample();
+  if (activeScreen === "renderer" && !animate && contextStatus === "ready") drawDiagnostic();
+  renderRendererStatus();
 });
 
 profileControls.addEventListener("input", (event: Event) => {
@@ -985,7 +1198,7 @@ profileReset.addEventListener("click", () => {
 
 window.addEventListener("resize", () => {
   resizeStudyCanvas();
-  if (!animate) drawDiagnostic();
+  if (!animate && activeScreen === "renderer" && contextStatus === "ready") drawDiagnostic();
   renderCalibration();
   scheduleMeasurements("resize");
 });
@@ -1002,10 +1215,18 @@ function watchDevicePixelRatio(): void {
 }
 function onDevicePixelRatioChange(): void {
   watchDevicePixelRatio();
+  resizeStudyCanvas();
+  if (!animate && activeScreen === "renderer" && contextStatus === "ready") drawDiagnostic();
   renderCalibration();
   scheduleMeasurements("DPR change");
 }
 watchDevicePixelRatio();
+
+document.addEventListener("visibilitychange", () => {
+  resetTimingSample();
+  if (document.hidden) stopAnimation();
+  else if (activeScreen === "renderer") renderCurrentScene();
+});
 
 syncControls();
 renderCalibration();
@@ -1154,11 +1375,6 @@ const calibrationObserver = new ResizeObserver(() => renderCalibration());
 calibrationObserver.observe(calibrationViewport);
 const studyStage = document.querySelector<HTMLElement>(".canvas-frame");
 if (studyStage) new ResizeObserver(() => scheduleMeasurements("stage resize")).observe(studyStage);
-
-function requireContext<T>(context: T | null, name: string): T {
-  if (!context) throw new Error(`${name} is unavailable`);
-  return context;
-}
 
 function requireElement<T extends Element>(element: T | null, name: string): T {
   if (!element) throw new Error(`Missing ${name}`);

@@ -187,14 +187,14 @@ also remains pending.
 
 ### 4. Add WebGL status and frame timing
 
-- [ ] Replace the current throwing context startup path with visible readiness
+- [x] Replace the current throwing context startup path with visible readiness
   and failure states. Read WebGL details from the context the study actually
   uses. Report `drawingBufferWidth` and `drawingBufferHeight` separately from
   requested attributes. On `webglcontextlost`, allow restoration with
   `preventDefault()` and stop the workload sample. On restore recreate renderer
   resources for that context and redraw. Keep HTML and Generic mode usable
   when WebGL2 is unavailable.
-- [ ] Use the existing rotating Game study as the start/stop workload. Make
+- [x] Use the existing rotating Game study as the start/stop workload. Make
   backing scale adjustable on this screen. Sample consecutive timestamps from
   the animation loop that draws it. Calculate FPS as 1000 divided by mean
   interval in milliseconds. Use median and nearest-rank p95 from numeric sorted
@@ -202,7 +202,7 @@ also remains pending.
   2000 ms and 30 intervals before publishing results. Keep a bounded sample
   that can reach both thresholds and throttle HTML updates independently of
   canvas drawing.
-- [ ] Reset the sample when workload or drawing buffer size changes, the
+- [x] Reset the sample when workload or drawing buffer size changes, the
   context is interrupted, or the page returns from being hidden. Clear the
   previous timestamp so no interval crosses the interruption. Stop drawing
   while hidden or on the other screen. Include the workload, actual drawing
@@ -213,6 +213,28 @@ also remains pending.
 Collecting state after the change and after returning from a hidden tab. Stop
 the workload and verify Idle. With WebGL2 unavailable, use the Generic canvas
 and report. If supported, exercise loss and restoration on the active context.
+
+**Step 4 results (2026-11-18).** Added visible WebGL2 startup, ready, lost, and
+unavailable states; context attributes, version, viewport, limits, extensions,
+and shader precision details; actual drawing-buffer dimensions separate from
+canvas attributes; and context loss/restoration handling that recreates the
+public renderer and redraws. The animated Game study now has explicit
+start/stop controls and selectable backing scale. Browser frame intervals are
+sampled from the drawing loop, with mean-based FPS, median and nearest-rank p95;
+results publish after 2 seconds and 30 intervals. Samples reset on workload,
+buffer-size, visibility, screen, and context interruptions. Drawing pauses when
+the page is hidden or the other screen is active. WebGL and timing details are
+included in both screen reports; optional vendor and renderer identifiers are
+omitted.
+
+`npm run check --workspace=diagnostics`, `npm run build --workspace=diagnostics`,
+and `git diff --check` passed. Browser checks in ChatGPT in-app browser
+(2026-11-18) confirmed WebGL2 readiness and a
+1200 × 900 drawing buffer, a fresh sample after changing to 3× (2400 × 1800),
+and published results after 2001 ms / 103 intervals (51.5 FPS in that run).
+Switching to Canvas & Environment stopped drawing; returning started a fresh
+sample. Stopping to confirm Idle, hidden-tab return, WebGL2 unavailable, and
+context loss/restoration remain pending browser verification.
 
 ### 5. Finish input parity and verify the release paths
 
@@ -274,9 +296,8 @@ the accepted behaviour as they are discovered.
 
 ## Next action
 
-Implement step 4: add WebGL readiness and failure states, renderer capability
-details, and browser frame timing for the animated Game workload. Connect these
-results to the existing shared report.
+Implement step 5: finish keyboard, mouse, touch, and gamepad parity; then run
+the verification paths and reconcile documentation and completion status.
 
 ## Completion criteria
 

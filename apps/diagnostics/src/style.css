@@ -80,6 +80,14 @@ button { color: inherit; }
 .report-fallback[hidden] { display: none; }
 .renderer-measurement-details { margin-top: 0; }
 .renderer-measurement-details .environment-values { margin-bottom: 8px; }
+.workload-controls { display: grid; gap: 12px; padding: 12px; border: 1px solid #2b424b; background: #091117; }
+.workload-controls[hidden], .timing-results[hidden] { display: none; }
+.workload-controls .panel-heading h3 { margin-bottom: 0; }
+.workload-controls .field-control select { width: 100%; }
+.workload-controls .environment-values { margin: 0; }
+.workload-controls #context-status { max-width: 150px; overflow-wrap: anywhere; }
+.timing-results { display: grid; gap: 8px; }
+.workload-controls .measurement-details { border-top: 1px solid #253840; }
 .secondary-button { padding: 0 11px; text-align: center; cursor: pointer; }
 .workbench:fullscreen { width: 100%; min-height: 100vh; padding: 18px 24px; overflow: auto; background: #080b11; }
 .renderer-layout { grid-template-columns: minmax(0, 1fr) minmax(260px, 300px); }
