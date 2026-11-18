@@ -138,7 +138,7 @@ so the specific DPR 3 / device-scale-capped-at-2 check remains pending.
 
 ### 3. Add measurements, history and fullscreen
 
-- [ ] Build one measurement snapshot for the summary, raw details and the
+- [x] Build one measurement snapshot for the summary, raw details and the
   report. Read the stage and canvas rectangles, page overflow, display, layout
   viewport, visual viewport, orientation, and fullscreen fields listed in the
   spec. For the visibility check use rectangles in the same coordinate space.
@@ -146,13 +146,13 @@ so the specific DPR 3 / device-scale-capped-at-2 check remains pending.
   clipping by the stage. Fall back to the layout viewport. Keep the root
   scroll extent check separate. Compute effective X and Y pixel scale from
   the actual buffer and measured CSS dimensions for each axis.
-- [ ] Observe the stage with `ResizeObserver`. Refresh on window resize and
+- [x] Observe the stage with `ResizeObserver`. Refresh on window resize and
   scroll, visual viewport resize and scroll, orientation and fullscreen change,
   and DPR change. A resolution media query can watch the current DPR. Rearm it
   after each change. Coalesce measurement work to one update per frame and skip
   unchanged values in the bounded before/after history. Use the same refresh
   path after settings change or a hidden screen becomes visible.
-- [ ] Add fullscreen on a workbench container that includes its readouts and
+- [x] Add fullscreen on a workbench container that includes its readouts and
   exit control. Drive status from the document's fullscreen state and handle
   unavailable or denied requests in the UI. Start the Copy report action on
   both screens with plain text and a selectable fallback. In step 4, connect
@@ -162,6 +162,28 @@ so the specific DPR 3 / device-scale-capped-at-2 check remains pending.
 fullscreen. Check that whole-canvas visibility and page overflow can report
 different results. Inspect raw values against the browser console. Verify a
 missing optional measurement and the report fallback both have a readable state.
+
+**Step 3 results (2026-11-18).** Added a shared measurement snapshot used by
+the Canvas & Environment summary, expandable raw values, and both screen
+reports. It includes stage and canvas rectangles, visible viewport bounds and
+stage clipping, actual and target aspect ratios, effective backing scale on
+both axes, page overflow, screen dimensions, DPR, layout and visual viewport
+values, orientation, and fullscreen state. A `ResizeObserver` plus resize,
+scroll, visual viewport, orientation, DPR, settings, screen-switch, and
+fullscreen events feed one animation-frame refresh path. Changed snapshots
+produce an eight-entry before/after history. Fullscreen covers the workbench
+and keeps its exit button available. Copy report writes plain text and exposes
+a selectable textarea if clipboard access fails.
+
+`npm run check --workspace=diagnostics` and `git diff --check` passed. Browser
+checks in ChatGPT in-app browser (2026-11-18; layout viewport 1113 × 1527 CSS
+px at DPR 1.5) confirmed the environment summary and raw values, renderer
+measurements after switching screens, fullscreen enter/exit, change-history
+updates, and successful report copying. The browser allowed clipboard access
+and provides `visualViewport`, so the denied-clipboard fallback and missing
+optional-measurement state could not be exercised there; those fallback paths
+remain pending browser verification. The Step 2 DPR 3 device-scale cap check
+also remains pending.
 
 ### 4. Add WebGL status and frame timing
 
@@ -215,9 +237,11 @@ and report. If supported, exercise loss and restoration on the active context.
 
 ## Verification
 
-Step 2 type-check and whitespace checks passed. Browser and controller checks
-remain pending. Record command results and the browser, device and controller
-used. Run from the repository root:
+Step 2 and Step 3 type-check and whitespace checks passed. The Step 2 DPR 3
+device-scale cap check and Step 3 missing-API and clipboard-denial fallbacks
+remain pending. Browser and controller checks for Steps 4 and 5 remain pending.
+Record command results and the browser, device and controller used. Run from
+the repository root:
 
 ```sh
 npm run check
@@ -250,9 +274,9 @@ the accepted behaviour as they are discovered.
 
 ## Next action
 
-Implement step 3: collect and display browser measurements, change history,
-fullscreen state, and the shared report action. Start in the Canvas &
-Environment screen and build one snapshot for the summary, details and report.
+Implement step 4: add WebGL readiness and failure states, renderer capability
+details, and browser frame timing for the animated Game workload. Connect these
+results to the existing shared report.
 
 ## Completion criteria
 

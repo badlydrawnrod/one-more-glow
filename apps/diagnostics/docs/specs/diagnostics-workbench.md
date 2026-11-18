@@ -2,8 +2,12 @@
 
 **Status: Accepted.**
 
-**Implementation: Not yet implemented.** The [diagnostics app specification](SPEC.md)
-describes the current app and its existing studies.
+**Implementation: Partially implemented.** The two-screen shell, canvas
+calibration controls, shared browser measurement snapshot, bounded change
+history, fullscreen action, and report action are implemented. WebGL readiness,
+frame timing, input parity, and release-path verification remain outstanding.
+The [diagnostics app specification](SPEC.md) describes the earlier app and its
+existing studies.
 
 ## Purpose
 

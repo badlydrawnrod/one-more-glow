@@ -10,13 +10,13 @@
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <main class="workbench" aria-label="Rendering diagnostics">
+    <main id="workbench" class="workbench" aria-label="Rendering diagnostics">
       <header class="masthead">
         <div>
           <p class="eyebrow">ONE MORE GLOW / DISPLAY LAB</p>
           <h1>Diagnostics workbench</h1>
         </div>
-        <p class="masthead-note">Inspect the canvas. Understand the display.</p>
+        <div class="masthead-actions"><p class="masthead-note">Inspect the canvas. Understand the display.</p><button id="fullscreen-toggle" class="secondary-button" type="button">Enter fullscreen</button></div>
       </header>
 
       <nav class="screen-nav" aria-label="Workbench screens">
@@ -85,6 +85,23 @@
               <div><dt>Pattern map</dt><dd id="mapping-value">—</dd></div>
               <div><dt>Scale</dt><dd id="scale-value">—</dd></div>
             </dl>
+            <section class="measurement-summary" aria-labelledby="measurement-summary-heading">
+              <h3 id="measurement-summary-heading">Browser readings</h3>
+              <dl class="environment-values">
+                <div><dt>Fits in view</dt><dd id="fit-summary">—</dd></div>
+                <div><dt>Canvas / target</dt><dd id="ratio-summary">—</dd></div>
+                <div><dt>Stage space</dt><dd id="stage-summary">—</dd></div>
+                <div><dt>Backing / CSS scale</dt><dd id="effective-scale-summary">—</dd></div>
+                <div><dt>DPR / orientation</dt><dd id="display-summary">—</dd></div>
+                <div><dt>Page overflow</dt><dd id="overflow-summary">—</dd></div>
+                <div><dt>Page fullscreen</dt><dd id="fullscreen-summary">—</dd></div>
+              </dl>
+            </section>
+            <details class="measurement-details"><summary>Raw display and viewport values</summary><pre id="raw-measurements">Measurements are unavailable.</pre></details>
+            <details class="measurement-details"><summary>Recent changes</summary><ol id="measurement-history" class="measurement-history"><li>No changes recorded.</li></ol></details>
+            <button type="button" class="secondary-button report-button">Copy report</button>
+            <p class="action-status" role="status" aria-live="polite"></p>
+            <textarea class="report-fallback" aria-label="Selectable plain text report" rows="8" readonly hidden></textarea>
           </aside>
         </div>
       </section>
@@ -132,6 +149,10 @@
               <input id="animation-toggle" type="checkbox" /><span>Animate craft</span>
             </label>
             <p class="control-hint">Test Card includes the normal and overdrive comparison samples.</p>
+            <details class="measurement-details renderer-measurement-details"><summary>Browser measurements</summary><dl class="environment-values"><div><dt>Fits in view</dt><dd id="renderer-fit-summary">—</dd></div><div><dt>Canvas / stage</dt><dd id="renderer-rect-summary">—</dd></div><div><dt>Page overflow</dt><dd id="renderer-overflow-summary">—</dd></div><div><dt>Page fullscreen</dt><dd id="renderer-fullscreen-summary">—</dd></div></dl><pre id="renderer-raw-measurements">Measurements are unavailable.</pre></details>
+            <button type="button" class="secondary-button report-button">Copy report</button>
+            <p class="action-status" role="status" aria-live="polite"></p>
+            <textarea class="report-fallback" aria-label="Selectable plain text report" rows="8" readonly hidden></textarea>
           </aside>
         </div>
       </section>

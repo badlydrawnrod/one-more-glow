@@ -51,6 +51,8 @@ const requestedSizeValue = requireElement(document.querySelector<HTMLElement>("#
 const backingSizeValue = requireElement(document.querySelector<HTMLElement>("#backing-size-value"), "#backing-size-value");
 const mappingValue = requireElement(document.querySelector<HTMLElement>("#mapping-value"), "#mapping-value");
 const scaleValue = requireElement(document.querySelector<HTMLElement>("#scale-value"), "#scale-value");
+const workbench = requireElement(document.querySelector<HTMLElement>("#workbench"), "#workbench");
+const fullscreenToggle = requireElement(document.querySelector<HTMLButtonElement>("#fullscreen-toggle"), "#fullscreen-toggle");
 let profile: DisplayProfile = { ...DEFAULT_DISPLAY_PROFILE };
 
 type CalibrationMode = "omg1" | "generic";
@@ -66,6 +68,27 @@ let lastCssSize: CanvasSize = { width: 1, height: 1 };
 let calibrationRenderer: DisplayRenderer | null = null;
 const omgSurfaces = new Map<DisplayOrientation, { canvas: HTMLCanvasElement; renderer: DisplayRenderer | null }>();
 let resizePointer: { id: number; x: number; width: number } | null = null;
+type MeasurementSnapshot = {
+  trigger: string;
+  timestamp: string;
+  screen: "environment" | "renderer";
+  stage: { left: number; top: number; width: number; height: number };
+  canvas: { left: number; top: number; width: number; height: number; backingWidth: number; backingHeight: number };
+  visibility: { wholeCanvasVisible: boolean; clippedByStage: boolean; viewport: string };
+  aspect: { actual: number; target: number };
+  effectiveScale: { x: number; y: number };
+  pageOverflow: { horizontal: boolean; vertical: boolean; scrollWidth: number; scrollHeight: number };
+  display: Record<string, number | string | null>;
+  layoutViewport: { width: number; height: number; rootWidth: number; rootHeight: number };
+  visualViewport: { width: number; height: number; scale: number; offsetLeft: number; offsetTop: number } | null;
+  orientation: { viewport: string; screenType: string | null; screenAngle: number | null };
+  fullscreen: { active: boolean; element: string | null };
+};
+const measurementHistory: Array<{ trigger: string; time: string; before: string; after: string }> = [];
+let previousMeasurement: MeasurementSnapshot | null = null;
+let measurementFrame: number | undefined;
+const pendingMeasurementTriggers = new Set<string>();
+let dprMediaQuery: MediaQueryList | null = null;
 
 const params = new URLSearchParams(location.search);
 let orientation: DisplayOrientation = params.get("orientation") === "portrait"
@@ -292,10 +315,224 @@ function renderCalibration(): void {
   widthInput.value = `${Math.round(css.width)}`;
   widthRange.value = `${Math.max(64, Math.min(4096, Math.round(css.width)))}`;
   calibrationModeLabel.textContent = `${calibrationMode === "omg1" ? "OMG-1" : "GENERIC"} / ${calibrationOrientation.toUpperCase()}`;
+  scheduleMeasurements("settings");
 }
 
 function logicalExtent(): string {
   return calibrationOrientation === "landscape" ? "1024 × 768" : "768 × 1024";
+}
+
+function roundMeasurement(value: number): number {
+  return Math.round(value * 100) / 100;
+}
+
+function rectSnapshot(rect: DOMRect): { left: number; top: number; width: number; height: number } {
+  return { left: roundMeasurement(rect.left), top: roundMeasurement(rect.top), width: roundMeasurement(rect.width), height: roundMeasurement(rect.height) };
+}
+
+function collectMeasurement(trigger: string): MeasurementSnapshot | null {
+  const environmentActive = activeScreen === "environment";
+  const canvas = environmentActive
+    ? calibrationMode === "generic" ? genericCanvas : omgCanvas
+    : screen;
+  const stage = environmentActive
+    ? calibrationViewport
+    : requireElement(document.querySelector<HTMLElement>(".canvas-frame"), ".canvas-frame");
+  const canvasRect = canvas.getBoundingClientRect();
+  const stageRect = stage.getBoundingClientRect();
+  if (canvasRect.width <= 0 || canvasRect.height <= 0 || stageRect.width <= 0 || stageRect.height <= 0) return null;
+  const visual = window.visualViewport;
+  const viewportBounds = visual
+    ? { left: visual.offsetLeft, top: visual.offsetTop, right: visual.offsetLeft + visual.width, bottom: visual.offsetTop + visual.height, label: "visual viewport" }
+    : { left: 0, top: 0, right: document.documentElement.clientWidth, bottom: document.documentElement.clientHeight, label: "layout viewport" };
+  const visibleBounds = {
+    left: Math.max(stageRect.left, viewportBounds.left),
+    top: Math.max(stageRect.top, viewportBounds.top),
+    right: Math.min(stageRect.right, viewportBounds.right),
+    bottom: Math.min(stageRect.bottom, viewportBounds.bottom),
+  };
+  const clippedByStage = canvasRect.left < stageRect.left || canvasRect.top < stageRect.top || canvasRect.right > stageRect.right || canvasRect.bottom > stageRect.bottom;
+  const wholeCanvasVisible = canvasRect.left >= visibleBounds.left && canvasRect.top >= visibleBounds.top
+    && canvasRect.right <= visibleBounds.right && canvasRect.bottom <= visibleBounds.bottom;
+  const actualRatio = canvasRect.width / canvasRect.height;
+  const target = environmentActive ? targetRatio : aspectRatio();
+  const root = document.documentElement;
+  const screenOrientation = window.screen.orientation;
+  const dpr = window.devicePixelRatio || 1;
+  return {
+    trigger,
+    timestamp: new Date().toISOString(),
+    screen: activeScreen,
+    stage: rectSnapshot(stageRect),
+    canvas: {
+      ...rectSnapshot(canvasRect),
+      backingWidth: canvas.width,
+      backingHeight: canvas.height,
+    },
+    visibility: { wholeCanvasVisible, clippedByStage, viewport: viewportBounds.label },
+    aspect: { actual: roundMeasurement(actualRatio), target: roundMeasurement(target) },
+    effectiveScale: { x: roundMeasurement(canvas.width / canvasRect.width), y: roundMeasurement(canvas.height / canvasRect.height) },
+    pageOverflow: {
+      horizontal: root.scrollWidth > root.clientWidth,
+      vertical: root.scrollHeight > root.clientHeight,
+      scrollWidth: root.scrollWidth,
+      scrollHeight: root.scrollHeight,
+    },
+    display: {
+      screenWidth: window.screen.width,
+      screenHeight: window.screen.height,
+      availableWidth: window.screen.availWidth,
+      availableHeight: window.screen.availHeight,
+      devicePixelRatio: dpr,
+    },
+    layoutViewport: { width: window.innerWidth, height: window.innerHeight, rootWidth: root.clientWidth, rootHeight: root.clientHeight },
+    visualViewport: visual ? {
+      width: roundMeasurement(visual.width), height: roundMeasurement(visual.height), scale: roundMeasurement(visual.scale),
+      offsetLeft: roundMeasurement(visual.offsetLeft), offsetTop: roundMeasurement(visual.offsetTop),
+    } : null,
+    orientation: {
+      viewport: window.innerWidth >= window.innerHeight ? "landscape" : "portrait",
+      screenType: screenOrientation?.type ?? null,
+      screenAngle: screenOrientation?.angle ?? null,
+    },
+    fullscreen: { active: document.fullscreenElement !== null, element: document.fullscreenElement?.id || document.fullscreenElement?.tagName || null },
+  };
+}
+
+function conciseMeasurement(snapshot: MeasurementSnapshot): string {
+  return `${snapshot.canvas.width} × ${snapshot.canvas.height} CSS px at ${snapshot.canvas.left}, ${snapshot.canvas.top}; ${snapshot.canvas.backingWidth} × ${snapshot.canvas.backingHeight} px; fit ${snapshot.visibility.wholeCanvasVisible ? "yes" : "no"}; DPR ${snapshot.display.devicePixelRatio}`;
+}
+
+function renderMeasurement(snapshot: MeasurementSnapshot): void {
+  const fit = snapshot.visibility.wholeCanvasVisible ? "Yes" : `No${snapshot.visibility.clippedByStage ? " · stage clipped" : ""}`;
+  const ratio = `${snapshot.aspect.actual.toFixed(3)} / ${snapshot.aspect.target.toFixed(3)}`;
+  const stage = `${snapshot.stage.width.toFixed(0)} × ${snapshot.stage.height.toFixed(0)} CSS px`;
+  const effective = `${snapshot.effectiveScale.x.toFixed(2)}× / ${snapshot.effectiveScale.y.toFixed(2)}×`;
+  const orientationText = `${snapshot.display.devicePixelRatio}× / ${snapshot.orientation.viewport}${snapshot.orientation.screenType ? ` · ${snapshot.orientation.screenType}` : ""}`;
+  const overflow = `H ${snapshot.pageOverflow.horizontal ? "yes" : "no"} · V ${snapshot.pageOverflow.vertical ? "yes" : "no"}`;
+  if (snapshot.screen === "environment") {
+    requireElement(document.querySelector<HTMLElement>("#fit-summary"), "#fit-summary").textContent = fit;
+    requireElement(document.querySelector<HTMLElement>("#ratio-summary"), "#ratio-summary").textContent = ratio;
+    requireElement(document.querySelector<HTMLElement>("#stage-summary"), "#stage-summary").textContent = stage;
+    requireElement(document.querySelector<HTMLElement>("#effective-scale-summary"), "#effective-scale-summary").textContent = effective;
+    requireElement(document.querySelector<HTMLElement>("#display-summary"), "#display-summary").textContent = orientationText;
+    requireElement(document.querySelector<HTMLElement>("#overflow-summary"), "#overflow-summary").textContent = overflow;
+    requireElement(document.querySelector<HTMLElement>("#fullscreen-summary"), "#fullscreen-summary").textContent = snapshot.fullscreen.active ? "Active" : "Off";
+    requireElement(document.querySelector<HTMLElement>("#raw-measurements"), "#raw-measurements").textContent = JSON.stringify(snapshot, null, 2);
+  } else {
+    requireElement(document.querySelector<HTMLElement>("#renderer-fit-summary"), "#renderer-fit-summary").textContent = fit;
+    requireElement(document.querySelector<HTMLElement>("#renderer-rect-summary"), "#renderer-rect-summary").textContent = `${snapshot.canvas.width} × ${snapshot.canvas.height} / ${stage}`;
+    requireElement(document.querySelector<HTMLElement>("#renderer-overflow-summary"), "#renderer-overflow-summary").textContent = overflow;
+    requireElement(document.querySelector<HTMLElement>("#renderer-fullscreen-summary"), "#renderer-fullscreen-summary").textContent = snapshot.fullscreen.active ? "Active" : "Off";
+    requireElement(document.querySelector<HTMLElement>("#renderer-raw-measurements"), "#renderer-raw-measurements").textContent = JSON.stringify(snapshot, null, 2);
+  }
+}
+
+function renderHistory(): void {
+  for (const list of document.querySelectorAll<HTMLOListElement>("#measurement-history")) {
+    list.replaceChildren();
+    if (measurementHistory.length === 0) {
+      const empty = document.createElement("li");
+      empty.textContent = "No changes recorded.";
+      list.append(empty);
+      continue;
+    }
+    for (const entry of measurementHistory) {
+      const item = document.createElement("li");
+      item.textContent = `${entry.time} · ${entry.trigger}: ${entry.before} → ${entry.after}`;
+      list.append(item);
+    }
+  }
+}
+
+function scheduleMeasurements(trigger: string): void {
+  pendingMeasurementTriggers.add(trigger);
+  if (measurementFrame !== undefined) return;
+  measurementFrame = requestAnimationFrame(() => {
+    measurementFrame = undefined;
+    const cause = [...pendingMeasurementTriggers].join(", ");
+    pendingMeasurementTriggers.clear();
+    const next = collectMeasurement(cause || trigger);
+    if (!next) return;
+    if (previousMeasurement && JSON.stringify({ ...previousMeasurement, trigger: "", timestamp: "" }) !== JSON.stringify({ ...next, trigger: "", timestamp: "" })) {
+      measurementHistory.push({ trigger: cause || "measurement", time: new Date().toLocaleTimeString(), before: conciseMeasurement(previousMeasurement), after: conciseMeasurement(next) });
+      if (measurementHistory.length > 8) measurementHistory.shift();
+      renderHistory();
+    }
+    previousMeasurement = next;
+    renderMeasurement(next);
+    updateFullscreenControl();
+  });
+}
+
+function updateFullscreenControl(): void {
+  const active = document.fullscreenElement === workbench;
+  fullscreenToggle.textContent = active ? "Exit fullscreen" : "Enter fullscreen";
+  fullscreenToggle.setAttribute("aria-label", active ? "Exit fullscreen" : "Enter fullscreen");
+}
+
+async function toggleFullscreen(): Promise<void> {
+  try {
+    if (document.fullscreenElement) await document.exitFullscreen();
+    else if (workbench.requestFullscreen) await workbench.requestFullscreen();
+    else throw new Error("Fullscreen is unavailable in this browser.");
+  } catch (error) {
+    const status = activeScreen === "environment"
+      ? environmentScreen.querySelector<HTMLElement>(".action-status")
+      : rendererScreen.querySelector<HTMLElement>(".action-status");
+    if (status) status.textContent = error instanceof Error ? error.message : "Fullscreen could not be changed.";
+  }
+}
+
+function createReport(): string {
+  const snapshot = collectMeasurement("report");
+  if (snapshot) {
+    previousMeasurement = snapshot;
+    renderMeasurement(snapshot);
+  }
+  return [
+    "One More Glow · Diagnostics report",
+    `Captured: ${new Date().toISOString()}`,
+    `Screen: ${activeScreen}`,
+    `Study: ${scene}${scene === "game" ? ` · animation ${animate ? "on" : "off"}` : ""}`,
+    `Calibration: ${calibrationMode} · ${calibrationOrientation} · ${ratioLabel} · ${autoFitInput.checked ? "auto fit" : `manual ${manualWidth} CSS px`}`,
+    `Mapping: ${mappingMode} · virtual ${virtualSize.width} × ${virtualSize.height} · backing choice ${backingScaleSelect.value}`,
+    `Display profile: beam ${profile.lineWidth}, point ${profile.pointRadius}, glow ${profile.glowStrength}, spread ${profile.glowSpread}`,
+    "",
+    "Browser measurements:",
+    snapshot ? JSON.stringify(snapshot, null, 2) : "Unavailable: active canvas or stage has no measurable area.",
+    "",
+    "Recent changes:",
+    ...(measurementHistory.length ? measurementHistory.map((entry) => `${entry.time} · ${entry.trigger}: ${entry.before} -> ${entry.after}`) : ["No changes recorded."]),
+  ].join("\n");
+}
+
+fullscreenToggle.addEventListener("click", () => void toggleFullscreen());
+document.addEventListener("fullscreenchange", () => {
+  updateFullscreenControl();
+  scheduleMeasurements("fullscreen");
+});
+
+for (const button of document.querySelectorAll<HTMLButtonElement>(".report-button")) {
+  button.addEventListener("click", async () => {
+    const panel = button.closest<HTMLElement>(".panel");
+    const status = panel?.querySelector<HTMLElement>(".action-status");
+    const fallback = panel?.querySelector<HTMLTextAreaElement>(".report-fallback");
+    const report = createReport();
+    if (!status || !fallback) return;
+    fallback.value = report;
+    fallback.hidden = true;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard access is unavailable.");
+      await navigator.clipboard.writeText(report);
+      status.textContent = "Report copied to the clipboard.";
+    } catch {
+      fallback.hidden = false;
+      fallback.focus();
+      fallback.select();
+      status.textContent = "Clipboard unavailable. The report is selected below for copying.";
+    }
+  });
 }
 
 const cyan: Color = [0, 0.9, 1];
@@ -683,6 +920,7 @@ for (const tab of screenTabs) {
     } else {
       renderCalibration();
     }
+    scheduleMeasurements("screen switch");
   });
 }
 
@@ -697,6 +935,7 @@ document.addEventListener("click", (event: MouseEvent) => {
     activeScreen = "renderer";
     syncControls();
     renderCurrentScene();
+    scheduleMeasurements("study selection");
     return;
   }
 
@@ -717,6 +956,7 @@ document.addEventListener("click", (event: MouseEvent) => {
     }
     activeScreen = "renderer";
     syncControls();
+    scheduleMeasurements("orientation");
   }
 });
 
@@ -747,11 +987,30 @@ window.addEventListener("resize", () => {
   resizeStudyCanvas();
   if (!animate) drawDiagnostic();
   renderCalibration();
+  scheduleMeasurements("resize");
 });
+window.addEventListener("scroll", () => scheduleMeasurements("scroll"), true);
+window.addEventListener("orientationchange", () => scheduleMeasurements("orientation"));
+window.screen.orientation?.addEventListener("change", () => scheduleMeasurements("orientation"));
+window.visualViewport?.addEventListener("resize", () => scheduleMeasurements("visual viewport resize"));
+window.visualViewport?.addEventListener("scroll", () => scheduleMeasurements("visual viewport scroll"));
+
+function watchDevicePixelRatio(): void {
+  dprMediaQuery?.removeEventListener("change", onDevicePixelRatioChange);
+  dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+  dprMediaQuery.addEventListener("change", onDevicePixelRatioChange, { once: true });
+}
+function onDevicePixelRatioChange(): void {
+  watchDevicePixelRatio();
+  renderCalibration();
+  scheduleMeasurements("DPR change");
+}
+watchDevicePixelRatio();
 
 syncControls();
 renderCalibration();
 renderCurrentScene();
+scheduleMeasurements("initial");
 
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-mode]")) {
   button.addEventListener("click", () => {
@@ -893,6 +1152,8 @@ resizeHandle.addEventListener("pointercancel", stopResize);
 
 const calibrationObserver = new ResizeObserver(() => renderCalibration());
 calibrationObserver.observe(calibrationViewport);
+const studyStage = document.querySelector<HTMLElement>(".canvas-frame");
+if (studyStage) new ResizeObserver(() => scheduleMeasurements("stage resize")).observe(studyStage);
 
 function requireContext<T>(context: T | null, name: string): T {
   if (!context) throw new Error(`${name} is unavailable`);
