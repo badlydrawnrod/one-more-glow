@@ -19,8 +19,10 @@ import { registerAppServiceWorker } from "./pwa.ts";
 registerAppServiceWorker();
 
 let screen = requireElement(document.querySelector<HTMLCanvasElement>("#screen"), "#screen");
-const menuToggle = requireElement(document.querySelector<HTMLButtonElement>("#menu-toggle"), "#menu-toggle");
-const menu = requireElement(document.querySelector<HTMLElement>("#display-menu"), "#display-menu");
+const environmentScreen = requireElement(document.querySelector<HTMLElement>("#environment-screen"), "#environment-screen");
+const rendererScreen = requireElement(document.querySelector<HTMLElement>("#renderer-screen"), "#renderer-screen");
+const studyStageLabel = requireElement(document.querySelector<HTMLElement>("#study-stage-label"), "#study-stage-label");
+const screenTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-screen]")];
 const animationControl = requireElement(document.querySelector<HTMLElement>("#animation-control"), "#animation-control");
 const animationToggle = requireElement(document.querySelector<HTMLInputElement>("#animation-toggle"), "#animation-toggle");
 const profileControls = requireElement(document.querySelector<HTMLElement>("#profile-controls"), "#profile-controls");
@@ -32,10 +34,16 @@ let orientation: DisplayOrientation = params.get("orientation") === "portrait"
   ? "portrait"
   : "landscape";
 const requestedScene = params.get("scene");
-const defaultScene = import.meta.env.VITE_DEFAULT_SCENE === "testcard" ? "testcard" : "game";
-let scene = requestedScene === "game" || requestedScene === "testcard" || requestedScene === "segments" || requestedScene === "spacing" || requestedScene === "profile"
-  ? requestedScene
-  : defaultScene;
+const validScenes = ["game", "testcard", "segments", "spacing", "profile"] as const;
+type Scene = (typeof validScenes)[number];
+const isScene = (value: string | null): value is Scene => validScenes.some((candidate) => candidate === value);
+const hasExplicitScene = isScene(requestedScene);
+const pagesDefault = import.meta.env.VITE_DEFAULT_SCENE === "testcard";
+const legacyGameLink = !params.has("scene") && (params.get("orientation") === "portrait" || params.get("animate") === "1");
+let scene: Scene = hasExplicitScene ? requestedScene : legacyGameLink ? "game" : pagesDefault ? "testcard" : "game";
+let activeScreen: "environment" | "renderer" = hasExplicitScene || pagesDefault || legacyGameLink
+  ? "renderer"
+  : "environment";
 let animate = params.get("animate") === "1" && scene === "game";
 let renderer: DisplayRenderer;
 
@@ -397,6 +405,11 @@ function renderCurrentScene(): void {
 }
 
 function syncControls(): void {
+  environmentScreen.hidden = activeScreen !== "environment";
+  rendererScreen.hidden = activeScreen !== "renderer";
+  for (const tab of screenTabs) {
+    tab.setAttribute("aria-current", String(tab.dataset.screen === activeScreen ? "page" : "false"));
+  }
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-scene]")) {
     button.setAttribute("aria-pressed", String(button.dataset.scene === scene));
   }
@@ -406,28 +419,31 @@ function syncControls(): void {
   animationControl.hidden = scene !== "game";
   animationToggle.checked = animate;
   profileControls.hidden = scene !== "profile";
+  studyStageLabel.textContent = `${scene.toUpperCase()} STUDY`;
   for (const input of profileControls.querySelectorAll<HTMLInputElement>("input[data-profile]")) {
     const key = input.dataset.profile;
     if (key === "lineWidth" || key === "pointRadius" || key === "glowStrength" || key === "glowSpread") {
       input.value = String(profile[key]);
+      const output = profileControls.querySelector<HTMLOutputElement>(`[data-profile-value="${key}"]`);
+      if (output) output.value = profile[key].toFixed(1);
     }
   }
 }
 
-function setMenuOpen(open: boolean): void {
-  menu.hidden = !open;
-  menuToggle.setAttribute("aria-expanded", String(open));
-  const label = menuToggle.querySelector<HTMLElement>(".visually-hidden");
-  if (label) label.textContent = open ? "Close display menu" : "Open display menu";
+for (const tab of screenTabs) {
+  tab.addEventListener("click", () => {
+    const next = tab.dataset.screen;
+    if (next !== "environment" && next !== "renderer") return;
+    activeScreen = next;
+    syncControls();
+    if (activeScreen === "renderer") {
+      resizeCanvas();
+      renderCurrentScene();
+    }
+  });
 }
 
-function closeMenu(): void {
-  setMenuOpen(false);
-  menuToggle.focus();
-}
-
-menuToggle.addEventListener("click", () => setMenuOpen(menu.hasAttribute("hidden")));
-menu.addEventListener("click", (event: MouseEvent) => {
+document.addEventListener("click", (event: MouseEvent) => {
   const target = event.target;
   if (!(target instanceof HTMLButtonElement)) return;
 
@@ -435,9 +451,9 @@ menu.addEventListener("click", (event: MouseEvent) => {
   if (selectedScene === "game" || selectedScene === "testcard" || selectedScene === "segments" || selectedScene === "spacing" || selectedScene === "profile") {
     scene = selectedScene;
     if (scene !== "game") animate = false;
+    activeScreen = "renderer";
     syncControls();
     renderCurrentScene();
-    closeMenu();
     return;
   }
 
@@ -455,8 +471,8 @@ menu.addEventListener("click", (event: MouseEvent) => {
       renderer = createRenderer(screen);
       renderCurrentScene();
     }
+    activeScreen = "renderer";
     syncControls();
-    closeMenu();
   }
 });
 
@@ -481,12 +497,6 @@ profileReset.addEventListener("click", () => {
   renderer.setDisplayProfile(profile);
   syncControls();
   renderCurrentScene();
-});
-
-window.addEventListener("keydown", (event: KeyboardEvent) => {
-  if (event.key === "Escape" && !menu.hidden) {
-    closeMenu();
-  }
 });
 
 window.addEventListener("resize", () => {

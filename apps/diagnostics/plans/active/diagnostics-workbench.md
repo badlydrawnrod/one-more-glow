@@ -52,16 +52,16 @@ still pending here, then set **Next action** to the first unchecked step.
 
 ### 1. Establish the baseline and build the shell
 
-- [ ] Run `npm run dev` from the root. Confirm the study links below, portrait
+- [x] Run `npm run dev` from the root. Confirm the study links below, portrait
   layout, overdrive comparison and live profile controls. Read `index.html`
   and `src/main.ts` before moving existing markup or drawing code.
-- [ ] Build the two HTML screens and persistent navigation. Put the existing
+- [x] Build the two HTML screens and persistent navigation. Put the existing
   studies in Renderer & Performance and move the visual sliders and reset
   into visible, labelled HTML controls. Keep the profile comparison samples on
   the canvas. Move and resize the shell in CSS. Put readouts alongside the
   stage on wide screens and after the canvas on narrow screens. Use the palette,
   focus and contrast requirements from the spec.
-- [ ] Parse startup selection once. A valid explicit `scene` selects that
+- [x] Parse startup selection once. A valid explicit `scene` selects that
   study. The Pages flag selects Test Card when there is no explicit study.
   Preserve `?orientation=portrait` and `?animate=1` at the regular entry by
   opening the legacy game study when those links omit `scene`. Animation only
@@ -73,6 +73,18 @@ values `game`, `testcard`, `segments`, `spacing` and `profile` still select the
 right study. Confirm `?scene=testcard&orientation=portrait` and that profile
 values survive switching studies and screens. Check keyboard focus on both
 layouts. Run `npm run check --workspace=diagnostics` once the library is built.
+
+**Step 1 results (2026-11-18).** Replaced the canvas overlay with persistent
+screen navigation and a responsive HTML shell. The regular entry opens Canvas
+& Environment; explicit study URLs, the Pages Test Card default, and legacy
+portrait/animation links open Renderer & Performance. All five studies remain
+selectable, and profile controls now sit beside the canvas samples. Browser
+checks confirmed profile values persist across screen switches, portrait
+Test Card selection, the Pages default, and the legacy links. Wide-layout
+keyboard focus is visible. Narrow-layout keyboard focus and profile persistence
+after changing away from the profile study remain pending for the responsive
+browser pass. `npm run check --workspace=diagnostics` passed; `git diff --check`
+passed.
 
 ### 2. Build the calibration canvas and its controls
 
@@ -217,8 +229,8 @@ the accepted behaviour as they are discovered.
 
 ## Next action
 
-Start the existing app with `npm run dev` and check the five study links and
-profile controls before replacing the shell.
+Implement step 2: add the calibration canvas, sizing controls, and mode-specific
+geometry to the Canvas & Environment screen.
 
 ## Completion criteria
 

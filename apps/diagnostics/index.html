@@ -5,156 +5,99 @@
     <link rel="icon" type="image/svg+xml" href="%BASE_URL%favicon.svg" />
     <link rel="manifest" href="%BASE_URL%manifest.webmanifest" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>One More Glow</title>
-    <style>
-      :root {
-        color-scheme: dark;
-        font-family: ui-sans-serif, system-ui, sans-serif;
-        background: #05070c;
-        color: #e6edf5;
-      }
-
-      * { box-sizing: border-box; }
-
-      body {
-        min-width: 320px;
-        min-height: 100vh;
-        margin: 0;
-        display: grid;
-        place-items: center;
-        overflow: hidden;
-        background: #05070c;
-      }
-
-      .display { position: relative; }
-      .profile-controls { position: absolute; inset: 0; pointer-events: none; }
-      .profile-controls[hidden] { display: none; }
-      .profile-controls input, .profile-controls button {
-        position: absolute;
-        pointer-events: auto;
-        opacity: 0.001;
-        cursor: pointer;
-      }
-      .profile-controls input { left: 15%; width: 70%; height: 30px; transform: translateY(-50%); }
-      .profile-controls input:focus-visible, .profile-controls button:focus-visible { opacity: 0.35; }
-      .profile-controls button { left: 10%; top: 71%; width: 28%; height: 8%; }
-
-      #screen {
-        display: block;
-        background: #05070c;
-      }
-
-      .menu-toggle {
-        z-index: 3;
-        position: absolute;
-        top: 12px;
-        left: 12px;
-        display: grid;
-        place-items: center;
-        width: 42px;
-        height: 42px;
-        border: 1px solid #45606b;
-        border-radius: 6px;
-        background: rgb(5 7 12 / 88%);
-        color: #b9f8ff;
-        font-size: 20px;
-        cursor: pointer;
-      }
-
-      .display-menu {
-        z-index: 2;
-        position: absolute;
-        top: 62px;
-        left: 12px;
-        display: grid;
-        gap: 16px;
-        width: min(280px, calc(100% - 24px));
-        padding: 18px;
-        border: 1px solid #34505a;
-        border-radius: 8px;
-        background: rgb(5 10 16 / 96%);
-        box-shadow: 0 10px 30px rgb(0 0 0 / 45%);
-      }
-
-      .display-menu[hidden], .animation-control[hidden] { display: none; }
-
-      .display-menu h1 {
-        margin: 0;
-        color: #b9f8ff;
-        font-size: 16px;
-        font-weight: 650;
-      }
-
-      .control-group { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-      .control-label { grid-column: 1 / -1; margin-bottom: 2px; color: #9db1bc; font-size: 12px; }
-
-      .display-menu button {
-        min-height: 34px;
-        border: 1px solid #314751;
-        border-radius: 4px;
-        background: #111b23;
-        color: #dce8ed;
-        cursor: pointer;
-      }
-
-      .display-menu button[aria-pressed="true"] {
-        border-color: #54dff0;
-        background: #12343b;
-        color: #c4faff;
-      }
-
-      button:focus-visible, input:focus-visible { outline: 2px solid #ffbd72; outline-offset: 2px; }
-
-      .animation-control { display: flex; align-items: center; gap: 9px; color: #dce8ed; font-size: 14px; }
-      .animation-control input { accent-color: #54dff0; }
-
-      .visually-hidden {
-        position: absolute;
-        width: 1px;
-        height: 1px;
-        padding: 0;
-        margin: -1px;
-        overflow: hidden;
-        clip: rect(0, 0, 0, 0);
-        white-space: nowrap;
-        border: 0;
-      }
-    </style>
+    <meta name="theme-color" content="#080b11" />
+    <title>One More Glow · Diagnostics</title>
+    <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
-    <main class="display" aria-label="Rendering diagnostics">
-      <canvas id="screen" width="800" height="600" aria-label="Rendering diagnostic display"></canvas>
-      <div id="profile-controls" class="profile-controls" aria-label="Display profile" hidden>
-        <input type="range" aria-label="Beam width in CSS pixels" data-profile="lineWidth" min="0.5" max="4" step="0.1" style="top: 25%" />
-        <input type="range" aria-label="Point radius in CSS pixels" data-profile="pointRadius" min="0.5" max="4" step="0.1" style="top: 38%" />
-        <input type="range" aria-label="Glow strength" data-profile="glowStrength" min="0" max="2" step="0.1" style="top: 51%" />
-        <input type="range" aria-label="Glow spread" data-profile="glowSpread" min="0.5" max="2" step="0.1" style="top: 64%" />
-        <button id="profile-reset" type="button" aria-label="Reset display profile">Reset</button>
-      </div>
-      <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="display-menu">
-        <span class="menu-icon" aria-hidden="true">☰</span>
-        <span class="visually-hidden">Open display menu</span>
-      </button>
-      <section id="display-menu" class="display-menu" aria-label="Display settings" hidden>
-        <h1>Display</h1>
-        <div class="control-group" role="group" aria-label="Scene">
-          <span class="control-label">Scene</span>
-          <button type="button" data-scene="game" aria-pressed="false">Game</button>
-          <button type="button" data-scene="testcard" aria-pressed="false">Test card</button>
-          <button type="button" data-scene="segments" aria-pressed="false">Segments</button>
-          <button type="button" data-scene="spacing" aria-pressed="false">Spacing</button>
-          <button type="button" data-scene="profile" aria-pressed="false">Profile</button>
+    <main class="workbench" aria-label="Rendering diagnostics">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">ONE MORE GLOW / DISPLAY LAB</p>
+          <h1>Diagnostics workbench</h1>
         </div>
-        <div class="control-group" role="group" aria-label="Orientation">
-          <span class="control-label">Orientation</span>
-          <button type="button" data-orientation="landscape" aria-pressed="false">Landscape</button>
-          <button type="button" data-orientation="portrait" aria-pressed="false">Portrait</button>
+        <p class="masthead-note">Inspect the canvas. Understand the display.</p>
+      </header>
+
+      <nav class="screen-nav" aria-label="Workbench screens">
+        <button type="button" class="screen-tab" data-screen="environment" aria-current="page">
+          <span class="tab-index">01</span><span>Canvas &amp; Environment</span>
+        </button>
+        <button type="button" class="screen-tab" data-screen="renderer" aria-current="false">
+          <span class="tab-index">02</span><span>Renderer &amp; Performance</span>
+        </button>
+      </nav>
+
+      <section id="environment-screen" class="workbench-screen" aria-labelledby="environment-title">
+        <div class="screen-heading">
+          <div><p class="eyebrow">FIT / SCALE / DISPLAY</p><h2 id="environment-title">Canvas &amp; Environment</h2></div>
+          <p>Check how a fixed vector canvas meets your browser window.</p>
         </div>
-        <label id="animation-control" class="animation-control" hidden>
-          <input id="animation-toggle" type="checkbox" />
-          <span>Animate craft</span>
-        </label>
+        <div class="environment-layout">
+          <section class="calibration-stage" aria-label="Calibration canvas preview">
+            <div class="stage-caption"><span>CALIBRATION STAGE</span><span>SETUP</span></div>
+            <div class="stage-placeholder" aria-live="polite">
+              <span class="placeholder-mark" aria-hidden="true">＋</span>
+              <strong>Canvas calibration</strong>
+              <span>Sizing controls and display measurements are next.</span>
+            </div>
+          </section>
+          <aside class="environment-readout panel">
+            <p class="eyebrow">ENVIRONMENT SUMMARY</p>
+            <h3>Ready to measure</h3>
+            <p>The calibration stage will report fit, shape, and backing scale.</p>
+            <dl><div><dt>Display</dt><dd>Browser window</dd></div><div><dt>Canvas</dt><dd>Calibration</dd></div></dl>
+          </aside>
+        </div>
       </section>
+
+      <section id="renderer-screen" class="workbench-screen" aria-labelledby="renderer-title" hidden>
+        <div class="screen-heading">
+          <div><p class="eyebrow">STUDIES / RENDERER</p><h2 id="renderer-title">Renderer &amp; Performance</h2></div>
+          <p>Compare geometry, text, display profiles, and animation.</p>
+        </div>
+        <div class="renderer-layout">
+          <section class="study-stage" aria-label="Rendering study">
+            <div class="stage-caption"><span id="study-stage-label">RENDERER STUDY</span><span>OMG-1 / WEBGL2</span></div>
+            <div class="canvas-frame">
+              <canvas id="screen" width="800" height="600" aria-label="Rendering diagnostic display"></canvas>
+            </div>
+            <p class="stage-footnote">The canvas keeps the selected study and profile while you move between screens.</p>
+          </section>
+
+          <aside class="study-controls panel" aria-label="Study controls">
+            <div class="panel-heading"><p class="eyebrow">AVAILABLE STUDIES</p><h3>Choose a study</h3></div>
+            <div class="study-choices" role="group" aria-label="Study">
+              <button type="button" data-scene="game" aria-pressed="false">Game scene</button>
+              <button type="button" data-scene="testcard" aria-pressed="false">Test card</button>
+              <button type="button" data-scene="segments" aria-pressed="false">Segment text</button>
+              <button type="button" data-scene="spacing" aria-pressed="false">Segment spacing</button>
+              <button type="button" data-scene="profile" aria-pressed="false">Display profile</button>
+            </div>
+            <div id="profile-controls" class="profile-controls" aria-labelledby="profile-heading" hidden>
+              <div class="panel-heading"><p class="eyebrow">LIVE DISPLAY PROFILE</p><h3 id="profile-heading">Adjust the vector beam</h3></div>
+              <label class="range-control"><span>Beam width <output data-profile-value="lineWidth"></output></span><input type="range" aria-label="Beam width in CSS pixels" data-profile="lineWidth" min="0.5" max="4" step="0.1" /></label>
+              <label class="range-control"><span>Point radius <output data-profile-value="pointRadius"></output></span><input type="range" aria-label="Point radius in CSS pixels" data-profile="pointRadius" min="0.5" max="4" step="0.1" /></label>
+              <label class="range-control"><span>Glow strength <output data-profile-value="glowStrength"></output></span><input type="range" aria-label="Glow strength" data-profile="glowStrength" min="0" max="2" step="0.1" /></label>
+              <label class="range-control"><span>Glow spread <output data-profile-value="glowSpread"></output></span><input type="range" aria-label="Glow spread" data-profile="glowSpread" min="0.5" max="2" step="0.1" /></label>
+              <button id="profile-reset" class="secondary-button" type="button">Reset profile</button>
+            </div>
+            <div class="control-divider"></div>
+            <div class="control-block">
+              <p class="control-title">Canvas orientation</p>
+              <div class="choice-pair" role="group" aria-label="Orientation">
+                <button type="button" data-orientation="landscape" aria-pressed="false">Landscape</button>
+                <button type="button" data-orientation="portrait" aria-pressed="false">Portrait</button>
+              </div>
+            </div>
+            <label id="animation-control" class="check-control" hidden>
+              <input id="animation-toggle" type="checkbox" /><span>Animate craft</span>
+            </label>
+            <p class="control-hint">Test Card includes the normal and overdrive comparison samples.</p>
+          </aside>
+        </div>
+      </section>
+      <footer class="workbench-footer"><span>LOCAL DISPLAY DIAGNOSTICS</span><span>01 / 02</span></footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
