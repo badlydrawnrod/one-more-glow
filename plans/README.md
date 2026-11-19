@@ -1,83 +1,64 @@
 # Implementation plans
 
-Plans are temporary, resumable records of implementation work.
-
-They describe **how work is progressing**, not the durable requirements of the software.
-
-Package requirements belong in `packages/<package>/docs/specs/`; app-specific specifications belong in `apps/<app>/docs/specs/`. Cross-package requirements belong in root `docs/specs/`. Architectural rules belong in `docs/architecture.md` and `docs/engineering.md`.
-
-Keep plans for work confined to one app in `apps/<app>/plans/active/`. Keep library and cross-app plans in `plans/active/`. Create the relevant directory when needed.
+An active plan is a temporary record of how to achieve and verify an objective.
+It gives the next person enough context to resume the work. See
+[work and documentation](../docs/engineering.md#work-and-documentation) for
+the roles of objectives, specifications, and architecture.
 
 ## When to create a plan
 
-Create a plan for work that:
+Create a plan when the work has meaningful steps to sequence, a design decision
+to investigate, or a likely handoff across people, agents, or sessions. A small,
+self-contained change can start from the objective and a suitable check.
 
-- Spans multiple meaningful steps or development sessions.
-- Involves significant design decisions or architectural changes.
-- Is likely to require handover between developers or agents.
+Start with the [template](template.md). Keep app-specific plans in
+`apps/<app>/plans/active/` and library or shared work in `plans/active/`.
 
-Do not require plans for trivial fixes or small, self-contained changes.
+## Write a resumable plan
 
-## Creating a plan
+- State the objective and the observable criteria for achieving it. Link
+  relevant specs and architecture where they apply. For behavior without a
+  spec, use the agreed objective and criteria as the basis for the plan.
+- Order meaningful steps by dependency. Name the entry point or starting files
+  when they help a handoff. Give each meaningful step a checkpoint with an
+  action or command, any relevant setup, and the expected result. Use the
+  smallest applicable workspace command from the [root README](../README.md).
+- When discovery or a decision blocks a step, say what evidence or decision is
+  needed and which work can proceed independently.
+- Record the first feasible next action so the plan can be picked up without
+  access to the original conversation.
 
-1. Copy `plans/template.md` to the appropriate active directory as `<descriptive-name>.md`.
-2. Link relevant durable specifications.
-3. Record the objective, scope and initial steps.
-4. Identify the first concrete action.
+### Example from diagnostics
 
-Plans should be concise and proportional to the task.
+**Objective** — When part of the test pattern disappears, a user can tell
+whether scrolling will reveal it or the test area is clipping it.
 
-## Writing steps for a handoff
+**Success criteria** — The summary shows whether the stage clips the canvas
+and whether the canvas is within the browser viewport. The copied report
+agrees with the summary in both cases.
 
-- For behavior changes, tie the scope to the accepted part of the relevant
-  spec. Identify the existing entry point, files or functions to start from,
-  and any public behavior the change must preserve.
-- Order the work by dependency. Give each meaningful step one observable
-  outcome that can be checked before starting work that depends on it. Name
-  a prerequisite explicitly when the order alone does not make it clear.
-- Give each step a checkpoint with the command or manual action, the relevant
-  setup or input, and the expected result. Use the smallest applicable
-  workspace command from the [root README](../README.md). For manual checks,
-  name the entry point and any browser, device, or fixture needed to reproduce
-  the result. One checkpoint can cover several small edits.
-- If a decision or an unknown capability blocks a step, state what evidence
-  or decision would unblock it. Make the investigation its own step and name
-  the work that can proceed independently.
+**Step and checkpoint** — Measure the canvas against both the stage and the
+viewport. In the calibration screen, use a short browser window and scroll
+until a canvas that fits its stage is partly outside the viewport. Verify
+that the summary shows partial visibility and that the canvas fits the stage.
+Scroll it back into view. Then set a manual width larger than the stage and
+verify that the summary shows stage clipping. In each case, compare the copied
+report with the on-screen summary.
 
-For example, a diagnostics sizing checkpoint can specify the Robots preset at
-DPR 3 with a 1200 × 900 CSS pixel stage. Expect a 1024 × 768 CSS pixel canvas
-and a 2048 × 1536 pixel backing buffer. Include the browser or emulation setup
-used to reproduce those conditions.
+The [diagnostics workbench spec](../apps/diagnostics/docs/specs/diagnostics-workbench.md#measurements-and-reports)
+keeps the resulting behavioral commitment.
 
-## Maintaining a plan
+## Maintain and close the plan
 
-Update the plan during implementation, not just at the beginning and end.
+Check the plan against the repository before resuming. As work progresses,
+check off steps after their checkpoints pass, record significant decisions
+and their rationale, and keep the next action current. Record actual evidence,
+including failures and pending checks with the browser, device, or fixture
+needed to run them.
 
-In particular:
-
-- Check off a step after its checkpoint passes.
-- Record important decisions and their rationale.
-- Record verification results, including failures. Mark checks that require an
-  unavailable browser, device, or fixture as pending and say what is needed.
-- Keep **Next action** current. Name the first feasible action and where to
-  start.
-- Record unresolved questions or blockers.
-
-A fresh agent or developer should be able to read the plan, inspect the repository and resume work without access to the previous conversation.
-
-Before resuming, verify the plan against the actual state of the repository. The plan may be stale.
-
-## Completing a plan
-
-When work is finished:
-
-1. Verify the completion criteria.
-2. Transfer durable decisions and requirements into the appropriate shared or app-local documents.
-3. Run relevant checks, including tests when observable behavior changes.
-4. Delete the completed plan.
-
-Completed plans are not authoritative documentation. Keep them only when there is a specific historical reason.
-
-## Guiding principle
-
-**Specifications preserve intent. Tests verify behaviour. Plans preserve progress.**
+Before closing, check the objective against the observed results and call out
+any unmet criteria or remaining verification gaps. Keep actionable follow-up
+visible when work is deferred. Transfer lasting decisions to the appropriate
+spec or architecture document. Keep a useful summary of the verification in
+the change description, then delete the completed plan. Retain a completed
+plan only for a specific historical reason.

@@ -19,11 +19,12 @@ All consumer apps depend on the library by package name. Keep game or app
 behavior in apps; place code in a shared package when a concrete reuse need appears. See
 [`docs/architecture.md`](docs/architecture.md) for the dependency rules.
 
-## Repository skills
+## Working on this repository
 
-The repository includes focused skills for API, architecture, complexity and
-correctness reviews, and for adding automated safeguards. See the
-[`skills catalog`](docs/skills.md) for descriptions and instructions.
+See [work and documentation](docs/engineering.md#work-and-documentation) for
+how to turn an objective into verifiable work, and where to record lasting
+decisions. The [skills catalog](docs/skills.md) lists workflows for focused
+reviews and automated safeguards.
 
 ## Getting started
 

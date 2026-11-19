@@ -32,6 +32,11 @@ Read only what is relevant:
 Distinguish accepted decisions from proposals and
 deferred decisions.
 
+Use the objective to understand the scope. When the work deliberately changes
+a boundary, assess it against the agreed decision and check that the relevant
+architecture document records the new boundary and its rationale. An active
+plan can point to that decision.
+
 Do not treat existing implementation details as
 architectural requirements without supporting evidence.
 
@@ -54,8 +59,8 @@ Examine the scope for:
 
 ## Review discipline
 
-- Evaluate the architecture actually documented. Include behavioural contract
-  violations at documented component or public interface boundaries.
+- Include behavioural contract violations at component or public interface
+  boundaries.
 - Do not impose preferred patterns or abstractions.
 - Do not invent requirements for undecided features.
 - Distinguish architectural violations from suggestions.

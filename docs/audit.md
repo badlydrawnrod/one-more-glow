@@ -65,11 +65,14 @@ Pay particular attention to situations involving:
 
 - Respecting public APIs and architectural boundaries.
 - Following established engineering conventions without inventing new ones.
+- Starting from a prose objective and observable success criteria when no spec
+  covers the work.
 - Distinguishing current requirements from deferred features.
 - Making the smallest change that satisfies a requirement.
-- Updating durable specifications when behaviour changes.
+- Updating durable specifications when agreed behaviour changes.
 - Using execution plans without turning them into permanent specifications.
-- Testing observable behaviour rather than implementation details.
+- Choosing checks that exercise the intended outcome and separating expected
+  from observed results.
 
 Identify a small number of realistic scenarios that could reveal weaknesses in the guidance.
 
