@@ -1,28 +1,34 @@
 # Rendering diagnostics
 
 From the repository root, run `npm run dev` and open the local address printed
-by Vite. The default is a static game-like scene in landscape orientation. Use
-the menu button in the upper-left corner of the display to select a scene or
-orientation. The animation toggle appears for the game scene only.
-Select **Profile** to adjust beam width, point radius, glow strength and glow
-spread live. Drag the vector sliders or focus them with Tab and use the arrow
-keys; Reset restores the default profile. Changes apply to every view for the
-current session.
+by Vite. The app opens on **Canvas & Environment**, where the calibration
+canvas, sizing controls, display measurements, change history, fullscreen, and
+copyable report are available. **Renderer & Performance** contains the Test
+Card, game scene, segment studies, and Display Profile study. Settings remain
+in memory when switching screens.
 
-URL query parameters are also available for opening a specific view directly:
+The workbench supports keyboard, mouse, touch, and standard-mapped gamepad
+controls. Open **Controls help** for the mappings. The calibration resize
+handle works with pointer drag or arrow keys; the labelled width field and
+range control change the same size setting. Use the animated Game workload
+controls to start frame timing explicitly. Profile sliders adjust beam width,
+point radius, glow strength, and glow spread live; Reset restores defaults.
+
+URL query parameters remain available for opening a study directly:
 
 - `?scene=testcard` shows geometry, transform and intensity samples, including
   a labelled comparison of normal intensity and overdrive.
-- `?scene=segments` compares the 16-segment design with the complete printable
+- `?scene=segments` compares the 16-segment design with the printable
   22-segment reference character set.
 - `?scene=spacing` compares HUD text in both fonts with fixed and kerned spacing.
-- `?scene=profile` opens the display profile study.
-- `?orientation=portrait` selects portrait orientation.
-- `?animate=1` rotates the craft in the game-like scene; it has no effect on
-  the static diagnostic views.
+- `?scene=profile` opens the Display Profile study.
+- `?orientation=portrait` selects portrait orientation for the Game study.
+- `?animate=1` starts the Game workload; it has no effect on other studies.
 
 Parameters can be combined, for example `?scene=testcard&orientation=portrait`.
-See [SPEC.md](docs/specs/SPEC.md) for the current diagnostic behavior.
+The published `/test-card/` entry opens the Test Card study. See
+[the workbench specification](docs/specs/diagnostics-workbench.md) and the
+[diagnostics baseline](docs/specs/SPEC.md) for behavior and status.
 
 The library’s 22-segment font adapts Stewart C. Russell’s ThreeFourTwoTwo font
 to vector strokes. See its [licence notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
