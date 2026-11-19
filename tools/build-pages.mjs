@@ -85,7 +85,10 @@ async function listFiles(directory, parent = "") {
 
 function runNpm(args, extraEnvironment = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn("npm", args, {
+    const npmCliPath = process.env.npm_execpath;
+    const command = npmCliPath ? process.execPath : "npm";
+    const commandArgs = npmCliPath ? [npmCliPath, ...args] : args;
+    const child = spawn(command, commandArgs, {
       cwd: root,
       stdio: "inherit",
       env: { ...process.env, ...extraEnvironment },

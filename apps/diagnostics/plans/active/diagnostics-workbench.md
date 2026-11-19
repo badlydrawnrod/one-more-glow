@@ -248,8 +248,9 @@ context loss/restoration remain pending browser verification.
   returns focus to its summary.
 - [x] Add Controls help and clear held gamepad input after disconnect or focus
   loss. The shared control handlers serve native and gamepad selections.
-- [ ] Verify all controls with a physical standard-mapped gamepad and a touch
-  device. These are not available in the current environment.
+- [x] The user confirmed and accepts current standard-mapped gamepad behaviour,
+  including select choices and controller disconnect/reconnect.
+- [ ] Verify touch resizing and pinch zoom when a touch device is available.
 - [x] Run workspace, diagnostics, and Pages builds; add focused sizing and
   timing regression tests; update the app and root READMEs; and reconcile the
   old overlay description in the spec index.
@@ -270,16 +271,31 @@ Pages preview opened `/test-card/` on the Test Card study. `npm run check`,
 `PAGES_BASE=/ npm run build:pages`, and
 `PAGES_BASE=/one-more-glow/ npm run build:pages` passed. The project-base
 artifact used assets under `/one-more-glow/test-card/`. `git diff --check`
-passed. Physical gamepad and touch-device interaction, plus the pending browser
-fallback and renderer interruption scenarios below, remain unverified.
+passed. At that point, physical gamepad and touch-device interaction, plus the
+pending browser fallback and renderer interruption scenarios below, remained
+unverified.
+
+**Follow-up (2026-11-19).** The user confirmed and accepts current gamepad
+navigation and select-choice behaviour, and confirmed controller
+disconnect/reconnect works correctly. Touch resizing and pinch zoom, browser
+fallback scenarios, and WebGL2-unavailable verification cannot currently be
+tested with available devices or browser conditions. A
+fresh workspace check, diagnostics build, and all five focused tests passed.
+Both Pages builds passed after the build script was changed to launch npm via
+the `npm_execpath` supplied by npm, which works around Windows failing to spawn
+the bare `npm` command. Computer-use browser review stopped because it could
+not confidently identify Chrome's current URL.
 
 ## Verification
 
 Automated build and focused test results are recorded under the completed
-steps. The Step 2 DPR 3 device-scale cap check and Step 3 missing-API and
-clipboard-denial fallbacks remain pending. Real controller and touch-device
-checks remain pending. Browser checks for Step 4 Idle, hidden-tab return,
-WebGL2 unavailable, and context loss/restoration also remain pending.
+steps. Gamepad navigation, selection, and disconnect/reconnect are
+user-verified and accepted. Touch resizing and pinch zoom, the Step 2 DPR 3
+device-scale cap, Step 3 missing-API and clipboard-denial fallbacks, and WebGL2
+unavailability are deferred because the required devices or browser conditions
+are unavailable.
+Browser checks for Step 4 Idle, hidden-tab return, context loss/restoration, and
+the installed-service-worker offline path remain open.
 Record command results and the browser, device and controller used. Run from
 the repository root:
 
@@ -314,10 +330,10 @@ the accepted behaviour as they are discovered.
 
 ## Next action
 
-Use a physical standard-mapped gamepad and touch device to verify the input
-paths. Then complete the pending WebGL2, browser fallback, hidden-tab, and
-offline service-worker scenarios. These hardware and browser conditions were
-unavailable in the current verification environment.
+Use a browser with a verifiable local preview URL to check Idle, hidden-tab
+return, context loss/restoration, and offline service-worker behavior. Keep the
+touch, DPR 3, browser fallback, and WebGL2-unavailable checks deferred until
+their required device or browser conditions are available.
 
 ## Completion criteria
 

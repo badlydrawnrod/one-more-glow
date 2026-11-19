@@ -8,8 +8,10 @@ for how to run it and select views. Shared display requirements remain in the
 ## Workbench redesign
 
 - [Diagnostics workbench](diagnostics-workbench.md) is accepted and implemented.
-  Manual controller, touch-device, and browser fallback verification remains
-  pending.
+  The user confirmed and accepts gamepad navigation, selection, and
+  disconnect/reconnect behaviour. Touch-device, browser fallback, and several
+  renderer-environment checks remain unverified because the required devices
+  or browser conditions are unavailable.
 
 ## Purpose and current behavior
 
