@@ -1381,6 +1381,7 @@ type NumericEdit = { input: HTMLInputElement; originalValue: string };
 type SelectEdit = { select: HTMLSelectElement; originalValue: string };
 let numericEdit: NumericEdit | null = null;
 let selectEdit: SelectEdit | null = null;
+let selectMenu: HTMLDivElement | null = null;
 let previousPadButtons = new Set<number>();
 let previousPadIndex: number | null = null;
 let nextPadRepeatAt = 0;
@@ -1405,9 +1406,18 @@ function visibleEnabledControls(): HTMLElement[] {
 }
 
 function focusControl(element: HTMLElement): void {
+  document.querySelectorAll<HTMLElement>(".gamepad-focused").forEach((focused) => focused.classList.remove("gamepad-focused"));
   element.focus();
+  element.classList.add("gamepad-focused");
   element.scrollIntoView({ block: "nearest", inline: "nearest" });
 }
+
+document.addEventListener("focusin", (event: FocusEvent) => {
+  const target = event.target;
+  document.querySelectorAll<HTMLElement>(".gamepad-focused").forEach((focused) => {
+    if (focused !== target) focused.classList.remove("gamepad-focused");
+  });
+});
 
 function moveControlFocus(direction: -1 | 1): void {
   const controls = visibleEnabledControls();
@@ -1458,14 +1468,51 @@ function beginNumericEdit(input: HTMLInputElement): boolean {
 function beginSelectEdit(select: HTMLSelectElement): boolean {
   if (select.disabled || select.options.length < 2) return false;
   selectEdit = { select, originalValue: select.value };
+  selectMenu = document.createElement("div");
+  selectMenu.className = "gamepad-select-menu";
+  selectMenu.setAttribute("role", "listbox");
+  selectMenu.setAttribute("aria-hidden", "true");
+  for (const option of select.options) {
+    const item = document.createElement("div");
+    item.className = "gamepad-select-option";
+    item.textContent = option.text;
+    item.setAttribute("role", "option");
+    if (option.disabled) item.classList.add("is-disabled");
+    selectMenu.append(item);
+  }
+  document.body.append(selectMenu);
+  updateSelectMenu();
   gamepadStatus.textContent = `Choosing ${select.labels[0]?.textContent?.trim() ?? "option"}. Use a direction to change; A accepts; B cancels.`;
   return true;
+}
+
+function updateSelectMenu(): void {
+  if (!selectEdit || !selectMenu) return;
+  const { select } = selectEdit;
+  const rect = select.getBoundingClientRect();
+  const menuHeight = Math.min(240, window.innerHeight - 16);
+  const contentHeight = Math.min(menuHeight, select.options.length * 34);
+  const placeBelow = window.innerHeight - rect.bottom >= contentHeight;
+  const left = Math.max(8, Math.min(rect.left, window.innerWidth - rect.width - 8));
+  selectMenu.style.left = `${left}px`;
+  selectMenu.style.top = `${placeBelow ? rect.bottom : Math.max(8, rect.top - contentHeight)}px`;
+  selectMenu.style.width = `${rect.width}px`;
+  selectMenu.style.maxHeight = `${menuHeight}px`;
+  [...selectMenu.children].forEach((child, index) => {
+    const option = select.options[index];
+    child.setAttribute("aria-selected", String(index === select.selectedIndex));
+    child.classList.toggle("is-selected", index === select.selectedIndex);
+    child.classList.toggle("is-disabled", option.disabled);
+  });
+  selectMenu.children[select.selectedIndex]?.scrollIntoView({ block: "nearest" });
 }
 
 function finishSelectEdit(accept: boolean): void {
   if (!selectEdit) return;
   const { select, originalValue } = selectEdit;
   selectEdit = null;
+  selectMenu?.remove();
+  selectMenu = null;
   if (accept) {
     select.dispatchEvent(new Event("change", { bubbles: true }));
     gamepadStatus.textContent = "Choice accepted.";
@@ -1483,6 +1530,8 @@ function moveSelectChoice(direction: number): void {
   const current = enabled.indexOf(select.selectedIndex);
   const next = (current + (direction > 0 ? 1 : -1) + enabled.length) % enabled.length;
   select.selectedIndex = enabled[next];
+  select.dispatchEvent(new Event("input", { bubbles: true }));
+  updateSelectMenu();
   gamepadStatus.textContent = `${select.options[select.selectedIndex]?.text ?? "Option"}. A accepts; B cancels.`;
 }
 
@@ -1609,6 +1658,7 @@ function pollGamepad(time: number): void {
     if (buttonEdge(0)) acceptNumericEdit();
     if (buttonEdge(1)) cancelNumericEdit();
   } else if (selectEdit) {
+    updateSelectMenu();
     if (shouldRepeatEdit(horizontal, vertical, time)) moveSelectChoice(horizontal || vertical);
     if (buttonEdge(0)) finishSelectEdit(true);
     if (buttonEdge(1)) finishSelectEdit(false);

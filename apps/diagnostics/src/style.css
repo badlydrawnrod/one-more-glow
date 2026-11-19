@@ -26,6 +26,11 @@ button { color: inherit; }
 .controls-help p { margin: 8px 0 0; }
 .controls-help strong { color: #d9f7fc; font-weight: 550; }
 .gamepad-status { color: #65cbd8; }
+.gamepad-select-menu { position: fixed; z-index: 20; overflow: auto; border: 1px solid #d9f7fc; border-radius: 3px; background: #0b151c; box-shadow: 0 8px 24px rgb(0 0 0 / 55%); color: #e1f3f6; font-size: 10px; }
+.gamepad-select-option { min-height: 34px; display: flex; align-items: center; padding: 0 9px; border-bottom: 1px solid #253a43; }
+.gamepad-select-option:last-child { border-bottom: 0; }
+.gamepad-select-option.is-selected { background: #17424a; color: #fff; box-shadow: inset 3px 0 #5ee4f1; }
+.gamepad-select-option.is-disabled { color: #63777d; }
 .eyebrow { margin: 0; color: #65cbd8; font-size: 9px; letter-spacing: .16em; }
 .screen-nav { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #283c45; }
 .screen-tab { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 0 15px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #849ba3; text-align: left; font-size: 12px; cursor: pointer; }
@@ -118,7 +123,7 @@ button { color: inherit; }
 .range-control output { color: #e4f7fa; font-variant-numeric: tabular-nums; }
 .range-control input { width: 100%; accent-color: #55dce9; }
 .secondary-button { min-height: 34px; padding: 0 11px; text-align: center; }
-button:focus-visible, input:focus-visible { outline: 2px solid #ffbf74; outline-offset: 3px; }
+button:focus-visible, input:focus-visible, select:focus-visible, .gamepad-focused { outline: 2px solid #ffbf74; outline-offset: 3px; }
 .workbench-footer { display: flex; justify-content: space-between; padding: 12px 1px 0; border-top: 1px solid #22343c; color: #537078; font-size: 8px; letter-spacing: .13em; }
 
 @media (max-width: 860px) {
