@@ -7,19 +7,18 @@ for how to run it and select views. Shared display requirements remain in the
 
 ## Workbench redesign
 
-- [Diagnostics workbench](diagnostics-workbench.md) is accepted and partially
-  implemented. Its two-screen shell, calibration, browser measurements,
-  WebGL2 status and capability details, context recovery, and Game frame timing
-  are implemented; input parity and release-path verification remain.
+- [Diagnostics workbench](diagnostics-workbench.md) is accepted and implemented.
+  Manual controller, touch-device, and browser fallback verification remains
+  pending.
 
 ## Purpose and current behavior
 
 The diagnostic is a consumer of the public library API for inspecting the
 renderer and evaluating display characteristics. It currently uses WebGL2.
 
-- The default view is a static, game-like scene with a grid, terrain, a craft
-  and exhaust, a fuel pod and tractor beam, geometric enemies, shots and stars.
-  An optional animation rotates the craft continuously.
+- The Renderer & Performance screen starts on a static, game-like study with a
+  grid, terrain, a craft and exhaust, a fuel pod and tractor beam, geometric
+  enemies, shots and stars. Its optional workload rotates the craft.
 - The test card presents open paths and closed outlines at several intensities,
   a central line, triangle and point, transformed craft, line and point
   samples, circles, ellipses, arcs and nested rectangles. These examples make
@@ -41,30 +40,16 @@ renderer and evaluating display characteristics. It currently uses WebGL2.
 - All views support landscape and portrait orientations. The canvas fits the
   window while preserving the selected aspect ratio, uses the device pixel
   ratio for its backing resolution, and updates on window resize.
-- The diagnostic views are static; the animation option only affects the game-like
-  scene. The in-page menu is the primary way to change views; URL parameters
-  remain available for opening a specific view directly.
+- The diagnostic studies are static until the Game workload is started. The
+  workbench controls change views without reloading; URL parameters remain
+  available for opening a specific study directly.
 
-## Accepted: in-page controls
+## Superseded: overlay controls
 
-**Implementation: Implemented.**
-
-The diagnostics app provides a small overlay menu so visitors can change views
-without editing the URL.
-
-- The menu starts closed so the selected diagnostic view remains unobstructed.
-- A persistent menu button over the canvas opens and closes the menu.
-- The menu lets the visitor choose the game scene, test card, segment study or
-  spacing study, and choose landscape or portrait orientation.
-- The menu offers an animation toggle only while the game scene is selected.
-  Animation stops when another scene is selected.
-- Choosing an option updates the displayed view immediately, without a page
-  reload. The menu closes after a scene or orientation is chosen; changing the
-  animation toggle leaves it open.
-- The controls use standard accessible HTML buttons and expose their selected
-  state to assistive technology.
-- Closing the menu leaves the menu button available to reopen it.
-- Pressing Escape closes the menu and returns focus to the menu button.
+The former in-canvas overlay menu was replaced by the accepted two-screen
+navigation and labelled controls in [the diagnostics workbench spec](diagnostics-workbench.md).
+The study choices, orientation setting, explicit Game animation control,
+accessible selected states, and live profile controls remain part of the app.
 
 ## Accepted: overdrive comparison
 
@@ -81,4 +66,4 @@ legible in both landscape and portrait orientations.
 
 **Implementation: Implemented.**
 
-The diagnostics offers a profile study with vector-drawn controls for line width, point radius, glow strength and glow spread, plus a reset to defaults. The controls update the renderer profile live and show lines, crossing lines, points and overdrive samples under the same profile. Pointer and keyboard interaction and accessible labels are provided by the app. Profile values remain selected across scene and orientation changes for the current session.
+The diagnostics offers a profile study with labelled HTML sliders for line width, point radius, glow strength and glow spread, plus a reset to defaults. The controls update the renderer profile live and show vector-drawn lines, crossing lines, points and overdrive samples under the same profile. Pointer, touch, keyboard and gamepad paths use the same settings. Profile values remain selected across scene and orientation changes for the current session.

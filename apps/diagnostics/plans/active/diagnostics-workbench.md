@@ -238,30 +238,48 @@ context loss/restoration remain pending browser verification.
 
 ### 5. Finish input parity and verify the release paths
 
-- [ ] Operate the native controls with mouse, touch and keyboard first. Add a
-  standard-mapped gamepad controller that navigates visible, enabled controls
-  in DOM order and invokes the same actions. Support a stick dead zone, repeat
-  for navigation and numeric adjustment, and one action per press for activate,
-  back and shoulder shortcuts. In numeric edit mode, use left/right for fine
-  steps and up/down for coarse steps. Make accept and cancel explicit, scroll
-  focused controls into view, and restore focus after closing panels. For
-  choices, use visible buttons or change the selected value through the same
-  handler used by the native field.
-- [ ] Add Controls help. Clear held input on disconnect or focus loss. Check
-  every custom numeric field, disclosure, study, profile slider, reset and
-  screen switch with the pad. Where a browser denies a fullscreen or clipboard
-  action, show the available fallback from the shared action handler.
-- [ ] Run the verification below. Update the diagnostics README and the root
-  README's description of `npm run dev` as needed. Reconcile the old overlay
-  and profile-control descriptions in the spec index, retaining the accepted
-  study behaviour. Record actual implementation status and verification gaps
-  in the specs. Remove this plan when the completion criteria are met.
+- [x] Keep native controls as the mouse, touch and keyboard path. The resize
+  handle also supports keyboard arrow adjustment.
+- [x] Add a standard-mapped gamepad poll that navigates visible, enabled
+  controls in DOM order. It uses a 0.25 stick dead zone, held-direction repeat,
+  one action per A/B/shoulder press, and explicit numeric and select edit modes.
+  Numeric editing uses fine left/right and coarse up/down steps, with A to
+  accept and B to cancel. Focused controls scroll into view; closing a detail
+  returns focus to its summary.
+- [x] Add Controls help and clear held gamepad input after disconnect or focus
+  loss. The shared control handlers serve native and gamepad selections.
+- [ ] Verify all controls with a physical standard-mapped gamepad and a touch
+  device. These are not available in the current environment.
+- [x] Run workspace, diagnostics, and Pages builds; add focused sizing and
+  timing regression tests; update the app and root READMEs; and reconcile the
+  old overlay description in the spec index.
+- [ ] Complete the remaining browser and release-path checks listed below.
+
+**Step 5 results (2026-11-19).** Added a separate gamepad poll with DOM-order
+focus navigation, neutral dead zone, direction repeat, standard A/B and
+shoulder mappings, numeric and native-select edit modes, explicit accept and
+cancel, focus scrolling, and an accessible status line. Added shared Controls
+help, Escape handling for gamepad edits, open details and fullscreen, and
+keyboard resizing on the calibration handle. Added sizing and frame-timing
+tests. Local browser checks (ChatGPT in-app browser, 2026-11-19) confirmed the
+help disclosure and Escape close/focus behavior, keyboard canvas-width change,
+Generic mode, 16:9 and Stretch choices, and screen navigation. The root-based
+Pages preview opened `/test-card/` on the Test Card study. `npm run check`,
+`npm run check --workspace=diagnostics`, `npm run build --workspace=diagnostics`,
+`node --experimental-strip-types --test apps/diagnostics/tests/*.test.ts`,
+`PAGES_BASE=/ npm run build:pages`, and
+`PAGES_BASE=/one-more-glow/ npm run build:pages` passed. The project-base
+artifact used assets under `/one-more-glow/test-card/`. `git diff --check`
+passed. Physical gamepad and touch-device interaction, plus the pending browser
+fallback and renderer interruption scenarios below, remain unverified.
 
 ## Verification
 
-Step 2 and Step 3 type-check and whitespace checks passed. The Step 2 DPR 3
-device-scale cap check and Step 3 missing-API and clipboard-denial fallbacks
-remain pending. Browser and controller checks for Steps 4 and 5 remain pending.
+Automated build and focused test results are recorded under the completed
+steps. The Step 2 DPR 3 device-scale cap check and Step 3 missing-API and
+clipboard-denial fallbacks remain pending. Real controller and touch-device
+checks remain pending. Browser checks for Step 4 Idle, hidden-tab return,
+WebGL2 unavailable, and context loss/restoration also remain pending.
 Record command results and the browser, device and controller used. Run from
 the repository root:
 
@@ -296,8 +314,10 @@ the accepted behaviour as they are discovered.
 
 ## Next action
 
-Implement step 5: finish keyboard, mouse, touch, and gamepad parity; then run
-the verification paths and reconcile documentation and completion status.
+Use a physical standard-mapped gamepad and touch device to verify the input
+paths. Then complete the pending WebGL2, browser fallback, hidden-tab, and
+offline service-worker scenarios. These hardware and browser conditions were
+unavailable in the current verification environment.
 
 ## Completion criteria
 

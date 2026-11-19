@@ -8,8 +8,8 @@ interactive demo apps built on that library.
 
 - `packages/one-more-glow/` — reusable library package, including its public
   entry point and tests.
-- [`apps/diagnostics/`](apps/diagnostics/README.md) — Vite consumer app for checking rendering with a test
-  card and sample scene.
+- [`apps/diagnostics/`](apps/diagnostics/README.md) — Vite workbench for canvas
+  sizing and renderer studies.
 - [`apps/asteroids-demo/`](apps/asteroids-demo/README.md) — keyboard and gamepad controlled Asteroids arcade game.
 - [`apps/gyruss-demo/`](apps/gyruss-demo/README.md) — keyboard and gamepad controlled orbital shooter demo.
 - [`apps/very-angry-robots/`](apps/very-angry-robots/README.md) — vector robot combat across connected rooms.
@@ -34,9 +34,11 @@ npm install
 npm run dev
 ```
 
-`npm run dev` starts the rendering diagnostics app. Use `?scene=testcard` for
-the rendering test card, `?orientation=portrait` to check the portrait display,
-or `?animate=1` to animate its sample scene. Run `npm run dev:asteroids` to
+`npm run dev` starts the diagnostics workbench on **Canvas & Environment**.
+Use its two screens to inspect canvas sizing or open a renderer study. The
+existing `?scene=testcard`, `?scene=segments`, `?scene=spacing`, and
+`?scene=profile` links remain available; `?orientation=portrait` and
+`?animate=1` continue to open the game study. Run `npm run dev:asteroids` to
 play Asteroids or `npm run dev:gyruss` to play the orbital shooter.
 Run `npm run dev:robots` to play Very Angry Robots.
 

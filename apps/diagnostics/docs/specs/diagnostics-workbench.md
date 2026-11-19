@@ -2,11 +2,12 @@
 
 **Status: Accepted.**
 
-**Implementation: Partially implemented.** The two-screen shell, canvas
+**Implementation: Implemented.** The two-screen shell, canvas
 calibration controls, shared browser measurement snapshot, bounded change
 history, fullscreen action, report action, WebGL2 readiness and capability
-details, context recovery, and animated Game frame timing are implemented.
-Gamepad input parity and release-path verification remain outstanding.
+details, context recovery, animated Game frame timing, and DOM-order standard
+gamepad control are implemented. Manual browser and hardware verification is
+tracked separately below; it does not imply a known implementation gap.
 The [diagnostics app specification](SPEC.md) describes the earlier app and its
 existing studies.
 
@@ -178,3 +179,13 @@ same collected measurements for the summary, details, and report.
   disabled.
 - Open the published Test Card entry and existing study links. Check that the
   selected studies appear and remain reachable after switching screens.
+
+**Verification status (2026-11-19).** Workspace type checks, the diagnostics
+production build, the Pages project-base build, and focused sizing and timing
+tests pass. A local browser check confirmed help disclosure and Escape behavior,
+keyboard width adjustment, Generic mode and mapping selection, screen
+navigation, and the Renderer & Performance screen. Remaining manual coverage:
+real gamepad navigation and disconnection behavior, touch drag and pinch zoom,
+device-scale capping at DPR 3, clipboard denial and missing viewport APIs,
+WebGL2 unavailability and context loss/restoration, hidden-tab timing restart,
+and the installed-service-worker offline path.

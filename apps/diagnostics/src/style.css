@@ -21,6 +21,11 @@ button { color: inherit; }
 .masthead-actions { display: flex; align-items: center; gap: 14px; }
 .masthead h1 { margin: 4px 0 0; color: #f0fbff; font-size: clamp(20px, 3vw, 30px); letter-spacing: -.05em; }
 .masthead-note { margin: 0 0 3px; color: #8ba4ad; font-size: 11px; }
+.controls-help { margin: 0 0 14px; padding: 9px 12px; border: 1px solid #253a43; background: rgb(7 12 18 / 72%); color: #9bb4bb; font-size: 9px; line-height: 1.6; }
+.controls-help summary { min-height: 24px; color: #c8e9ed; cursor: pointer; }
+.controls-help p { margin: 8px 0 0; }
+.controls-help strong { color: #d9f7fc; font-weight: 550; }
+.gamepad-status { color: #65cbd8; }
 .eyebrow { margin: 0; color: #65cbd8; font-size: 9px; letter-spacing: .16em; }
 .screen-nav { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid #283c45; }
 .screen-tab { display: flex; align-items: center; gap: 12px; min-height: 54px; padding: 0 15px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: #849ba3; text-align: left; font-size: 12px; cursor: pointer; }

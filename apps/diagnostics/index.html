@@ -19,6 +19,14 @@
         <div class="masthead-actions"><p class="masthead-note">Inspect the canvas. Understand the display.</p><button id="fullscreen-toggle" class="secondary-button" type="button">Enter fullscreen</button></div>
       </header>
 
+      <details class="controls-help">
+        <summary>Controls help</summary>
+        <p><strong>Keyboard:</strong> Tab and Shift+Tab move between controls; Enter or Space activates; Escape closes the open detail or exits fullscreen.</p>
+        <p><strong>Mouse and touch:</strong> Use the visible controls. Drag the calibration handle to resize; scrolling and pinch zoom work elsewhere.</p>
+        <p><strong>Standard gamepad:</strong> D-pad or left stick moves through visible controls in page order. A activates or accepts; B cancels numeric editing or closes the open detail; LB/RB switch screens. Hold a direction to repeat. In numeric edit mode, left/right changes by a fine step and up/down by a coarse step.</p>
+        <p id="gamepad-status" class="gamepad-status" role="status" aria-live="polite">Connect a standard-mapped gamepad to navigate.</p>
+      </details>
+
       <nav class="screen-nav" aria-label="Workbench screens">
         <button type="button" class="screen-tab" data-screen="environment" aria-current="page">
           <span class="tab-index">01</span><span>Canvas &amp; Environment</span>

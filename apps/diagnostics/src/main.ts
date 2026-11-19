@@ -16,6 +16,7 @@ import {
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 import { registerAppServiceWorker } from "./pwa.ts";
 import { backingSize, fitCanvasSize, genericMap, type CanvasSize } from "./calibration-sizing.ts";
+import { hasEnoughFrameSample, summarizeFrameIntervals, type FrameTimingResult } from "./frame-timing.ts";
 
 registerAppServiceWorker();
 
@@ -115,7 +116,7 @@ let animationFrame: number | undefined;
 let timingIntervals: number[] = [];
 let timingStart: number | null = null;
 let previousFrameTime: number | null = null;
-let timingResult: { fps: number; median: number; p95: number; duration: number; count: number } | null = null;
+let timingResult: FrameTimingResult | null = null;
 let lastTimingUiUpdate = 0;
 let capabilityDetails = "WebGL2 capability details are unavailable.";
 
@@ -293,16 +294,8 @@ function updateTimingSample(time: number): void {
     timingIntervals.push(time - previousFrameTime);
     if (timingIntervals.length > 600) timingIntervals.shift();
     const duration = time - timingStart;
-    if (duration >= 2000 && timingIntervals.length >= 30) {
-      const sorted = [...timingIntervals].sort((a, b) => a - b);
-      const mean = sorted.reduce((sum, interval) => sum + interval, 0) / sorted.length;
-      timingResult = {
-        fps: 1000 / mean,
-        median: (sorted[Math.floor((sorted.length - 1) / 2)] + sorted[Math.floor(sorted.length / 2)]) / 2,
-        p95: sorted[Math.ceil(sorted.length * 0.95) - 1],
-        duration,
-        count: timingIntervals.length,
-      };
+    if (hasEnoughFrameSample(duration, timingIntervals.length)) {
+      timingResult = summarizeFrameIntervals(timingIntervals, duration);
     }
   }
   previousFrameTime = time;
@@ -1370,6 +1363,297 @@ const stopResize = (event: PointerEvent): void => {
 };
 resizeHandle.addEventListener("pointerup", stopResize);
 resizeHandle.addEventListener("pointercancel", stopResize);
+resizeHandle.addEventListener("keydown", (event: KeyboardEvent) => {
+  if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
+  event.preventDefault();
+  const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
+  const amount = event.shiftKey ? 10 : 1;
+  autoFitInput.checked = false;
+  manualWidth = Math.max(64, Math.min(4096, manualWidth + direction * amount));
+  widthInput.value = String(manualWidth);
+  widthRange.value = String(manualWidth);
+  chooseManualPreset();
+  syncControls();
+  renderCalibration();
+});
+
+type NumericEdit = { input: HTMLInputElement; originalValue: string };
+type SelectEdit = { select: HTMLSelectElement; originalValue: string };
+let numericEdit: NumericEdit | null = null;
+let selectEdit: SelectEdit | null = null;
+let previousPadButtons = new Set<number>();
+let previousPadIndex: number | null = null;
+let nextPadRepeatAt = 0;
+let repeatedPadDirection = "";
+let repeatedEditDirection = "";
+let nextPadEditAt = 0;
+let requirePadNeutral = false;
+let fullscreenInitiator: HTMLButtonElement | null = null;
+const gamepadStatus = requireElement(document.querySelector<HTMLElement>("#gamepad-status"), "#gamepad-status");
+
+function visibleEnabledControls(): HTMLElement[] {
+  const candidates = document.querySelectorAll<HTMLElement>(
+    "button, input, select, textarea, summary, [tabindex]:not([tabindex='-1'])",
+  );
+  return [...candidates].filter((element) => {
+    if (element.closest("[hidden], [inert]")) return false;
+    if (element.matches(":disabled, [aria-disabled='true']")) return false;
+    const closedDetails = element.closest("details:not([open])");
+    if (closedDetails && !element.matches("summary")) return false;
+    return element.getClientRects().length > 0;
+  });
+}
+
+function focusControl(element: HTMLElement): void {
+  element.focus();
+  element.scrollIntoView({ block: "nearest", inline: "nearest" });
+}
+
+function moveControlFocus(direction: -1 | 1): void {
+  const controls = visibleEnabledControls();
+  if (!controls.length) return;
+  const index = controls.indexOf(document.activeElement as HTMLElement);
+  const next = index < 0
+    ? (direction > 0 ? 0 : controls.length - 1)
+    : (index + direction + controls.length) % controls.length;
+  focusControl(controls[next]);
+}
+
+function closeOpenDetails(): boolean {
+  const active = document.activeElement;
+  const focusedDetails = active instanceof HTMLElement ? active.closest<HTMLDetailsElement>("details[open]") : null;
+  const details = focusedDetails ?? [...document.querySelectorAll<HTMLDetailsElement>("details[open]")].at(-1) ?? null;
+  if (!details) return false;
+  const summary = details.querySelector<HTMLElement>("summary");
+  details.open = false;
+  if (summary) focusControl(summary);
+  return true;
+}
+
+function cancelNumericEdit(): void {
+  if (!numericEdit) return;
+  const { input, originalValue } = numericEdit;
+  numericEdit = null;
+  input.value = originalValue;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  gamepadStatus.textContent = "Numeric edit cancelled.";
+}
+
+function acceptNumericEdit(): void {
+  if (!numericEdit) return;
+  const { input } = numericEdit;
+  numericEdit = null;
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  gamepadStatus.textContent = "Numeric edit accepted.";
+}
+
+function beginNumericEdit(input: HTMLInputElement): boolean {
+  if (input.type !== "number" && input.type !== "range") return false;
+  numericEdit = { input, originalValue: input.value };
+  gamepadStatus.textContent = `Editing ${input.getAttribute("aria-label") ?? input.labels?.[0]?.textContent?.trim() ?? "value"}. Left/right is fine; up/down is coarse. A accepts; B cancels.`;
+  return true;
+}
+
+function beginSelectEdit(select: HTMLSelectElement): boolean {
+  if (select.disabled || select.options.length < 2) return false;
+  selectEdit = { select, originalValue: select.value };
+  gamepadStatus.textContent = `Choosing ${select.labels[0]?.textContent?.trim() ?? "option"}. Use a direction to change; A accepts; B cancels.`;
+  return true;
+}
+
+function finishSelectEdit(accept: boolean): void {
+  if (!selectEdit) return;
+  const { select, originalValue } = selectEdit;
+  selectEdit = null;
+  if (accept) {
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    gamepadStatus.textContent = "Choice accepted.";
+  } else {
+    select.value = originalValue;
+    gamepadStatus.textContent = "Choice cancelled.";
+  }
+}
+
+function moveSelectChoice(direction: number): void {
+  if (!selectEdit || !direction) return;
+  const { select } = selectEdit;
+  const enabled = [...select.options].map((option, index) => option.disabled ? -1 : index).filter((index) => index >= 0);
+  if (!enabled.length) return;
+  const current = enabled.indexOf(select.selectedIndex);
+  const next = (current + (direction > 0 ? 1 : -1) + enabled.length) % enabled.length;
+  select.selectedIndex = enabled[next];
+  gamepadStatus.textContent = `${select.options[select.selectedIndex]?.text ?? "Option"}. A accepts; B cancels.`;
+}
+
+function shouldRepeatEdit(horizontal: number, vertical: number, time: number): boolean {
+  const direction = `${horizontal}:${vertical}`;
+  if (direction === "0:0") {
+    repeatedEditDirection = "";
+    nextPadEditAt = 0;
+    return false;
+  }
+  if (direction !== repeatedEditDirection) {
+    repeatedEditDirection = direction;
+    nextPadEditAt = time + 300;
+    return true;
+  }
+  if (time < nextPadEditAt) return false;
+  nextPadEditAt = time + 100;
+  return true;
+}
+
+function adjustNumericEdit(horizontal: number, vertical: number): void {
+  if (!numericEdit) return;
+  const input = numericEdit.input;
+  const stepValue = Number(input.step);
+  const step = Number.isFinite(stepValue) && stepValue > 0 ? stepValue : 1;
+  const coarseStep = step * (input.type === "range" ? 5 : 10);
+  const delta = horizontal * step - vertical * coarseStep;
+  if (!delta) return;
+  const min = input.min === "" ? -Infinity : Number(input.min);
+  const max = input.max === "" ? Infinity : Number(input.max);
+  const current = Number(input.value);
+  const base = Number.isFinite(current) ? current : (Number.isFinite(min) ? min : 0);
+  const next = Math.max(min, Math.min(max, base + delta));
+  input.value = String(Number(next.toFixed(6)));
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function activateFocusedControl(): void {
+  const focused = document.activeElement;
+  if (!(focused instanceof HTMLElement)) return;
+  if (focused instanceof HTMLInputElement) {
+    if (beginNumericEdit(focused)) return;
+    if (focused.type === "checkbox") focused.click();
+    return;
+  }
+  if (focused instanceof HTMLSelectElement && beginSelectEdit(focused)) return;
+  if (focused instanceof HTMLButtonElement || focused.matches("summary")) {
+    focused.click();
+  }
+}
+
+function cancelGamepadAction(): void {
+  if (numericEdit) {
+    cancelNumericEdit();
+    return;
+  }
+  if (selectEdit) {
+    finishSelectEdit(false);
+    return;
+  }
+  closeOpenDetails();
+}
+
+function switchScreenFromGamepad(screenName: "environment" | "renderer"): void {
+  const tab = screenTabs.find((candidate) => candidate.dataset.screen === screenName);
+  if (!tab) return;
+  tab.click();
+  focusControl(tab);
+}
+
+function clearGamepadState(requireNeutral: boolean): void {
+  previousPadButtons.clear();
+  previousPadIndex = null;
+  repeatedPadDirection = "";
+  repeatedEditDirection = "";
+  nextPadRepeatAt = 0;
+  nextPadEditAt = 0;
+  requirePadNeutral = requireNeutral;
+  if (numericEdit) cancelNumericEdit();
+  if (selectEdit) finishSelectEdit(false);
+}
+
+function pollGamepad(time: number): void {
+  const pad = Array.from(navigator.getGamepads?.() ?? []).find((candidate) => candidate?.connected && candidate.mapping === "standard") ?? null;
+  if (!pad) {
+    if (previousPadIndex !== null) clearGamepadState(false);
+    if (gamepadStatus.textContent !== "Connect a standard-mapped gamepad to navigate.") {
+      gamepadStatus.textContent = "Connect a standard-mapped gamepad to navigate.";
+    }
+    requestAnimationFrame(pollGamepad);
+    return;
+  }
+  if (previousPadIndex !== pad.index) {
+    previousPadButtons = new Set(Array.from(pad.buttons, (button, index) => button.pressed ? index : -1).filter((index) => index >= 0));
+    previousPadIndex = pad.index;
+    requirePadNeutral = true;
+    gamepadStatus.textContent = "Standard gamepad connected. Release held controls to begin.";
+  }
+  if (!document.hasFocus() || document.hidden) {
+    clearGamepadState(true);
+    requestAnimationFrame(pollGamepad);
+    return;
+  }
+
+  const down = (index: number): boolean => pad.buttons[index]?.pressed ?? false;
+  const buttonsNeutral = Array.from(pad.buttons).every((button) => !button.pressed);
+  const axesNeutral = (pad.axes[0] ?? 0) ** 2 + (pad.axes[1] ?? 0) ** 2 < 0.25 ** 2;
+  if (requirePadNeutral) {
+    if (buttonsNeutral && axesNeutral) requirePadNeutral = false;
+    previousPadButtons = new Set(Array.from(pad.buttons, (button, index) => button.pressed ? index : -1).filter((index) => index >= 0));
+    requestAnimationFrame(pollGamepad);
+    return;
+  }
+
+  const buttonEdge = (index: number): boolean => down(index) && !previousPadButtons.has(index);
+  const dpadX = Number(down(15)) - Number(down(14));
+  const dpadY = Number(down(13)) - Number(down(12));
+  const axisX = Math.abs(pad.axes[0] ?? 0) > 0.25 ? Math.sign(pad.axes[0] ?? 0) : 0;
+  const axisY = Math.abs(pad.axes[1] ?? 0) > 0.25 ? Math.sign(pad.axes[1] ?? 0) : 0;
+  const horizontal = dpadX || axisX;
+  const vertical = dpadY || axisY;
+  if (numericEdit) {
+    if (shouldRepeatEdit(horizontal, vertical, time)) adjustNumericEdit(horizontal, vertical);
+    if (buttonEdge(0)) acceptNumericEdit();
+    if (buttonEdge(1)) cancelNumericEdit();
+  } else if (selectEdit) {
+    if (shouldRepeatEdit(horizontal, vertical, time)) moveSelectChoice(horizontal || vertical);
+    if (buttonEdge(0)) finishSelectEdit(true);
+    if (buttonEdge(1)) finishSelectEdit(false);
+  } else {
+    const direction = vertical || horizontal;
+    const directionKey = direction === 0 ? "" : String(direction);
+    if (!directionKey) {
+      repeatedPadDirection = "";
+      nextPadRepeatAt = 0;
+    } else if (directionKey !== repeatedPadDirection || time >= nextPadRepeatAt) {
+      moveControlFocus(direction as -1 | 1);
+      repeatedPadDirection = directionKey;
+      nextPadRepeatAt = time + (repeatedPadDirection === directionKey && nextPadRepeatAt === 0 ? 360 : 150);
+    }
+    if (buttonEdge(0)) activateFocusedControl();
+    if (buttonEdge(1)) cancelGamepadAction();
+    if (buttonEdge(4)) switchScreenFromGamepad("environment");
+    if (buttonEdge(5)) switchScreenFromGamepad("renderer");
+  }
+  previousPadButtons = new Set(Array.from(pad.buttons, (button, index) => button.pressed ? index : -1).filter((index) => index >= 0));
+  requestAnimationFrame(pollGamepad);
+}
+
+window.addEventListener("blur", () => clearGamepadState(true));
+window.addEventListener("focus", () => { requirePadNeutral = true; });
+window.addEventListener("gamepaddisconnected", () => clearGamepadState(false));
+window.addEventListener("gamepadconnected", () => { gamepadStatus.textContent = "Gamepad connected; checking for standard mapping."; });
+document.addEventListener("keydown", (event: KeyboardEvent) => {
+  if (event.key !== "Escape") return;
+  if (numericEdit) {
+    event.preventDefault();
+    cancelNumericEdit();
+  } else if (selectEdit) {
+    event.preventDefault();
+    finishSelectEdit(false);
+  } else if (closeOpenDetails()) {
+    event.preventDefault();
+  } else if (document.fullscreenElement) {
+    event.preventDefault();
+    fullscreenInitiator = fullscreenToggle;
+    void document.exitFullscreen().then(() => fullscreenInitiator?.focus()).catch(() => {});
+  }
+});
+fullscreenToggle.addEventListener("click", () => { fullscreenInitiator = fullscreenToggle; });
+requestAnimationFrame(pollGamepad);
 
 const calibrationObserver = new ResizeObserver(() => renderCalibration());
 calibrationObserver.observe(calibrationViewport);
