@@ -181,11 +181,17 @@ same collected measurements for the summary, details, and report.
   selected studies appear and remain reachable after switching screens.
 
 **Verification status (2026-11-19).** Workspace type checks, the diagnostics
-production build, the Pages project-base build, and focused sizing and timing
-tests pass. A local browser check confirmed help disclosure and Escape behavior,
-keyboard width adjustment, Generic mode and mapping selection, screen
-navigation, and the Renderer & Performance screen. Remaining manual coverage:
-real gamepad navigation and disconnection behavior, touch drag and pinch zoom,
-device-scale capping at DPR 3, clipboard denial and missing viewport APIs,
-WebGL2 unavailability and context loss/restoration, hidden-tab timing restart,
-and the installed-service-worker offline path.
+production build, both root-base and project-base Pages builds, and focused
+sizing and timing tests pass. A local browser check confirmed help disclosure
+and Escape behavior, keyboard width adjustment, Generic mode and mapping
+selection, screen navigation, and the Renderer & Performance screen. The user
+confirmed and accepts current gamepad navigation and select-choice behaviour,
+and confirmed that controller disconnect/reconnect works correctly. At the
+user's request, remaining manual coverage is deferred: touch drag and pinch
+zoom, device-scale capping at DPR 3, clipboard denial and missing viewport
+APIs, WebGL2 unavailability, context loss/restoration, workload Idle and
+hidden-tab timing restart, and the installed-service-worker offline path. Some
+scenarios require touch hardware, browser fallback conditions, or WebGL
+availability controls that are not currently available. The local Pages
+preview check was blocked because the Computer Use safeguard could not
+confidently identify Chrome's current URL.
