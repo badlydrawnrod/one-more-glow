@@ -20,7 +20,10 @@ or files in their relevant context. If no scope is specified, review current
 changes, including staged, unstaged, and relevant untracked work; if there are
 none, ask what to review. Report material limits on review coverage.
 
-Use the project's specifications, architecture, and engineering guidance to understand intended behaviour, but do not assume that these documents are necessarily correct or complete.
+Start from the agreed objective, even when it exists only in the request. Use
+the applicable specifications and architecture to identify commitments the work
+must respect. Challenge gaps or contradictions in those sources when they
+affect the outcome.
 
 ## Review approach
 
@@ -31,7 +34,7 @@ Consider:
 - **Assumptions:** What is being taken for granted? Which assumptions are undocumented, untested, or potentially false?
 - **Correctness:** Does the work actually achieve its stated purpose? Can you construct counterexamples?
 - **Edge cases:** What happens at boundaries, with unusual inputs, or under failure conditions?
-- **Evidence:** Do tests and other evidence establish the claimed behaviour, or merely demonstrate selected examples?
+- **Evidence:** Would the proposed checks establish the objective? For completed work, what do the actual results show, and which important cases remain unverified?
 - **Requirements:** Are the requirements internally consistent, sufficiently precise, and aligned with the stated goal?
 - **Failure modes:** What could go wrong in realistic use, including unexpected interactions between components?
 

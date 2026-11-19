@@ -1,74 +1,78 @@
 import { drawText, measureText, type DrawingContext } from "one-more-glow";
 
-function drawStudyText(
-  drawing: DrawingContext, text: string, x: number, y: number, height: number, design: "16" | "22",
-): void {
-  drawText(drawing, text, x, y, { font: design === "16" ? "segment16" : "segment22", height });
-}
+const cyan = [0, 0.9, 1] as const;
+const amber = [1, 0.55, 0.12] as const;
 
-/** Compare the proposed cells using the same samples and drawing style. */
 export function drawSegmentStudy(drawing: DrawingContext, portrait: boolean): void {
-  const top = portrait ? 465 : 330;
-  const large = portrait ? 37 : 32;
-  const left = -16 * large * 0.82 / 2;
-  const row = portrait ? 65 : 49;
+  const width = portrait ? 768 : 1024;
+  const height = portrait ? 1024 : 768;
+  const left = -width * 0.41;
+  const title = { font: "segment16", height: width * 0.023 } as const;
+  const sampleHeight = width * 0.022;
+  const chartHeight = width * 0.035;
+  const matchedText = "PLAYER 1  SCORE 01250";
 
   drawing.beginFrame();
-  drawing.setColor([1, 0.55, 0.12]);
-  drawing.setIntensity(0.8);
-  drawStudyText(drawing, "16 SEGMENT", left, top - 20, 19, "16");
-  drawing.setColor([0, 0.9, 1]);
-  drawing.setIntensity(0.9);
-  drawStudyText(drawing, "ABCDEFGHIJKLM", left, top - row - large, large, "16");
-  drawStudyText(drawing, "NOPQRSTUVWXYZ", left, top - row * 2 - large, large, "16");
-  drawStudyText(drawing, "0123456789", left, top - row * 3 - large, large, "16");
-  drawing.setIntensity(0.7);
-  drawStudyText(drawing, "SCORE 001250  WAVE 03", left, top - row * 4 - 20, 20, "16");
-
-  drawing.setColor([1, 0.55, 0.12]);
-  drawing.setIntensity(0.8);
-  drawStudyText(drawing, "22 SEGMENT", left, top - row * 5 - 18, 18, "22");
-  drawing.setColor([0, 0.9, 1]);
-  drawing.setIntensity(0.9);
-  // Six rows of the reference chart: ASCII 0x20 through 0x7e, followed by
-  // the blank 0x7f cell. Preserve the space at the start of the first row.
-  for (let line = 0; line < 6; line += 1) {
-    const text = Array.from({ length: 16 }, (_, column) =>
-      line === 5 && column === 15 ? " " : String.fromCharCode(0x20 + line * 16 + column)).join("");
-    drawStudyText(drawing, text, left, top - row * (6 + line) - large, large, "22");
+  for (const [font, fontName, y] of [["segment16", "16", 0.397], ["segment22", "22", 0.34]] as const) {
+    drawing.setIntensity(0.78);
+    drawing.setColor(amber);
+    drawText(drawing, fontName, left, height * y, title);
+    drawing.setColor(cyan);
+    drawText(drawing, matchedText, left + width * 0.088, height * y, { font, height: sampleHeight });
   }
-  drawing.setIntensity(0.7);
-  drawStudyText(drawing, "Score 001250  Wave 03", left, top - row * 12 - 20, 20, "22");
-  const sample = "The quick brown fox jumps over the lazy dog.";
-  const options = { font: "segment22", height: 24, spacing: "kerned" } as const;
-  const width = measureText(sample, options).width;
-  drawText(drawing, sample, -(width - 24 * 0.22) / 2, top - row * 13 - 24, options);
+
+  drawing.setColor(amber);
+  drawText(drawing, "16-SEGMENT CHART", left, height * 0.222, title);
+  drawing.setColor(cyan);
+  drawText(drawing, "ABCDEFGHIJKLM", left, height * 0.154, { font: "segment16", height: chartHeight });
+  drawText(drawing, "NOPQRSTUVWXYZ", left, height * 0.09, { font: "segment16", height: chartHeight });
+  drawText(drawing, "0123456789", width * 0.105, height * 0.154, { font: "segment16", height: chartHeight });
+
+  drawing.setColor(amber);
+  drawText(drawing, "22-SEGMENT CHART", left, height * -0.007, title);
+  drawing.setColor(cyan);
+  // Six rows of sixteen cells preserve the full 0x20–0x7f reference chart.
+  for (let row = 0; row < 6; row += 1) {
+    const text = Array.from({ length: 16 }, (_, column) =>
+      row === 5 && column === 15 ? " " : String.fromCharCode(0x20 + row * 16 + column)).join("");
+    drawText(drawing, text, left, height * (-0.077 - row * 0.068), { font: "segment22", height: chartHeight });
+  }
   drawing.endFrame();
 }
 
-/** Compare HUD text in each font and spacing mode at two sizes. */
 export function drawSpacingStudy(drawing: DrawingContext, portrait: boolean): void {
-  const left = portrait ? -320 : -460;
-  const top = portrait ? 455 : 335;
-  const groupHeight = portrait ? 205 : 160;
+  const width = portrait ? 768 : 1024;
+  const height = portrait ? 1024 : 768;
+  const columns = [["fixed", -width * 0.41], ["kerned", width * 0.06]] as const;
+  const heading = { font: "segment16", height: width * 0.025 } as const;
   const groups = [
-    { font: "segment16", spacing: "fixed", label: "16 FIXED" },
-    { font: "segment16", spacing: "kerned", label: "16 KERNED" },
-    { font: "segment22", spacing: "fixed", label: "22 FIXED" },
-    { font: "segment22", spacing: "kerned", label: "22 KERNED" },
+    ["segment16", "16 SMALL", 0.021], ["segment22", "22 SMALL", 0.021],
+    ["segment16", "16 LARGE", 0.029], ["segment22", "22 LARGE", 0.029],
   ] as const;
 
   drawing.beginFrame();
-  groups.forEach(({ font, spacing, label }, index) => {
-    const y = top - index * groupHeight;
-    drawing.setColor([1, 0.55, 0.12]);
-    drawing.setIntensity(0.65);
-    drawText(drawing, label, left, y, { font: "segment16", height: 18 });
-    drawing.setColor([0, 0.9, 1]);
-    drawing.setIntensity(0.65);
-    drawText(drawing, "SHIPS 03  EARTH: 1 SECTOR", left, y - 32, { font, spacing, height: 14 });
-    drawText(drawing, "SCORE 001200  WAVE 11", left, y - 56, { font, spacing, height: 14 });
-    drawText(drawing, "VELOCITY 000  0123456789", left, y - 84, { font, spacing, height: 20 });
-  });
+  for (const [spacing, x] of columns) {
+    drawing.setColor(cyan);
+    drawing.setIntensity(0.8);
+    drawText(drawing, spacing.toUpperCase(), x, height * 0.41, heading);
+    for (const [index, [font, title, size]] of groups.entries()) {
+      const y = height * (0.295 - index * 0.19);
+      drawing.setColor(amber);
+      drawing.setIntensity(0.8);
+      drawText(drawing, title, x, y, heading);
+
+      const options = { font, height: width * size, spacing };
+      drawing.setColor(cyan);
+      drawText(drawing, "SCORE 001250", x, y - height * 0.065, options);
+      drawText(drawing, "gypq, 019.5!", x, y - height * 0.125, options);
+
+      drawing.setIntensity(0.4);
+      for (const sample of ["SCORE ", "SCORE 001250"]) {
+        const mark = x + measureText(sample, options).width;
+        drawing.moveTo(mark, y - height * 0.071);
+        drawing.lineTo(mark, y - height * 0.056);
+      }
+    }
+  }
   drawing.endFrame();
 }

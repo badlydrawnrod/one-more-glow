@@ -1,115 +1,79 @@
 # One More Glow
 
-One More Glow is a TypeScript project for retro-inspired 2D vector graphics.
-It includes a renderer-independent drawing library with a WebGL2 backend and
-interactive demo apps built on that library.
+One More Glow is a TypeScript library for drawing retro-style 2D vector
+graphics. Try the browser demos to see what it can draw and check how the
+graphics look on your display.
 
-## Repository layout
+[Try an app online](#try-an-app-online) ·
+[Run an app locally](#run-an-app-locally) ·
+[Ask for a change](#ask-for-a-change) ·
+[Use the drawing library](#use-the-drawing-library)
 
-- `packages/one-more-glow/` — reusable library package, including its public
-  entry point and tests.
-- [`apps/diagnostics/`](apps/diagnostics/README.md) — Vite workbench for canvas
-  sizing and renderer studies.
-- [`apps/asteroids-demo/`](apps/asteroids-demo/README.md) — keyboard and gamepad controlled Asteroids arcade game.
-- [`apps/gyruss-demo/`](apps/gyruss-demo/README.md) — keyboard and gamepad controlled orbital shooter demo.
-- [`apps/very-angry-robots/`](apps/very-angry-robots/README.md) — vector robot combat across connected rooms.
-- `packages/one-more-glow/docs/specs/` — library behavior requirements.
+## Try an app online
 
-All consumer apps depend on the library by package name. Keep game or app
-behavior in apps; place code in a shared package when a concrete reuse need appears. See
-[`docs/architecture.md`](docs/architecture.md) for the dependency rules.
+- [Play Very Angry Robots](https://badlydrawnrod.github.io/one-more-glow/very-angry-robots/)
+  and fight robots as you move through connected rooms.
+- [Open Test Card](https://badlydrawnrod.github.io/one-more-glow/test-card/)
+  to see how the renderer draws lines, curves, and bright points. Switch to
+  **Canvas & Environment** to check sizing and clipping on your display.
 
-## Repository skills
+## Run an app locally
 
-The repository includes focused skills for API, architecture, complexity and
-correctness reviews, and for adding automated safeguards. See the
-[`skills catalog`](docs/skills.md) for descriptions and instructions.
-
-## Getting started
-
-Requires Node.js and npm. From the repository root:
+Use Node.js 22.12 or later with npm. In a local checkout, open a terminal in
+the folder containing this README and run these commands.
 
 ```sh
 npm install
 npm run dev
 ```
 
-`npm run dev` starts the diagnostics workbench on **Canvas & Environment**.
-Use its two screens to inspect canvas sizing or open a renderer study. The
-existing `?scene=testcard`, `?scene=segments`, `?scene=spacing`, and
-`?scene=profile` links remain available; `?orientation=portrait` and
-`?animate=1` continue to open the game study. Run `npm run dev:asteroids` to
-play Asteroids or `npm run dev:gyruss` to play the orbital shooter.
-Run `npm run dev:robots` to play Very Angry Robots.
+Open the local URL printed in the terminal. The diagnostics app opens on
+**Canvas & Environment**. To see the Test Card, open **Renderer & Performance**
+and select **Test card**. See the [diagnostics guide](apps/diagnostics/README.md)
+for links that open each study directly.
 
-## Workspace commands
+To start a game, run its command from the same folder and open the URL it prints.
 
-Run these from the repository root:
-Repository checks belong in `tools/`, and every root npm command is listed here.
-`npm run check` verifies both conventions.
-
-| Command | Purpose |
+| Game | Command |
 | --- | --- |
-| `npm run dev` | Build the library and start the diagnostics app. |
-| `npm run dev:asteroids` | Build the library and start Asteroids. |
-| `npm run dev:gyruss` | Build the library and start the orbital shooter demo. |
-| `npm run dev:robots` | Build the library and start Very Angry Robots. |
-| `npm run check` | Build the library, then type-check all apps against its package API. |
-| `npm run check:repo-conventions` | Check that root npm commands are listed here and repository-check scripts live in `tools/`. |
-| `npm run check:boundaries` | Check that apps import the library through its public entry point and do not depend on other apps. |
-| `npm run check:asteroids` | Build the library and type-check the Asteroids app. |
-| `npm run check:gyruss` | Build the library and type-check the orbital shooter demo. |
-| `npm run check:robots` | Build the library and type-check Very Angry Robots. |
-| `npm test` | Run the library tests. |
-| `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
-| `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
-| `npm run build` | Build the library and all production apps. |
-| `npm run build:asteroids` | Build the library and production Asteroids app. |
-| `npm run build:gyruss` | Build the library and production orbital shooter demo. |
-| `npm run build:robots` | Build the library and production Very Angry Robots app. |
-| `npm run preview` | Preview the production diagnostics build. |
-| `npm run preview:asteroids` | Preview the production Asteroids app. |
-| `npm run preview:gyruss` | Preview the production orbital shooter. |
-| `npm run preview:robots` | Preview the production Very Angry Robots app. |
-| `npm run build:pages` | Build and assemble the explicitly selected GitHub Pages apps into `.pages-output/`. |
+| [Asteroids](apps/asteroids-demo/README.md) | `npm run dev:asteroids` |
+| [Gyruss](apps/gyruss-demo/README.md) | `npm run dev:gyruss` |
+| [Very Angry Robots](apps/very-angry-robots/README.md) | `npm run dev:robots` |
 
-Each workspace has its own manifest and configuration. The root is private;
-the library package is the independent package boundary. Library builds emit
-JavaScript and TypeScript declarations into its ignored `dist/` directory.
+## Ask for a change
 
-## GitHub Pages site
+Start a Codex chat or [open a GitHub issue](https://github.com/badlydrawnrod/one-more-glow/issues/new).
+Describe in your own words what you’re trying to do and what you’d see or be
+able to do if it worked.
 
-The combined Pages site publishes the landing page, Very Angry Robots at
-`/very-angry-robots/`, and diagnostics as Test Card at `/test-card/`. The
-publication allowlist is maintained in `tools/pages-publication.mjs`; adding a
-workspace to npm does not publish it. A future app needs an explicit entry
-there and app-owned route/PWA assets before it is included.
+> When part of the diagnostics test card disappears, I want to know whether
+> scrolling will reveal it or whether the test area is clipping it. I’d like
+> to try both cases and see the right explanation on-screen and in the copied
+> report.
 
-Build and preview the assembled site locally from the repository root:
+| If you’re starting with… | What to ask for | What you can expect |
+| --- | --- | --- |
+| Something broken | Say what you expected and what happened. Include steps to reproduce if you have them. | A verified fix or an explanation of what’s blocking it. |
+| A clear improvement | Describe the outcome you want and give an example of success. | A checked change, with lasting behavior recorded in the spec where it matters. |
+| A sense that something is off | Ask for a review and describe where it feels confusing or falls short. | Findings and options you can use to decide what to change. |
+| An idea for a new app | Say who it’s for and what they should be able to do in the first version. Mention if you also want to [publish it](#publish-an-app). | An app you can run locally, with instructions for trying the first scenario. |
 
-```sh
-PAGES_BASE=/ npm run build:pages
-npm exec vite -- preview --outDir .pages-output
-```
+See [work and documentation](docs/engineering.md#work-and-documentation) for
+how changes are planned, checked, and documented. The
+[skills catalog](docs/skills.md) lists focused reviews and automated safeguards.
 
-Open the preview URL's `/`, `/very-angry-robots/`, and `/test-card/` paths.
-`PAGES_BASE` defaults to `/`. The Pages workflow sets it to the repository
-project path (for example `/one-more-glow/`); set the repository Actions
-variable `PAGES_BASE` to `/` when publishing at a custom domain root. Each app
-build also receives its own `APP_ROUTE`, and its Vite base combines that route
-with `PAGES_BASE`.
+## Use the drawing library
 
-Before the first deployment, set the repository's Pages publishing source to
-**GitHub Actions** in Settings → Pages.
+Import drawing types and helpers from `one-more-glow`. Write drawing code
+against `DrawingContext` and use the WebGL2 renderer to display the result
+in a browser. See the [vector display specification](packages/one-more-glow/docs/specs/SPEC.md)
+for the drawing API and its behavior.
 
-Pull requests build and upload an artifact for validation only. Pushes to the
-default branch deploy automatically. A manual workflow run deploys the branch
-selected for that run.
+### Adjust the display profile
 
-## Display profile
-
-The renderer exposes a global profile separately from drawing commands. Supply
-a complete profile to change it for the next frame:
+Create the renderer with an existing WebGL2 context. Pass a complete display
+profile to change settings for the next frame. This example reduces the glow
+strength while keeping the other default settings.
 
 ```ts
 import { createWebGL2Renderer, DEFAULT_DISPLAY_PROFILE } from "one-more-glow";
@@ -118,13 +82,12 @@ const renderer = createWebGL2Renderer(webglContext);
 renderer.setDisplayProfile({ ...DEFAULT_DISPLAY_PROFILE, glowStrength: 0.5 });
 ```
 
-The profile controls line width, point radius, glow strength and glow spread.
-See the [display specification](packages/one-more-glow/docs/specs/SPEC.md) for ranges and
-update semantics. The diagnostics app's Profile view allows live adjustment.
+The profile controls line width, point radius, glow strength, and glow spread.
+Try the settings in the diagnostics app's **Display profile** study.
 
-## Segment text
+### Draw and measure segment text
 
-Use the renderer-independent text helpers with an existing drawing context:
+Pass an existing `DrawingContext` as `drawing`.
 
 ```ts
 import { drawText, measureText } from "one-more-glow";
@@ -134,9 +97,96 @@ const metrics = measureText("Player 1", options);
 drawText(drawing, "Player 1", 0, 0, options);
 ```
 
-The position is the start of the baseline in logical coordinates. `height` is
-uppercase height; `metrics.ascent + metrics.descent` gives the full nominal
-font height. `metrics.width` is the advance to the next character, including
-trailing spaces. Choose `segment16` for the uppercase design; ASCII lowercase
-is converted automatically. Fixed spacing is the default. See the
-[segment text specification](packages/one-more-glow/docs/specs/segment-text.md) for coverage and behavior.
+The `x` and `y` arguments give the start of the baseline in logical coordinates.
+`height` sets the height of uppercase letters. Add `metrics.ascent` and
+`metrics.descent` for the full nominal font height. `metrics.width` gives the
+distance from the start of the text to where the next character would start,
+including trailing spaces.
+Use `segment16` for the uppercase design, which converts ASCII lowercase
+letters automatically. Spacing is fixed by default. See the
+[segment text specification](packages/one-more-glow/docs/specs/segment-text.md)
+for character coverage and layout rules.
+
+## Publish an app
+
+The [GitHub Pages site](https://badlydrawnrod.github.io/one-more-glow/) hosts
+Very Angry Robots and Test Card. To publish another app, add it to
+[`tools/pages-publication.mjs`](tools/pages-publication.mjs) and give it a
+public route, a web app manifest, and a service worker. See the
+[publication requirements](docs/specs/github-pages-pwa.md) for the assets and
+checks each app needs.
+
+### Preview the site locally
+
+Build the site from the repository root, then start the preview server.
+
+```sh
+PAGES_BASE=/ npm run build:pages
+npm exec vite -- preview --outDir .pages-output
+```
+
+Open the URL printed in the terminal. The landing page links to Very Angry
+Robots and Test Card. Open both links to check that the apps load.
+
+### Deploy the site
+
+Before the first deployment, select **GitHub Actions** under **Settings → Pages**
+in the repository. Pushes to the default branch deploy automatically. To
+deploy a specific branch, select it in a manual workflow run. Pull requests
+build and upload the site for validation.
+
+The Pages workflow uses the repository path as `PAGES_BASE`, for example
+`/one-more-glow/`. To publish at the root of a custom domain, set the
+repository Actions variable `PAGES_BASE` to `/`. Each app's Vite base combines
+this path with its `APP_ROUTE`.
+
+## Workspace commands
+
+Run these commands from the repository root.
+
+### Run and preview
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Build the library and start diagnostics. |
+| `npm run dev:asteroids` | Build the library and start Asteroids. |
+| `npm run dev:gyruss` | Build the library and start Gyruss. |
+| `npm run dev:robots` | Build the library and start Very Angry Robots. |
+| `npm run preview` | Preview the production diagnostics build. |
+| `npm run preview:asteroids` | Preview the production Asteroids build. |
+| `npm run preview:gyruss` | Preview the production Gyruss build. |
+| `npm run preview:robots` | Preview the production Very Angry Robots build. |
+
+### Check and test
+
+| Command | Purpose |
+| --- | --- |
+| `npm run check` | Check repository conventions and app dependencies, build the library, and type-check all apps. |
+| `npm run check:repo-conventions` | Check the README command list, skills catalog, and placement of check scripts in `tools/`. |
+| `npm run check:boundaries` | Check that apps import the library through its public entry point and avoid dependencies on other apps. |
+| `npm run check:asteroids` | Build the library and type-check Asteroids. |
+| `npm run check:gyruss` | Build the library and type-check Gyruss. |
+| `npm run check:robots` | Build the library and type-check Very Angry Robots. |
+| `npm test` | Run the library tests. |
+| `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
+| `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
+
+### Build
+
+| Command | Purpose |
+| --- | --- |
+| `npm run build` | Build the library and all production apps. |
+| `npm run build:asteroids` | Build the library and production Asteroids app. |
+| `npm run build:gyruss` | Build the library and production Gyruss app. |
+| `npm run build:robots` | Build the library and production Very Angry Robots app. |
+| `npm run build:pages` | Build the apps selected for GitHub Pages and assemble the site in `.pages-output/`. |
+
+## Repository layout
+
+- [`apps/`](apps/) contains the demos and the diagnostics app. Each app owns
+  its behavior and imports the library by package name.
+- [`packages/one-more-glow/`](packages/one-more-glow/) contains the reusable
+  library, its tests, and its specifications. The library build writes
+  JavaScript and TypeScript declarations to `packages/one-more-glow/dist/`.
+- [Repository architecture](docs/architecture.md) explains which parts of the
+  repository own each responsibility and how they depend on one another.

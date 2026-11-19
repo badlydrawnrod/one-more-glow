@@ -1,5 +1,9 @@
 # Architecture
 
+This document describes the workspace structure and the boundaries shared by
+its apps and packages. See [work and documentation](engineering.md#work-and-documentation)
+for when to update it.
+
 ## Repository layout
 
 The repository is a small npm-workspaces monorepo. Root tooling and scripts
@@ -29,14 +33,6 @@ currently contains one package. Apps depend on packages through their public
 package names and exports. Packages must not depend on apps. Code specific to
 one app should remain in that app. Create a shared package when a concrete
 reusable boundary emerges, rather than in anticipation of hypothetical reuse.
-
-Package specifications live with the package under `docs/specs/`; app
-specifications live with the app under `docs/specs/`. Each uses `SPEC.md` as
-the index when requirements are split by capability. Cross-package
-specifications live under the root `docs/specs/`. Practical documentation
-lives in the package's or app's `README.md` when needed. App-specific active
-plans live under the app's `plans/active/`; shared and cross-app plans live
-under the root `plans/`.
 
 The GitHub Pages deployment builds one static artifact with separate paths and
 PWA scopes for explicitly selected apps. Its selection and initial publication
@@ -156,4 +152,4 @@ machinery.
 
 Keep the repository layout small. Add packages when a real reusable boundary
 appears; do not create a shared package or general-purpose framework
-speculatively. Record deliberate architectural changes here.
+speculatively.

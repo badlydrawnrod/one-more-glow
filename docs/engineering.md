@@ -27,28 +27,60 @@ Test deterministic, observable behavior at stable boundaries. Test internal inva
 
 An abstraction or dependency must justify its maintenance cost. Do not add frameworks, factories, registries, dependency-injection systems or configuration layers without a concrete requirement. Prefer small duplication to the wrong abstraction; use standard language and browser APIs where practical.
 
-## Documentation
+## Work and documentation
 
-Specifications capture behavior and evolving intent. Architecture documentation records significant boundaries and their rationale. Plans record temporary progress. Keep these purposes distinct and do not document unagreed capabilities as requirements.
+| Artifact | What it answers | Where it belongs |
+| --- | --- | --- |
+| **Objective** | What should be better when this work is done, and for whom? | In the request, issue, or active plan. A sentence in prose can be enough. |
+| **Plan** | How will we achieve the objective, check the result, and resume the work? | In a temporary [active plan](../plans/README.md) when sequencing or handoff warrants one. |
+| **Specification** | What behavior should a user, caller, or maintainer be able to rely on? | In the owning app's or package's `docs/specs/`, or in root `docs/specs/` for shared behavior. Use `SPEC.md` as the entry point. |
+| **Architecture** | What owns each responsibility, where are the boundaries, and why do they matter? | In [repository architecture](architecture.md) for shared structure and in the owning app or package for local boundaries. |
 
-## Specification lifecycle
+### Objectives and verification
 
-Specifications are durable records of intent. They may contain accepted requirements, proposals, deferred capabilities and unresolved decisions; maturity applies to a capability or section, not necessarily to a whole document.
+Start with the agreed objective and identify what would show that it has been
+achieved. Use observable success criteria where people could reasonably
+interpret the objective in different ways. Account for any relevant behavior
+that users or callers already rely on. An objective is enough to start work
+when no spec covers it.
 
-### Maturity
+Choose checks that exercise the intended outcome. Use automated checks for
+repeatable contracts and regressions. Use a manual walkthrough when judging
+the presentation or trying real hardware is part of the evidence. Name the
+setup and expected result for important scenarios. Report what was actually
+checked, including material gaps. Keep reusable verification scenarios in the
+spec or test suite and task-specific run results in the active plan or change
+description.
 
-Use these terms where useful:
+### Specifications
 
-- **Proposed:** Candidate behaviour or design, not yet agreed.
-- **Accepted:** Agreed intent or behaviour, authoritative for implementation.
-- **Deferred:** Intentionally postponed, potentially with unresolved decisions.
-- **Superseded:** Replaced by another documented decision.
+Keep a spec for behavior worth preserving across changes. Describe the intent,
+observable rules, and rationale a future maintainer needs. Specify particular
+controls, values, or mechanisms when they are part of an agreed contract.
 
-Keep intended behavior distinct from implementation and verification status. For
-accepted capabilities, including those in app specs, record whether they are
-implemented, partially implemented or not yet implemented; note meaningful gaps.
-Update that note when implementation changes. Use brief notes at the capability
-or section level, and identify experimental implementations without implying
-their design is accepted.
+Consult any relevant spec when changing behavior. If the objective changes an
+accepted requirement, make that decision explicit and update the spec as part
+of the change. Capture newly agreed, lasting behavior in the relevant spec,
+whether it was settled before implementation or learned through the work.
+Preserve unrelated open questions.
 
-When changing behavior, check the relevant specification, resolve only decisions needed for the task, and record lasting decisions there. Preserve unrelated open questions. Do not promote proposals or deferred capabilities into requirements. Plans do not override specifications; move lasting decisions from plans into the appropriate durable document.
+Mark maturity at the capability or section level where it matters.
+
+- **Proposed** is a candidate for discussion.
+- **Accepted** is agreed behavior that guides implementation.
+- **Deferred** is intentionally postponed.
+- **Superseded** has been replaced by another decision. Link to its replacement.
+
+Keep those decisions distinct from implementation and verification. Record
+whether an accepted capability is implemented, partial, or still pending.
+Identify experiments and meaningful verification gaps separately. Keep these
+notes brief and update them when implementation or coverage changes.
+
+### Architecture
+
+Document component responsibilities, public entry points, dependency
+direction, and important constraints on how components fit together. Explain
+the reasoning where it helps future changes respect the boundary. Update the
+architecture with a lasting change to those decisions or to the repository
+structure. Routine implementation edits need an architecture update only if
+they change something the document claims about the system.

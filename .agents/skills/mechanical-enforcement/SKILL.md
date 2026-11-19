@@ -21,8 +21,11 @@ Work on findings, rules, or areas specified by the user. When no scope is specif
 
 For each concern:
 
-1. **Validate the concern.** Check relevant code and accepted requirements. Report unsupported or unresolved concerns rather than enforcing them.
-2. **Identify the property.** What behaviour or constraint should be protected?
+1. **Validate the concern.** Check the relevant code against the agreed
+   objective and any applicable requirements. Report concerns that lack
+   evidence or depend on an unresolved decision.
+2. **Identify the property.** Name the agreed, repeatable behaviour or
+   constraint the safeguard will protect.
 3. **Assess existing enforcement.** If coverage is adequate, or no reliable, proportionate check is practical, explain why and stop for that concern.
 4. **Choose and implement a safeguard.** Prefer existing tools and the smallest effective change. Integrate it into an appropriate routine check or presubmit, or report why that was not possible.
 5. **Verify effectiveness.** Use evidence appropriate to the mechanism to show that valid cases pass and a representative violation is caught, such as a type-check fixture or a regression test against the original defect.

@@ -1,71 +1,79 @@
 # Rendering diagnostics
 
-This is a reverse-engineered baseline of the current diagnostic app, not a
-claim that every scene detail is an accepted design decision. See [README.md](../../README.md)
-for how to run it and select views. Shared display requirements remain in the
+The diagnostics app is an independent consumer of the public `one-more-glow`
+API. It provides calibration and renderer studies for checking vector output
+and display behavior. See [README.md](../../README.md) for navigation and
+[Diagnostics workbench](diagnostics-workbench.md) for the accepted workbench
+behavior. Shared display behavior remains defined by the
 [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md).
 
-## Workbench redesign
+## Current studies
 
-- [Diagnostics workbench](diagnostics-workbench.md) is accepted and implemented.
-  The user confirmed and accepts gamepad navigation, selection, and
-  disconnect/reconnect behaviour. The user deferred the remaining manual
-  verification scenarios; their status and limits are recorded in the
-  workbench specification.
+**Implementation: Implemented.** Renderer & Performance offers a Game scene,
+Test Card, Segment text, and Display profile studies. Game animation and frame
+timing start via **Run frame timing** or the `?animate=1` link.
 
-## Purpose and current behavior
+### Test Card
 
-The diagnostic is a consumer of the public library API for inspecting the
-renderer and evaluating display characteristics. It currently uses WebGL2.
+**Status: Accepted.**
 
-- The Renderer & Performance screen starts on a static, game-like study with a
-  grid, terrain, a craft and exhaust, a fuel pod and tractor beam, geometric
-  enemies, shots and stars. Its optional workload rotates the craft.
-- The test card presents open paths and closed outlines at several intensities,
-  a central line, triangle and point, transformed craft, line and point
-  samples, circles, ellipses, arcs and nested rectangles. These examples make
-  geometry, transformations, intensity and halo appearance easier to inspect.
-- An experimental segment-text view compares the 16-segment alphabet, digits
-  and HUD sample with the 22-segment printable character set, a HUD sample and
-  a kerned mixed-case sentence. It uses the public text helpers.
-  The 16-segment font joins its top and bottom halves and adds two
-  diagonals for V. Both fonts use left stems and chamfered diagonal edges for
-  uppercase B and D. The 22-segment font adapts Stewart C. Russell's
-  [ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based
-  on the [Litronix DL-3422 chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85),
-  into vector line centres. The adaptation retains the source font's licence;
-  see the [library notice](../../../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
-- A segment-spacing view compares both fonts and spacing modes using game HUD
-  labels, digits and punctuation at small and larger sizes.
-- The 22-segment interpretation includes dots and strokes below the baseline
-  for descenders. It is not a hardware or ROM emulation.
-- All views support landscape and portrait orientations. The canvas fits the
-  window while preserving the selected aspect ratio, uses the device pixel
-  ratio for its backing resolution, and updates on window resize.
-- The diagnostic studies are static until the Game workload is started. The
-  workbench controls change views without reloading; URL parameters remain
-  available for opening a specific study directly.
+The Test Card groups samples as **Joins and endpoints**, **Curves and
+transforms**, and **Overdrive**. It uses open paths and closed outlines at
+several intensities, basic line and point samples, circles, ellipses, arcs,
+and transformed outlines. The overdrive group labels line and point samples
+in cyan and magenta at intensities 0.5, 1, 1.25, 1.5, and 2, using matching
+geometry at every level. This exercises the response defined in the vector
+display specification.
 
-## Superseded: overlay controls
+### Segment text
 
-The former in-canvas overlay menu was replaced by the accepted two-screen
-navigation and labelled controls in [the diagnostics workbench spec](diagnostics-workbench.md).
-The study choices, orientation setting, explicit Game animation control,
-accessible selected states, and live profile controls remain part of the app.
+**Glyphs** compares matching text at the same size in the 16-segment design
+and the 22-segment printable chart, including the complete ASCII 20–7F chart
+and score examples. **Spacing** compares fixed and kerned advances at small
+and large sizes using score digits, punctuation, lowercase and descenders;
+baseline markers make digit alignment and text advance visible. The study
+uses the public renderer-independent text helpers. The 22-segment
+interpretation includes dots and strokes below the baseline for descenders;
+it is not hardware or ROM emulation.
 
-## Accepted: overdrive comparison
+The 16-segment font joins its top and bottom halves and adds two diagonals for
+V. Both fonts use left stems and chamfered diagonal edges for uppercase B and
+D. The 22-segment font adapts Stewart C. Russell's
+[ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based
+on the [Litronix DL-3422 chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85),
+into vector line centres. The adaptation retains the source font's licence;
+see the [OFL notice](../../../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
 
-**Implementation: Implemented.**
+### Display profile
 
-The test card provides a labelled comparison of normal intensity and overdrive
-for evaluating the response specified in the [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md).
-It shows lines and points in at least two distinct colours at intensities 0.5,
-1, 1.25, 1.5 and 2, using the same colours and geometry at each intensity so
-the changes in core colour and halo are easy to compare. The samples remain
-legible in both landscape and portrait orientations.
+**Status: Accepted.**
 
-## Accepted: display profile study
+The Display profile study shows real line, crossing-line, point, and overdrive
+beam samples under the active profile. HTML controls adjust beam width, point
+radius, glow strength, and glow spread and display their numeric values.
+**Compare with defaults** toggles the same samples between the edited profile
+and library defaults without discarding edits; reset restores defaults.
+Profile and backing settings are identified in the study readout and report.
 
-**Implementation: Implemented.**
+## Legacy study links
 
-The diagnostics offers a profile study with labelled HTML sliders for line width, point radius, glow strength and glow spread, plus a reset to defaults. The controls update the renderer profile live and show vector-drawn lines, crossing lines, points and overdrive samples under the same profile. Pointer, touch, keyboard and gamepad paths use the same settings. Profile values remain selected across scene and orientation changes for the current session.
+Keep these documented links working:
+
+- `?scene=testcard` opens Test Card.
+- `?scene=segments` opens Segment text at **Glyphs**.
+- `?scene=spacing` opens Segment text at **Spacing**.
+- `?scene=profile` opens Display profile.
+- `?orientation=portrait` selects portrait orientation for the Game study.
+- `?animate=1` starts the Game workload; it has no effect on other studies.
+
+Parameters can be combined, for example
+`?scene=testcard&orientation=portrait`. The published `/test-card/` entry
+opens Test Card. Calibration orientation and study orientation are independent.
+
+## Verification status
+
+Chrome checks covered Test Card aspect and backing dimensions in both
+orientations at desktop and emulated phone sizes. The study samples, legacy
+links, profile edits, comparison, reset, and persistence across studies were
+checked in the browser. See [workbench verification](diagnostics-workbench.md#verification-status)
+for the environment and input coverage.

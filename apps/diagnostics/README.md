@@ -1,34 +1,41 @@
 # Rendering diagnostics
 
 From the repository root, run `npm run dev` and open the local address printed
-by Vite. The app opens on **Canvas & Environment**, where the calibration
-canvas, sizing controls, display measurements, change history, fullscreen, and
-copyable report are available. **Renderer & Performance** contains the Test
-Card, game scene, segment studies, and Display Profile study. Settings remain
-in memory when switching screens.
+by Vite. The app opens on **Canvas & Environment**. Use **Renderer &
+Performance** for the Game scene, Test Card, Segment text, and Display profile
+studies. Settings remain in memory when switching screens.
+
+On Canvas & Environment, **Auto size** fits the test stage; **Manual size**
+uses one CSS width field. Drag the canvas handle or edit the field to change
+the same width. **Use Robots settings** restores the reference setup. The
+summary distinguishes test-stage clipping, browser visibility, content
+mapping, and backing resolution. Copy report is available on both screens and
+shows selectable text if clipboard access is unavailable.
 
 The workbench supports keyboard, mouse, touch, and standard-mapped gamepad
-controls. Open **Controls help** for the mappings. The calibration resize
-handle works with pointer drag or arrow keys; the labelled width field and
-range control change the same size setting. Use the animated Game workload
-controls to start frame timing explicitly. Profile sliders adjust beam width,
-point radius, glow strength, and glow spread live; Reset restores defaults.
+input. Open **Controls help** for the mappings. The Game workload starts only
+when requested; timing results retain the two most recent completed runs and
+their conditions. Display profile sliders adjust beam width, point radius,
+glow strength, and glow spread. **Compare with defaults** keeps edits while
+showing the default beam samples; Reset restores defaults.
 
-URL query parameters remain available for opening a study directly:
+URL query parameters remain available for opening studies directly:
 
-- `?scene=testcard` shows geometry, transform and intensity samples, including
-  a labelled comparison of normal intensity and overdrive.
-- `?scene=segments` compares the 16-segment design with the printable
-  22-segment reference character set.
-- `?scene=spacing` compares HUD text in both fonts with fixed and kerned spacing.
-- `?scene=profile` opens the Display Profile study.
+- `?scene=testcard` opens Test Card, grouped as Joins and endpoints, Curves
+  and transforms, and Overdrive.
+- `?scene=segments` opens Segment text at **Glyphs**.
+- `?scene=spacing` opens Segment text at **Spacing**.
+- `?scene=profile` opens Display profile.
 - `?orientation=portrait` selects portrait orientation for the Game study.
 - `?animate=1` starts the Game workload; it has no effect on other studies.
 
-Parameters can be combined, for example `?scene=testcard&orientation=portrait`.
-The published `/test-card/` entry opens the Test Card study. See
-[the workbench specification](docs/specs/diagnostics-workbench.md) and the
-[diagnostics baseline](docs/specs/SPEC.md) for behavior and status.
+Parameters can be combined, for example
+`?scene=testcard&orientation=portrait`. The published `/test-card/` entry
+opens Test Card. See [the workbench specification](docs/specs/diagnostics-workbench.md)
+and [the studies specification](docs/specs/SPEC.md) for behavior and current
+verification status.
 
-The library’s 22-segment font adapts Stewart C. Russell’s ThreeFourTwoTwo font
-to vector strokes. See its [licence notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
+The 22-segment font adapts Stewart C. Russell's
+[ThreeFourTwoTwo font](https://fontlibrary.org/en/font/threefourtwotwo), based
+on the [Litronix DL-3422 character chart](https://bitsavers.trailing-edge.com/components/litronix/_dataBooks/1982_Litronix_Optoelectronics_Catalog.pdf#page=85),
+to vector line centres. See the font's [OFL notice](../../packages/one-more-glow/THREEFOURTWOTWO-OFL.txt).
