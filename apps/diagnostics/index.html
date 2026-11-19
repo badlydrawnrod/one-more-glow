@@ -13,136 +13,149 @@
     <main id="workbench" class="workbench" aria-label="Rendering diagnostics">
       <header class="masthead">
         <div>
-          <p class="eyebrow">ONE MORE GLOW / DISPLAY LAB</p>
-          <h1>Diagnostics workbench</h1>
+          <p class="eyebrow">ONE MORE GLOW</p>
+          <h1>Diagnostics</h1>
         </div>
-        <div class="masthead-actions"><p class="masthead-note">Inspect the canvas. Understand the display.</p><button id="fullscreen-toggle" class="secondary-button" type="button">Enter fullscreen</button></div>
+        <div class="masthead-actions">
+          <details class="controls-help">
+            <summary>Controls help</summary>
+            <div class="controls-help-content">
+              <p><strong>Keyboard</strong> Use Tab and Shift+Tab to move, Enter or Space to activate, and Escape to close a detail or exit fullscreen.</p>
+              <p><strong>Mouse and touch</strong> Drag the calibration handle or enter a width. Scroll and pinch zoom outside the handle.</p>
+              <p><strong>Standard gamepad</strong> Move with the D-pad or left stick. Press A to activate or edit, B to go back, and LB/RB to switch screens. In numeric edits, use left/right for small steps and up/down for large steps.</p>
+              <p id="gamepad-status" class="gamepad-status" role="status" aria-live="polite">Connect a standard-mapped gamepad to navigate.</p>
+            </div>
+          </details>
+          <button id="fullscreen-toggle" class="secondary-button" type="button">Enter fullscreen</button>
+        </div>
       </header>
-
-      <details class="controls-help">
-        <summary>Controls help</summary>
-        <p><strong>Keyboard:</strong> Tab and Shift+Tab move between controls; Enter or Space activates; Escape closes the open detail or exits fullscreen.</p>
-        <p><strong>Mouse and touch:</strong> Use the visible controls. Drag the calibration handle to resize; scrolling and pinch zoom work elsewhere.</p>
-        <p><strong>Standard gamepad:</strong> D-pad or left stick moves through visible controls in page order. Press A on a select to open its on-screen choices, use a direction to choose, then press A to accept or B to cancel. A activates other controls; B cancels numeric editing or closes the open detail; LB/RB switch screens. Hold a direction to repeat. In numeric edit mode, left/right changes by a fine step and up/down by a coarse step.</p>
-        <p id="gamepad-status" class="gamepad-status" role="status" aria-live="polite">Connect a standard-mapped gamepad to navigate.</p>
-      </details>
 
       <nav class="screen-nav" aria-label="Workbench screens">
         <button type="button" class="screen-tab" data-screen="environment" aria-current="page">
-          <span class="tab-index">01</span><span>Canvas &amp; Environment</span>
+          Canvas &amp; Environment
         </button>
         <button type="button" class="screen-tab" data-screen="renderer" aria-current="false">
-          <span class="tab-index">02</span><span>Renderer &amp; Performance</span>
+          Renderer &amp; Performance
         </button>
       </nav>
 
       <section id="environment-screen" class="workbench-screen" aria-labelledby="environment-title">
-        <div class="screen-heading">
-          <div><p class="eyebrow">FIT / SCALE / DISPLAY</p><h2 id="environment-title">Canvas &amp; Environment</h2></div>
-          <p>Check how a fixed vector canvas meets your browser window.</p>
-        </div>
+        <h2 id="environment-title" class="visually-hidden">Canvas &amp; Environment</h2>
         <div class="environment-layout">
           <section class="calibration-stage" aria-label="Calibration canvas preview">
-            <div class="stage-caption"><span>CALIBRATION STAGE</span><span id="calibration-mode-label">OMG-1 / LANDSCAPE</span></div>
+            <div class="stage-caption"><span>Calibration</span><span id="calibration-mode-label">OMG-1 / LANDSCAPE</span></div>
             <div id="calibration-viewport" class="calibration-viewport" aria-label="Available canvas area">
-              <canvas id="calibration-generic" class="calibration-canvas" aria-label="Generic calibration pattern"></canvas>
+              <canvas id="calibration-generic" class="calibration-canvas" aria-label="Canvas 2D calibration pattern" hidden></canvas>
               <canvas id="calibration-omg" class="calibration-canvas" aria-label="OMG-1 calibration pattern"></canvas>
               <button id="resize-handle" class="resize-handle" type="button" aria-label="Drag to resize calibration canvas" title="Drag to resize"></button>
             </div>
-            <p class="stage-footnote">The outlined stage is the available area. The bright pattern shows the mapped content.</p>
+            <p class="stage-footnote">Test area in slate, canvas edge in cyan, content guide in green.</p>
           </section>
-          <aside class="environment-readout panel">
-            <div class="panel-heading"><p class="eyebrow">CALIBRATION SETUP</p><h3>Canvas &amp; mapping</h3></div>
-            <label class="field-control">Preset
-              <select id="calibration-preset"><option value="robots">Very Angry Robots · 4:3</option><option value="manual">Custom setup</option></select>
-            </label>
-            <div class="choice-pair" role="group" aria-label="Canvas mode">
-              <button type="button" data-cal-mode="omg1" aria-pressed="true">OMG-1</button>
-              <button type="button" data-cal-mode="generic" aria-pressed="false">Generic</button>
-            </div>
-            <label class="check-control"><input id="auto-fit" type="checkbox" checked /><span>Fit to available stage</span></label>
-            <label class="field-control">Canvas width <span class="unit">CSS px</span><input id="manual-width" type="number" min="64" max="4096" step="1" value="1024" /></label>
-            <label class="field-control">Target aspect ratio</label>
-            <div class="choice-pair ratio-choices" role="group" aria-label="Target aspect ratio">
-              <button type="button" data-ratio="4:3" aria-pressed="true">4:3</button><button type="button" data-ratio="16:9" aria-pressed="false">16:9</button><button type="button" data-ratio="1:1" aria-pressed="false">1:1</button><button type="button" data-ratio="3:4" aria-pressed="false">3:4</button><button type="button" data-ratio="custom" aria-pressed="false">Custom</button>
-            </div>
-            <div id="custom-ratio" class="inline-fields" hidden>
-              <label class="field-control">Width<input id="ratio-width" type="number" min="1" max="10000" step="1" value="4" /></label>
-              <span aria-hidden="true">:</span>
-              <label class="field-control">Height<input id="ratio-height" type="number" min="1" max="10000" step="1" value="3" /></label>
-            </div>
-            <div id="orientation-control" class="control-block">
-              <p class="control-title">OMG-1 orientation</p>
-              <div class="choice-pair" role="group" aria-label="OMG-1 orientation"><button type="button" data-cal-orientation="landscape" aria-pressed="true">Landscape</button><button type="button" data-cal-orientation="portrait" aria-pressed="false">Portrait</button></div>
-            </div>
-            <div id="generic-controls" class="generic-controls" hidden>
-              <p class="control-title">Generic virtual size</p>
-              <div class="inline-fields"><label class="field-control">Width<input id="virtual-width" type="number" min="1" max="10000" step="1" value="1024" /></label><span aria-hidden="true">×</span><label class="field-control">Height<input id="virtual-height" type="number" min="1" max="10000" step="1" value="768" /></label></div>
-              <div class="choice-pair" role="group" aria-label="Generic mapping"><button type="button" data-mapping="fit" aria-pressed="true">Fit</button><button type="button" data-mapping="stretch" aria-pressed="false">Stretch</button></div>
-            </div>
-            <label class="field-control">Backing scale
-              <select id="backing-scale"><option value="robots">Device scale · max 2</option><option value="device">Device scale</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option>
-              </select>
-            </label>
-            <input id="resize-handle-range" class="size-range" type="range" min="64" max="4096" step="1" value="1024" aria-label="Canvas width in CSS pixels" />
-            <p id="calibration-error" class="field-error" role="status" aria-live="polite"></p>
-            <dl class="environment-values">
-              <div><dt>Requested size</dt><dd id="requested-size-value">—</dd></div>
-              <div><dt>Canvas size</dt><dd id="canvas-size-value">—</dd></div>
-              <div><dt>Backing buffer</dt><dd id="backing-size-value">—</dd></div>
-              <div><dt>Pattern map</dt><dd id="mapping-value">—</dd></div>
-              <div><dt>Scale</dt><dd id="scale-value">—</dd></div>
-            </dl>
+          <aside class="environment-readout panel" aria-label="Calibration results and settings">
             <section class="measurement-summary" aria-labelledby="measurement-summary-heading">
-              <h3 id="measurement-summary-heading">Browser readings</h3>
+              <h3 id="measurement-summary-heading">Canvas diagnosis</h3>
               <dl class="environment-values">
-                <div><dt>Fits in view</dt><dd id="fit-summary">—</dd></div>
-                <div><dt>Canvas / target</dt><dd id="ratio-summary">—</dd></div>
-                <div><dt>Stage space</dt><dd id="stage-summary">—</dd></div>
-                <div><dt>Backing / CSS scale</dt><dd id="effective-scale-summary">—</dd></div>
-                <div><dt>DPR / orientation</dt><dd id="display-summary">—</dd></div>
-                <div><dt>Page overflow</dt><dd id="overflow-summary">—</dd></div>
-                <div><dt>Page fullscreen</dt><dd id="fullscreen-summary">—</dd></div>
+                <div><dt>Test area</dt><dd id="stage-clipping-summary">—</dd></div>
+                <div><dt>In browser view</dt><dd id="fit-summary">—</dd></div>
+                <div><dt>Content mapping</dt><dd id="mapping-value">—</dd></div>
+                <div><dt>Backing resolution</dt><dd id="backing-size-value">—</dd></div>
+                <div><dt>Canvas size</dt><dd id="canvas-size-value">—</dd></div>
+                <div><dt>Rendering</dt><dd id="calibration-rendering-status" role="status">—</dd></div>
               </dl>
             </section>
-            <details class="measurement-details"><summary>Raw display and viewport values</summary><pre id="raw-measurements">Measurements are unavailable.</pre></details>
-            <details class="measurement-details"><summary>Recent changes</summary><ol id="measurement-history" class="measurement-history"><li>No changes recorded.</li></ol></details>
             <button type="button" class="secondary-button report-button">Copy report</button>
             <p class="action-status" role="status" aria-live="polite"></p>
             <textarea class="report-fallback" aria-label="Selectable plain text report" rows="8" readonly hidden></textarea>
+            <div class="reference-settings">
+              <p id="reference-status">Robots settings</p>
+              <button type="button" id="use-robots-settings" class="secondary-button">Use Robots settings</button>
+            </div>
+            <div class="choice-pair" role="group" aria-label="Sizing mode">
+              <button type="button" data-size-mode="auto" aria-pressed="true">Auto size</button>
+              <button type="button" data-size-mode="manual" aria-pressed="false">Manual size</button>
+            </div>
+            <label id="manual-width-control" class="field-control" hidden>Canvas width (CSS px)<input id="manual-width" aria-describedby="calibration-error" type="number" min="64" max="4096" step="1" value="1024" /></label>
+            <p id="calibration-error" class="field-error" role="status" aria-live="polite"></p>
+            <details class="measurement-details">
+              <summary>Advanced canvas settings</summary>
+              <div class="advanced-settings">
+                <div class="choice-pair" role="group" aria-label="Pattern renderer">
+                  <button type="button" data-cal-mode="omg1" aria-pressed="true">OMG-1</button>
+                  <button type="button" data-cal-mode="generic" aria-pressed="false">Canvas 2D</button>
+                </div>
+                <div class="control-block">
+                  <p class="control-title">Canvas aspect</p>
+                  <div class="choice-pair ratio-choices" role="group" aria-label="Canvas aspect">
+                    <button type="button" data-ratio="4:3" aria-pressed="true">4:3</button><button type="button" data-ratio="16:9" aria-pressed="false">16:9</button><button type="button" data-ratio="1:1" aria-pressed="false">1:1</button><button type="button" data-ratio="3:4" aria-pressed="false">3:4</button><button type="button" data-ratio="custom" aria-pressed="false">Custom</button>
+                  </div>
+                  <div id="custom-ratio" class="inline-fields" hidden>
+                    <label class="field-control">Width<input id="ratio-width" type="number" min="1" max="10000" step="1" value="4" /></label>
+                    <span aria-hidden="true">:</span>
+                    <label class="field-control">Height<input id="ratio-height" type="number" min="1" max="10000" step="1" value="3" /></label>
+                  </div>
+                </div>
+                <div id="orientation-control" class="control-block">
+                  <p class="control-title">Content aspect</p>
+                  <div class="choice-pair" role="group" aria-label="OMG-1 content aspect"><button type="button" data-cal-orientation="landscape" aria-pressed="true">Landscape 4:3</button><button type="button" data-cal-orientation="portrait" aria-pressed="false">Portrait 3:4</button></div>
+                </div>
+                <div id="generic-controls" class="generic-controls" hidden>
+                  <p class="control-title">Content aspect</p>
+                  <div class="inline-fields"><label class="field-control">Width<input id="virtual-width" type="number" min="1" max="10000" step="1" value="1024" /></label><span aria-hidden="true">×</span><label class="field-control">Height<input id="virtual-height" type="number" min="1" max="10000" step="1" value="768" /></label></div>
+                  <div class="choice-pair" role="group" aria-label="Content mapping"><button type="button" data-mapping="fit" aria-pressed="true">Preserve proportions</button><button type="button" data-mapping="stretch" aria-pressed="false">Fill and stretch</button></div>
+                </div>
+                <label class="field-control">Backing scale
+                  <select id="backing-scale"><option value="robots">Device scale (max 2×)</option><option value="device">Device scale</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select>
+                </label>
+                <p id="advanced-calibration-error" class="field-error" role="status"></p>
+              </div>
+            </details>
+            <details class="measurement-details"><summary>Browser and canvas details</summary><pre id="raw-measurements">Measurements are unavailable.</pre></details>
+            <details id="calibration-capability-section" class="measurement-details"><summary>WebGL2 capabilities</summary><pre id="calibration-capabilities">Unavailable.</pre></details>
+            <details class="measurement-details"><summary>Recent changes</summary><ol class="measurement-history"><li>No changes recorded.</li></ol></details>
           </aside>
         </div>
       </section>
 
       <section id="renderer-screen" class="workbench-screen" aria-labelledby="renderer-title" hidden>
-        <div class="screen-heading">
-          <div><p class="eyebrow">STUDIES / RENDERER</p><h2 id="renderer-title">Renderer &amp; Performance</h2></div>
-          <p>Compare geometry, text, display profiles, and animation.</p>
-        </div>
+        <h2 id="renderer-title" class="visually-hidden">Renderer &amp; Performance</h2>
         <div class="renderer-layout">
           <section class="study-stage" aria-label="Rendering study">
-            <div class="stage-caption"><span id="study-stage-label">RENDERER STUDY</span><span>OMG-1 / WEBGL2</span></div>
+            <div class="stage-caption"><span id="study-stage-label">Renderer study</span></div>
             <div class="canvas-frame">
               <canvas id="screen" width="800" height="600" aria-label="Rendering diagnostic display"></canvas>
             </div>
-            <p class="stage-footnote">The canvas keeps the selected study and profile while you move between screens.</p>
+            <p id="study-inspection" class="stage-footnote"></p>
           </section>
 
           <aside class="study-controls panel" aria-label="Study controls">
-            <div class="panel-heading"><p class="eyebrow">AVAILABLE STUDIES</p><h3>Choose a study</h3></div>
+            <dl class="study-readout" aria-label="Active rendering settings">
+              <div><dt>WebGL2</dt><dd id="context-status" role="status">Checking…</dd></div>
+              <div><dt>Backing</dt><dd id="drawing-buffer-size">—</dd></div>
+              <div><dt>Profile</dt><dd id="active-profile">Defaults</dd></div>
+            </dl>
+            <div class="study-report">
+              <button type="button" class="secondary-button report-button">Copy report</button>
+              <p class="action-status" role="status" aria-live="polite"></p>
+              <textarea class="report-fallback" aria-label="Selectable plain text report" rows="8" readonly hidden></textarea>
+            </div>
+            <h3 class="control-title">Study</h3>
             <div class="study-choices" role="group" aria-label="Study">
               <button type="button" data-scene="game" aria-pressed="false">Game scene</button>
               <button type="button" data-scene="testcard" aria-pressed="false">Test card</button>
-              <button type="button" data-scene="segments" aria-pressed="false">Segment text</button>
-              <button type="button" data-scene="spacing" aria-pressed="false">Segment spacing</button>
+              <button id="segment-study-select" type="button" data-scene="segments" aria-pressed="false">Segment text</button>
               <button type="button" data-scene="profile" aria-pressed="false">Display profile</button>
             </div>
+            <div id="segment-study-views" class="choice-pair" role="group" aria-label="Segment text views" hidden>
+              <button type="button" data-scene="segments" aria-pressed="false">Glyphs</button>
+              <button type="button" data-scene="spacing" aria-pressed="false">Spacing</button>
+            </div>
             <div id="profile-controls" class="profile-controls" aria-labelledby="profile-heading" hidden>
-              <div class="panel-heading"><p class="eyebrow">LIVE DISPLAY PROFILE</p><h3 id="profile-heading">Adjust the vector beam</h3></div>
+              <div class="panel-heading"><h3 id="profile-heading">Display profile</h3></div>
               <label class="range-control"><span>Beam width <output data-profile-value="lineWidth"></output></span><input type="range" aria-label="Beam width in CSS pixels" data-profile="lineWidth" min="0.5" max="4" step="0.1" /></label>
               <label class="range-control"><span>Point radius <output data-profile-value="pointRadius"></output></span><input type="range" aria-label="Point radius in CSS pixels" data-profile="pointRadius" min="0.5" max="4" step="0.1" /></label>
               <label class="range-control"><span>Glow strength <output data-profile-value="glowStrength"></output></span><input type="range" aria-label="Glow strength" data-profile="glowStrength" min="0" max="2" step="0.1" /></label>
               <label class="range-control"><span>Glow spread <output data-profile-value="glowSpread"></output></span><input type="range" aria-label="Glow spread" data-profile="glowSpread" min="0.5" max="2" step="0.1" /></label>
+              <button id="profile-compare" class="secondary-button" type="button" aria-pressed="false">Compare with defaults</button>
               <button id="profile-reset" class="secondary-button" type="button">Reset profile</button>
             </div>
             <div class="control-divider"></div>
@@ -154,35 +167,28 @@
               </div>
             </div>
             <section id="workload-controls" class="workload-controls" aria-labelledby="workload-heading" hidden>
-              <div class="panel-heading"><p class="eyebrow">BROWSER FRAME TIMING</p><h3 id="workload-heading">Animated workload</h3></div>
+              <div class="panel-heading"><h3 id="workload-heading">Browser frame timing</h3></div>
               <label class="field-control">Backing scale
                 <select id="workload-scale"><option value="device">Device scale</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select>
               </label>
               <button id="workload-toggle" class="secondary-button" type="button">Start workload</button>
-              <dl class="environment-values">
-                <div><dt>WebGL2</dt><dd id="webgl-status">Checking…</dd></div>
-                <div><dt>Context</dt><dd id="context-status">Unavailable</dd></div>
-                <div><dt>Drawing buffer</dt><dd id="drawing-buffer-size">—</dd></div>
-                <div><dt>Sample</dt><dd id="timing-status">Idle</dd></div>
-              </dl>
-              <div id="timing-results" class="timing-results" hidden>
-                <dl class="environment-values">
-                  <div><dt>FPS</dt><dd id="timing-fps">—</dd></div>
-                  <div><dt>Median interval</dt><dd id="timing-median">—</dd></div>
-                  <div><dt>95th percentile</dt><dd id="timing-p95">—</dd></div>
-                </dl>
-              </div>
-              <details class="measurement-details"><summary>WebGL2 capabilities</summary><pre id="webgl-capabilities">Unavailable.</pre></details>
+              <p id="timing-status" class="stage-footnote">Idle</p>
+              <div id="timing-results" class="timing-results" hidden></div>
             </section>
-            <p class="control-hint">Test Card includes the normal and overdrive comparison samples.</p>
-            <details class="measurement-details renderer-measurement-details"><summary>Browser measurements</summary><dl class="environment-values"><div><dt>Fits in view</dt><dd id="renderer-fit-summary">—</dd></div><div><dt>Canvas / stage</dt><dd id="renderer-rect-summary">—</dd></div><div><dt>Page overflow</dt><dd id="renderer-overflow-summary">—</dd></div><div><dt>Page fullscreen</dt><dd id="renderer-fullscreen-summary">—</dd></div></dl><pre id="renderer-raw-measurements">Measurements are unavailable.</pre></details>
-            <button type="button" class="secondary-button report-button">Copy report</button>
-            <p class="action-status" role="status" aria-live="polite"></p>
-            <textarea class="report-fallback" aria-label="Selectable plain text report" rows="8" readonly hidden></textarea>
+            <details class="measurement-details renderer-measurement-details">
+              <summary>Browser and canvas details</summary>
+              <dl class="environment-values">
+                <div><dt>Test area</dt><dd id="renderer-stage-clipping-summary">—</dd></div>
+                <div><dt>In browser view</dt><dd id="renderer-fit-summary">—</dd></div>
+                <div><dt>Canvas size</dt><dd id="renderer-rect-summary">—</dd></div>
+              </dl>
+              <pre id="renderer-raw-measurements">Measurements are unavailable.</pre>
+            </details>
+            <details class="measurement-details"><summary>WebGL2 capabilities</summary><pre id="webgl-capabilities">Unavailable.</pre></details>
+            <details class="measurement-details"><summary>Recent changes</summary><ol class="measurement-history"><li>No changes recorded.</li></ol></details>
           </aside>
         </div>
       </section>
-      <footer class="workbench-footer"><span>LOCAL DISPLAY DIAGNOSTICS</span><span>01 / 02</span></footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

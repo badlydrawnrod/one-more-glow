@@ -15,7 +15,7 @@ import {
 } from "one-more-glow";
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 import { registerAppServiceWorker } from "./pwa.ts";
-import { backingSize, fitCanvasSize, genericMap, type CanvasSize } from "./calibration-sizing.ts";
+import { fitCanvasSize, genericMap, planBackingAllocation, type CanvasSize } from "./calibration-sizing.ts";
 import { hasEnoughFrameSample, summarizeFrameIntervals, type FrameTimingResult } from "./frame-timing.ts";
 
 registerAppServiceWorker();
@@ -24,20 +24,23 @@ let screen = requireElement(document.querySelector<HTMLCanvasElement>("#screen")
 const environmentScreen = requireElement(document.querySelector<HTMLElement>("#environment-screen"), "#environment-screen");
 const rendererScreen = requireElement(document.querySelector<HTMLElement>("#renderer-screen"), "#renderer-screen");
 const studyStageLabel = requireElement(document.querySelector<HTMLElement>("#study-stage-label"), "#study-stage-label");
+const studyStage = requireElement(document.querySelector<HTMLElement>(".canvas-frame"), ".canvas-frame");
 const screenTabs = [...document.querySelectorAll<HTMLButtonElement>("[data-screen]")];
 const workloadControls = requireElement(document.querySelector<HTMLElement>("#workload-controls"), "#workload-controls");
 const workloadToggle = requireElement(document.querySelector<HTMLButtonElement>("#workload-toggle"), "#workload-toggle");
 const workloadScale = requireElement(document.querySelector<HTMLSelectElement>("#workload-scale"), "#workload-scale");
 const profileControls = requireElement(document.querySelector<HTMLElement>("#profile-controls"), "#profile-controls");
+const profileCompare = requireElement(document.querySelector<HTMLButtonElement>("#profile-compare"), "#profile-compare");
 const profileReset = requireElement(document.querySelector<HTMLButtonElement>("#profile-reset"), "#profile-reset");
 const calibrationViewport = requireElement(document.querySelector<HTMLElement>("#calibration-viewport"), "#calibration-viewport");
 const genericCanvas = requireElement(document.querySelector<HTMLCanvasElement>("#calibration-generic"), "#calibration-generic");
 let omgCanvas = requireElement(document.querySelector<HTMLCanvasElement>("#calibration-omg"), "#calibration-omg");
 const resizeHandle = requireElement(document.querySelector<HTMLButtonElement>("#resize-handle"), "#resize-handle");
 const widthInput = requireElement(document.querySelector<HTMLInputElement>("#manual-width"), "#manual-width");
-const widthRange = requireElement(document.querySelector<HTMLInputElement>("#resize-handle-range"), "#resize-handle-range");
-const autoFitInput = requireElement(document.querySelector<HTMLInputElement>("#auto-fit"), "#auto-fit");
-const presetSelect = requireElement(document.querySelector<HTMLSelectElement>("#calibration-preset"), "#calibration-preset");
+const widthControl = requireElement(document.querySelector<HTMLElement>("#manual-width-control"), "#manual-width-control");
+const robotsReset = requireElement(document.querySelector<HTMLButtonElement>("#use-robots-settings"), "#use-robots-settings");
+const referenceStatus = requireElement(document.querySelector<HTMLElement>("#reference-status"), "#reference-status");
+const sizeModeButtons = document.querySelectorAll<HTMLButtonElement>("[data-size-mode]");
 const backingScaleSelect = requireElement(document.querySelector<HTMLSelectElement>("#backing-scale"), "#backing-scale");
 const ratioWidthInput = requireElement(document.querySelector<HTMLInputElement>("#ratio-width"), "#ratio-width");
 const ratioHeightInput = requireElement(document.querySelector<HTMLInputElement>("#ratio-height"), "#ratio-height");
@@ -47,15 +50,15 @@ const customRatio = requireElement(document.querySelector<HTMLElement>("#custom-
 const genericControls = requireElement(document.querySelector<HTMLElement>("#generic-controls"), "#generic-controls");
 const orientationControl = requireElement(document.querySelector<HTMLElement>("#orientation-control"), "#orientation-control");
 const calibrationError = requireElement(document.querySelector<HTMLElement>("#calibration-error"), "#calibration-error");
+const advancedCalibrationError = requireElement(document.querySelector<HTMLElement>("#advanced-calibration-error"), "#advanced-calibration-error");
 const calibrationModeLabel = requireElement(document.querySelector<HTMLElement>("#calibration-mode-label"), "#calibration-mode-label");
 const canvasSizeValue = requireElement(document.querySelector<HTMLElement>("#canvas-size-value"), "#canvas-size-value");
-const requestedSizeValue = requireElement(document.querySelector<HTMLElement>("#requested-size-value"), "#requested-size-value");
 const backingSizeValue = requireElement(document.querySelector<HTMLElement>("#backing-size-value"), "#backing-size-value");
 const mappingValue = requireElement(document.querySelector<HTMLElement>("#mapping-value"), "#mapping-value");
-const scaleValue = requireElement(document.querySelector<HTMLElement>("#scale-value"), "#scale-value");
 const workbench = requireElement(document.querySelector<HTMLElement>("#workbench"), "#workbench");
 const fullscreenToggle = requireElement(document.querySelector<HTMLButtonElement>("#fullscreen-toggle"), "#fullscreen-toggle");
 let profile: DisplayProfile = { ...DEFAULT_DISPLAY_PROFILE };
+let compareWithDefaults = false;
 
 type CalibrationMode = "omg1" | "generic";
 type MappingMode = "fit" | "stretch";
@@ -65,20 +68,43 @@ let calibrationOrientation: DisplayOrientation = "landscape";
 let targetRatio = 4 / 3;
 let ratioLabel = "4:3";
 let virtualSize: CanvasSize = { width: 1024, height: 768 };
+let automaticSize = true;
 let manualWidth = 1024;
 let lastCssSize: CanvasSize = { width: 1, height: 1 };
-let calibrationRenderer: DisplayRenderer | null = null;
-const omgSurfaces = new Map<DisplayOrientation, { canvas: HTMLCanvasElement; renderer: DisplayRenderer | null }>();
+let calibrationAllocation: ReturnType<typeof planBackingAllocation> | null = null;
+let studyAllocation: ReturnType<typeof planBackingAllocation> | null = null;
+type CalibrationSurface = {
+  canvas: HTMLCanvasElement;
+  context: WebGL2RenderingContext | null;
+  renderer: DisplayRenderer | null;
+  error: string | null;
+};
+const omgSurfaces = new Map<DisplayOrientation, CalibrationSurface>();
+let genericBufferAvailable = false;
 let resizePointer: { id: number; x: number; width: number } | null = null;
 type MeasurementSnapshot = {
   trigger: string;
   timestamp: string;
   screen: "environment" | "renderer";
+  test: string;
+  settings: { sizeMode: "auto" | "manual"; requestedWidth: number | null; canvasAspect: string; mapping: MappingMode }
+    | { orientation: DisplayOrientation; profile: DisplayProfile };
   stage: { left: number; top: number; width: number; height: number };
-  canvas: { left: number; top: number; width: number; height: number; backingWidth: number; backingHeight: number };
-  visibility: { wholeCanvasVisible: boolean; clippedByStage: boolean; viewport: string };
+  canvas: { left: number; top: number; width: number; height: number };
+  visibility: { withinBrowserViewport: boolean; clippedByStage: boolean; viewport: string };
   aspect: { actual: number; target: number };
-  effectiveScale: { x: number; y: number };
+  mapping: string;
+  backing: {
+    policy: string;
+    requestedScale: number;
+    appliedScale: number;
+    requested: CanvasSize;
+    attributes: CanvasSize;
+    buffer: CanvasSize | null;
+    effectiveScale: { x: number; y: number } | null;
+    reasons: string[];
+  };
+  rendering: { backend: "Canvas 2D" | "WebGL2"; status: string };
   pageOverflow: { horizontal: boolean; vertical: boolean; scrollWidth: number; scrollHeight: number };
   display: Record<string, number | string | null>;
   layoutViewport: { width: number; height: number; rootWidth: number; rootHeight: number };
@@ -99,6 +125,17 @@ let orientation: DisplayOrientation = params.get("orientation") === "portrait"
 const requestedScene = params.get("scene");
 const validScenes = ["game", "testcard", "segments", "spacing", "profile"] as const;
 type Scene = (typeof validScenes)[number];
+const studyNames: Record<Scene, string> = {
+  game: "Game scene", testcard: "Test Card", segments: "Segment text · Glyphs",
+  spacing: "Segment text · Spacing", profile: "Display profile",
+};
+const studyCues: Record<Scene, string> = {
+  game: "Start frame timing to compare the same rotating scene at two backing scales.",
+  testcard: "Inspect joins and endpoints, compare curves and transforms, and look for halo changes above 1.0 intensity.",
+  segments: "Compare matching glyphs in the two fonts. The 22-segment chart includes lowercase, punctuation and descenders.",
+  spacing: "Compare the same text at each size. Look for tight punctuation pairs and check whether scores keep their alignment.",
+  profile: "Compare the same beam samples with the edited profile and defaults. Inspect core width, point size and halo.",
+};
 const isScene = (value: string | null): value is Scene => validScenes.some((candidate) => candidate === value);
 const hasExplicitScene = isScene(requestedScene);
 const pagesDefault = import.meta.env.VITE_DEFAULT_SCENE === "testcard";
@@ -116,9 +153,18 @@ let animationFrame: number | undefined;
 let timingIntervals: number[] = [];
 let timingStart: number | null = null;
 let previousFrameTime: number | null = null;
-let timingResult: FrameTimingResult | null = null;
+type TimingConditions = {
+  css: CanvasSize;
+  buffer: CanvasSize;
+  profile: DisplayProfile;
+  orientation: DisplayOrientation;
+  scale: string;
+};
+type TimingRun = { result: FrameTimingResult; conditions: TimingConditions };
+let timingConditions: TimingConditions | null = null;
+let timingSampleComplete = false;
 let lastTimingUiUpdate = 0;
-let capabilityDetails = "WebGL2 capability details are unavailable.";
+const completedTimingRuns: TimingRun[] = [];
 
 function createNullRenderer(): DisplayRenderer {
   return {
@@ -131,55 +177,82 @@ function aspectRatio(): number {
   return orientation === "landscape" ? 4 / 3 : 3 / 4;
 }
 
-function resizeStudyCanvas(): void {
-  const ratio = aspectRatio();
-  const maxWidth = Math.min(window.innerWidth * 0.96, window.innerHeight * 0.92 * ratio);
-  const cssWidth = Math.max(1, Math.min(800, maxWidth));
-  const cssHeight = cssWidth / ratio;
-  const configuredScale = workloadScale.value === "device" ? (window.devicePixelRatio || 1) : Number(workloadScale.value);
-  const requestedScale = Number.isFinite(configuredScale) && configuredScale > 0 ? configuredScale : 1;
-  const allocationScale = Math.min(requestedScale, 8192 / cssWidth, 8192 / cssHeight, Math.sqrt(32_000_000 / (cssWidth * cssHeight)));
+function stageBounds(stage: HTMLElement) {
+  const rect = stage.getBoundingClientRect();
+  return {
+    left: rect.left + stage.clientLeft,
+    top: rect.top + stage.clientTop,
+    width: rect.width - stage.clientLeft * 2,
+    height: rect.height - stage.clientTop * 2,
+  };
+}
 
-  const oldWidth = screen.width;
-  const oldHeight = screen.height;
-  screen.style.width = `${cssWidth}px`;
-  screen.style.height = `${cssHeight}px`;
-  const backingWidth = Math.max(1, Math.round(cssWidth * allocationScale));
-  const backingHeight = Math.max(1, Math.round(cssHeight * allocationScale));
-  if (screen.width !== backingWidth) screen.width = backingWidth;
-  if (screen.height !== backingHeight) screen.height = backingHeight;
-  if (oldWidth !== screen.width || oldHeight !== screen.height) refreshCapabilityDetails();
-  if (oldWidth !== screen.width || oldHeight !== screen.height) resetTimingSample();
+function fitStageToViewport(stage: HTMLElement, ratio: number): CanvasSize {
+  const scroll = document.fullscreenElement === workbench ? workbench.scrollTop : window.scrollY;
+  const rect = stage.getBoundingClientRect();
+  stage.style.setProperty("--stage-height", `${Math.floor(window.innerHeight - rect.top - scroll - 16)}px`);
+  const naturalHeight = (rect.width - 2 * stage.clientLeft) / ratio + 2 * stage.clientTop;
+  stage.style.setProperty("--natural-stage-height", `${Math.ceil(naturalHeight)}px`);
+  return stageBounds(stage);
+}
+
+function sizeCanvas(canvas: HTMLCanvasElement, css: CanvasSize): CanvasSize {
+  canvas.style.width = `${css.width}px`;
+  canvas.style.height = `${css.height}px`;
+  const rect = canvas.getBoundingClientRect();
+  return { width: rect.width, height: rect.height };
+}
+
+function setCanvasBacking(canvas: HTMLCanvasElement, size: CanvasSize): boolean {
+  if (canvas.width === size.width && canvas.height === size.height) return false;
+  if (canvas.width !== size.width) canvas.width = size.width;
+  if (canvas.height !== size.height) canvas.height = size.height;
+  return true;
+}
+
+function resizeStudyCanvas(): void {
+  if (rendererScreen.hidden) return;
+  const stage = fitStageToViewport(studyStage, aspectRatio());
+  const measured = sizeCanvas(screen, fitCanvasSize(stage, aspectRatio(), 800));
+  const configuredScale = scene !== "game" || workloadScale.value === "device" ? (window.devicePixelRatio || 1) : Number(workloadScale.value);
+  const requestedScale = Number.isFinite(configuredScale) && configuredScale > 0 ? configuredScale : 1;
+  studyAllocation = planBackingAllocation(measured, requestedScale);
+  const changed = setCanvasBacking(screen, studyAllocation.applied);
+  const cssChanged = timingConditions && (timingConditions.css.width !== measured.width || timingConditions.css.height !== measured.height);
+  if (changed || cssChanged) resetTimingSample();
 }
 
 function resetTimingSample(): void {
   timingIntervals = [];
   timingStart = null;
   previousFrameTime = null;
-  timingResult = null;
+  timingConditions = null;
+  timingSampleComplete = false;
+  lastTimingUiUpdate = 0;
   renderRendererStatus();
 }
 
 function attachStudyCanvas(canvas: HTMLCanvasElement): void {
   canvas.addEventListener("webglcontextlost", (event) => {
     event.preventDefault();
+    if (canvas !== screen) return;
     contextStatus = "lost";
     rendererError = null;
-    refreshCapabilityDetails();
     resetTimingSample();
     stopAnimation();
-    renderRendererStatus();
+    scheduleMeasurements("WebGL2 context lost");
   });
   canvas.addEventListener("webglcontextrestored", () => {
+    if (canvas !== screen) return;
     const context = canvas.getContext("webgl2", { alpha: true });
+    studyContext = context;
     if (!context) {
       contextStatus = "unavailable";
       rendererError = "WebGL2 context restoration failed.";
       renderer = createNullRenderer();
     } else {
-      studyContext = context;
       try {
-        renderer = createWebGL2Renderer(context, { orientation, profile });
+        renderer = createWebGL2Renderer(context, { orientation, profile: activeDisplayProfile() });
         contextStatus = "ready";
         rendererError = null;
       } catch (error) {
@@ -189,9 +262,8 @@ function attachStudyCanvas(canvas: HTMLCanvasElement): void {
       }
     }
     resetTimingSample();
-    refreshCapabilityDetails();
     renderCurrentScene();
-    renderRendererStatus();
+    scheduleMeasurements("WebGL2 context restored");
   });
 }
 
@@ -200,7 +272,7 @@ function startRenderer(canvas: HTMLCanvasElement): void {
   try {
     studyContext = canvas.getContext("webgl2", { alpha: true });
     if (!studyContext) throw new Error("WebGL2 is unavailable in this browser.");
-    renderer = createWebGL2Renderer(studyContext, { orientation, profile });
+    renderer = createWebGL2Renderer(studyContext, { orientation, profile: activeDisplayProfile() });
     contextStatus = "ready";
     rendererError = null;
   } catch (error) {
@@ -209,12 +281,8 @@ function startRenderer(canvas: HTMLCanvasElement): void {
     contextStatus = "unavailable";
     rendererError = error instanceof Error ? error.message : "WebGL2 could not be initialized.";
   }
-  refreshCapabilityDetails();
   renderRendererStatus();
 }
-
-resizeStudyCanvas();
-startRenderer(screen);
 
 function readWebGLCapabilities(gl: WebGL2RenderingContext): Record<string, unknown> {
   const precision = (shaderType: number): Record<string, number> => {
@@ -242,137 +310,191 @@ function readWebGLCapabilities(gl: WebGL2RenderingContext): Record<string, unkno
   };
 }
 
-function refreshCapabilityDetails(): void {
-  if (!studyContext || contextStatus !== "ready") {
-    capabilityDetails = rendererError ?? (contextStatus === "lost" ? "Context is lost; details will refresh after restoration." : "WebGL2 capability details are unavailable.");
-    return;
+function renderCapabilities(): void {
+  const environmentActive = activeScreen === "environment";
+  const output = document.querySelector(environmentActive ? "#calibration-capabilities" : "#webgl-capabilities");
+  if (!output?.closest("details")?.open) return;
+  const gl = environmentActive ? omgSurfaces.get(calibrationOrientation)?.context : studyContext;
+  try {
+    output.textContent = gl && !gl.isContextLost()
+      ? JSON.stringify(readWebGLCapabilities(gl), null, 2)
+      : "WebGL2 capability details are unavailable.";
+  } catch {
+    output.textContent = "The browser could not provide WebGL2 capability details.";
   }
-  try { capabilityDetails = JSON.stringify(readWebGLCapabilities(studyContext), null, 2); }
-  catch (error) { capabilityDetails = `Capability details unavailable: ${error instanceof Error ? error.message : "browser query failed"}`; }
+}
+
+function timingStatus(): string {
+  if (!animate || scene !== "game") return "Idle";
+  if (activeScreen !== "renderer" || document.hidden) return "Paused · workload hidden";
+  if (!drawingBufferSize(studyContext) || contextStatus !== "ready") return "Paused · WebGL2 buffer unavailable";
+  if (timingSampleComplete) return "Sample complete · workload running";
+  const seconds = timingStart === null || previousFrameTime === null ? 0 : (previousFrameTime - timingStart) / 1000;
+  return `Collecting · ${seconds.toFixed(1)} s · ${timingIntervals.length} intervals (2 s and 30 intervals minimum)`;
 }
 
 function renderRendererStatus(): void {
-  const webgl = document.querySelector<HTMLElement>("#webgl-status");
-  const context = document.querySelector<HTMLElement>("#context-status");
-  const buffer = document.querySelector<HTMLElement>("#drawing-buffer-size");
-  const status = document.querySelector<HTMLElement>("#timing-status");
-  const results = document.querySelector<HTMLElement>("#timing-results");
-  const capabilities = document.querySelector<HTMLElement>("#webgl-capabilities");
-  if (!webgl || !context || !buffer || !status || !results || !capabilities) return;
+  const running = animate && scene === "game" && activeScreen === "renderer";
+  workloadToggle.textContent = running ? "Stop" : "Run frame timing";
+  workloadToggle.disabled = !running && (contextStatus !== "ready" || !drawingBufferSize(studyContext));
+  writeValue("timing-status", timingStatus());
+}
 
-  webgl.textContent = contextStatus === "ready" ? "Started" : contextStatus === "lost" ? "Interrupted" : "Unavailable";
-  context.textContent = contextStatus === "ready" ? "Ready" : contextStatus === "lost" ? "Lost · awaiting restoration" : rendererError ?? "Unavailable";
-  buffer.textContent = studyContext
-    ? `${studyContext.drawingBufferWidth} × ${studyContext.drawingBufferHeight} px (requested ${screen.width} × ${screen.height})`
-    : `${screen.width} × ${screen.height} px requested · unavailable`;
-  capabilities.textContent = capabilityDetails;
+function describeTimingConditions(conditions: TimingConditions): string {
+  return `${dimensions(conditions.css)} CSS px · ${dimensions(conditions.buffer)} px buffer · ${conditions.scale} · ${conditions.orientation} · ${profileSummary(conditions.profile)}`;
+}
 
-  workloadToggle.textContent = animate ? "Stop workload" : "Start workload";
-  results.hidden = timingResult === null;
-  if (!animate) status.textContent = "Idle";
-  else if (timingResult) status.textContent = `Results · ${timingResult.duration.toFixed(0)} ms · ${timingResult.count} intervals`;
-  else if (activeScreen !== "renderer" || document.hidden) status.textContent = "Collecting paused · workload not visible";
-  else status.textContent = contextStatus === "ready"
-    ? `Collecting · ${timingIntervals.length} intervals${timingStart === null ? "" : ` · ${Math.max(0, performance.now() - timingStart).toFixed(0)} ms`}`
-    : "Collecting paused · WebGL2 unavailable";
+function describeTimingResult(result: FrameTimingResult): string[] {
+  return [
+    `Median ${result.median.toFixed(2)} ms · p95 ${result.p95.toFixed(2)} ms`,
+    `${result.fps.toFixed(1)} FPS · ${(result.duration / 1000).toFixed(2)} s · ${result.count} intervals`,
+  ];
+}
 
-  if (timingResult) {
-    const set = (selector: string, value: string): void => {
-      const item = document.querySelector<HTMLElement>(selector);
-      if (item) item.textContent = value;
-    };
-    set("#timing-fps", timingResult.fps.toFixed(1));
-    set("#timing-median", `${timingResult.median.toFixed(2)} ms`);
-    set("#timing-p95", `${timingResult.p95.toFixed(2)} ms`);
+function renderTimingRuns(): void {
+  const container = requireElement(document.getElementById("timing-results"), "#timing-results");
+  container.replaceChildren();
+  container.hidden = completedTimingRuns.length === 0;
+  for (const [index, run] of completedTimingRuns.entries()) {
+    const card = document.createElement("section");
+    card.className = "timing-run";
+    const heading = document.createElement("h4");
+    heading.textContent = index === 0 ? "Latest completed run" : "Previous completed run";
+    const [primary, details] = describeTimingResult(run.result);
+    const metrics = document.createElement("strong");
+    metrics.textContent = primary;
+    const secondary = document.createElement("p");
+    secondary.textContent = details;
+    const conditions = document.createElement("p");
+    conditions.textContent = describeTimingConditions(run.conditions);
+    card.append(heading, metrics, secondary, conditions);
+    container.append(card);
   }
 }
 
+function timingReportLines(): string[] {
+  return [
+    `Browser frame timing: ${timingStatus()}`,
+    ...completedTimingRuns.flatMap((run, index) => [
+      index === 0 ? "Latest completed run" : "Previous completed run",
+      ...describeTimingResult(run.result),
+      describeTimingConditions(run.conditions),
+    ]),
+  ];
+}
+
 function updateTimingSample(time: number): void {
-  if (!animate || activeScreen !== "renderer" || document.hidden || contextStatus !== "ready") return;
-  if (timingStart === null) timingStart = time;
-  if (previousFrameTime !== null && timingResult === null) {
-    timingIntervals.push(time - previousFrameTime);
-    if (timingIntervals.length > 600) timingIntervals.shift();
-    const duration = time - timingStart;
-    if (hasEnoughFrameSample(duration, timingIntervals.length)) {
-      timingResult = summarizeFrameIntervals(timingIntervals, duration);
+  if (timingSampleComplete) return;
+  if (timingStart === null) {
+    const buffer = drawingBufferSize(studyContext);
+    if (!buffer) return;
+    const { width, height } = screen.getBoundingClientRect();
+    const scale = workloadScale.value === "device" ? `Device scale (${window.devicePixelRatio || 1}× requested)` : `${workloadScale.value}× requested`;
+    timingConditions = { css: { width, height }, buffer, profile: { ...profile }, orientation, scale };
+    timingStart = time;
+  }
+  if (previousFrameTime !== null) timingIntervals.push(time - previousFrameTime);
+  previousFrameTime = time;
+  const duration = time - timingStart;
+  if (timingConditions && hasEnoughFrameSample(duration, timingIntervals.length)) {
+    const result = summarizeFrameIntervals(timingIntervals, duration);
+    if (result) {
+      timingSampleComplete = true;
+      completedTimingRuns.unshift({ result, conditions: timingConditions });
+      completedTimingRuns.splice(2);
+      renderTimingRuns();
+    } else {
+      resetTimingSample();
     }
   }
-  previousFrameTime = time;
-  if (time - lastTimingUiUpdate >= 250 || timingResult) {
+  if (time - lastTimingUiUpdate >= 250 || timingSampleComplete) {
     lastTimingUiUpdate = time;
     renderRendererStatus();
   }
 }
 
-function ensureCalibrationRenderer(): DisplayRenderer | null {
-  let surface = omgSurfaces.get(calibrationOrientation);
+function initializeCalibrationSurface(surface: CalibrationSurface, orientation: DisplayOrientation): void {
+  surface.renderer = null;
+  surface.error = null;
+  try {
+    surface.context = surface.canvas.getContext("webgl2", { alpha: true });
+    if (!surface.context) throw new Error("WebGL2 is unavailable in this browser.");
+    surface.renderer = createWebGL2Renderer(surface.context, { orientation });
+  } catch (error) {
+    surface.error = error instanceof Error ? error.message : "WebGL2 could not start.";
+  }
+}
+
+function ensureCalibrationSurface(): CalibrationSurface {
+  const orientation = calibrationOrientation;
+  let surface = omgSurfaces.get(orientation);
   if (!surface) {
-    const canvas = calibrationOrientation === "landscape" ? omgCanvas : document.createElement("canvas");
+    const canvas = orientation === "landscape" ? omgCanvas : document.createElement("canvas");
     canvas.className = "calibration-canvas";
-    canvas.id = calibrationOrientation === "landscape" ? "calibration-omg" : "calibration-omg-portrait";
-    canvas.setAttribute("aria-label", `OMG-1 ${calibrationOrientation} calibration pattern`);
-    let nextRenderer: DisplayRenderer | null = null;
-    try {
-      const context = canvas.getContext("webgl2", { alpha: true });
-      if (context) nextRenderer = createWebGL2Renderer(context, { orientation: calibrationOrientation });
-    } catch {
-      nextRenderer = null;
-    }
-    surface = { canvas, renderer: nextRenderer };
-    omgSurfaces.set(calibrationOrientation, surface);
+    canvas.id = orientation === "landscape" ? "calibration-omg" : "calibration-omg-portrait";
+    canvas.setAttribute("aria-label", `OMG-1 ${orientation} calibration pattern`);
+    const next = { canvas, context: null, renderer: null, error: null };
+    surface = next;
+    omgSurfaces.set(orientation, next);
+    initializeCalibrationSurface(next, orientation);
+    canvas.addEventListener("webglcontextlost", (event) => {
+      event.preventDefault();
+      if (canvas === omgCanvas) scheduleMeasurements("WebGL2 context lost");
+    });
+    canvas.addEventListener("webglcontextrestored", () => {
+      initializeCalibrationSurface(next, orientation);
+      if (canvas === omgCanvas && calibrationMode === "omg1") renderCalibration("WebGL2 context restored");
+    });
   }
   if (omgCanvas !== surface.canvas) {
     omgCanvas.replaceWith(surface.canvas);
     omgCanvas = surface.canvas;
   }
-  calibrationRenderer = surface.renderer;
-  return calibrationRenderer;
+  return surface;
 }
 
 function selectedBackingScale(): number {
-  const dpr = Math.max(0.25, window.devicePixelRatio || 1);
+  const dpr = window.devicePixelRatio || 1;
   const value = backingScaleSelect.value;
   if (value === "robots") return Math.min(dpr, 2);
   if (value === "device") return dpr;
   return Number(value);
 }
 
-function availableCanvasSize(): CanvasSize {
-  return { width: calibrationViewport.clientWidth, height: calibrationViewport.clientHeight };
+function setCalibrationError(message = "", input = widthInput): void {
+  calibrationError.textContent = input === widthInput ? message : "";
+  advancedCalibrationError.textContent = input === widthInput ? "" : message;
 }
 
-function setCalibrationError(message = ""): void {
-  calibrationError.textContent = message;
-}
-
-function boundedValue(input: HTMLInputElement, label: string, maximum: number): number | null {
-  const value = Number(input.value);
-  if (!input.value.trim() || !Number.isFinite(value) || value <= 0) {
-    setCalibrationError(`${label} must be a finite positive number. The previous setting is still active.`);
+function boundedValue(input: HTMLInputElement, label: string): number | null {
+  const value = input.valueAsNumber;
+  if (!Number.isInteger(value) || value < Number(input.min) || value > Number(input.max)) {
+    setCalibrationError(`${label} needs a whole number from ${input.min} to ${input.max}.`, input);
     return null;
   }
-  if (value > maximum) {
-    setCalibrationError(`${label} is limited to ${maximum}. The previous setting is still active.`);
-    return null;
-  }
+  setCalibrationError();
   return value;
 }
 
-function chooseManualPreset(): void {
-  presetSelect.value = "manual";
-}
-
-function drawGenericCalibration(css: CanvasSize, backing: CanvasSize): void {
+function drawGenericCalibration(css: CanvasSize, backing: CanvasSize, backingChanged: boolean): void {
   const ctx = genericCanvas.getContext("2d");
-  if (!ctx) return;
+  if (!ctx || ctx.isContextLost?.()) {
+    genericBufferAvailable = false;
+    return;
+  }
   const dprX = backing.width / css.width;
   const dprY = backing.height / css.height;
-  if (genericCanvas.width !== backing.width) genericCanvas.width = backing.width;
-  if (genericCanvas.height !== backing.height) genericCanvas.height = backing.height;
   ctx.setTransform(dprX, 0, 0, dprY, 0, 0);
   ctx.fillStyle = "#05080e";
   ctx.fillRect(0, 0, css.width, css.height);
+  if (backingChanged || !genericBufferAvailable) {
+    try {
+      genericBufferAvailable = ctx.getImageData(backing.width - 1, backing.height - 1, 1, 1).data[3] !== 0;
+    } catch {
+      genericBufferAvailable = false;
+    }
+    if (!genericBufferAvailable) return;
+  }
   const mapped = genericMap(css, virtualSize, mappingMode);
   ctx.save();
   ctx.translate(mapped.offsetX, mapped.offsetY);
@@ -407,14 +529,8 @@ function drawGenericCalibration(css: CanvasSize, backing: CanvasSize): void {
   ctx.restore();
 }
 
-function drawOmgCalibration(backing: CanvasSize): void {
-  const target = ensureCalibrationRenderer();
-  if (!target) return;
-  if (omgCanvas.width !== backing.width) omgCanvas.width = backing.width;
-  if (omgCanvas.height !== backing.height) omgCanvas.height = backing.height;
-  const logical = calibrationOrientation === "landscape" ? { width: 1024, height: 768 } : { width: 768, height: 1024 };
-  const x = logical.width / 2;
-  const y = logical.height / 2;
+function drawOmgCalibration(target: DisplayRenderer): void {
+  const logical = logicalSize(calibrationOrientation);
   const edgeX = logical.width * 0.44;
   const edgeY = logical.height * 0.44;
   target.beginFrame();
@@ -427,8 +543,8 @@ function drawOmgCalibration(backing: CanvasSize): void {
   target.moveTo(-edgeX, 0); target.lineTo(edgeX, 0); target.moveTo(0, -edgeY); target.lineTo(0, edgeY);
   target.setColor([1, 0.72, 0.3]); target.setIntensity(1);
   const square = Math.min(logical.width, logical.height) * 0.42;
-  target.moveTo(x - square / 2, y - square / 2); target.lineTo(x + square / 2, y - square / 2);
-  target.lineTo(x + square / 2, y + square / 2); target.lineTo(x - square / 2, y + square / 2); target.lineTo(x - square / 2, y - square / 2);
+  target.moveTo(-square / 2, -square / 2); target.lineTo(square / 2, -square / 2);
+  target.lineTo(square / 2, square / 2); target.lineTo(-square / 2, square / 2); target.lineTo(-square / 2, -square / 2);
   drawCircle(target, [0, 0], square * 0.34);
   target.setColor([0.9, 0.4, 1]); target.setIntensity(0.9);
   target.moveTo(-edgeX * 0.88, -edgeY * 0.88); target.lineTo(edgeX * 0.88, edgeY * 0.88);
@@ -439,64 +555,53 @@ function drawOmgCalibration(backing: CanvasSize): void {
   target.endFrame();
 }
 
-function positionResizeHandle(css: CanvasSize): void {
-  const area = availableCanvasSize();
+function positionResizeHandle(css: CanvasSize, area: CanvasSize): void {
   const x = Math.max(12, Math.min(area.width - 12, (area.width + css.width) / 2));
   const y = Math.max(12, Math.min(area.height - 12, (area.height + css.height) / 2));
   resizeHandle.style.left = `${x}px`;
   resizeHandle.style.top = `${y}px`;
 }
 
-function renderCalibration(): void {
+function renderCalibration(trigger = "calibration settings"): void {
   if (environmentScreen.hidden) return;
-  const stage = availableCanvasSize();
+  const stage = fitStageToViewport(calibrationViewport, targetRatio);
   if (stage.width <= 1 || stage.height <= 1) return;
-  const automatic = autoFitInput.checked;
-  const cap = presetSelect.value === "robots" ? 1024 : 4096;
-  const css = automatic ? fitCanvasSize(stage, targetRatio, cap) : { width: manualWidth, height: manualWidth / targetRatio };
+  const css = automaticSize ? fitCanvasSize(stage, targetRatio, 1024) : { width: manualWidth, height: manualWidth / targetRatio };
   const scale = selectedBackingScale();
-  for (const canvas of [genericCanvas, omgCanvas]) {
-    canvas.style.width = `${css.width}px`;
-    canvas.style.height = `${css.height}px`;
-  }
+  const surface = calibrationMode === "omg1" ? ensureCalibrationSurface() : null;
   genericCanvas.hidden = calibrationMode !== "generic";
   omgCanvas.hidden = calibrationMode !== "omg1";
-  const measuredRect = (calibrationMode === "generic" ? genericCanvas : omgCanvas).getBoundingClientRect();
-  const measured: CanvasSize = { width: measuredRect.width, height: measuredRect.height };
-  const backing = backingSize(measured, scale);
-  if (backing.width > 8192 || backing.height > 8192 || backing.width * backing.height > 32_000_000) {
-    setCalibrationError("The requested backing buffer exceeds the 32 megapixel allocation limit.");
-    return;
-  }
-  setCalibrationError();
+  const activeCanvas = surface?.canvas ?? genericCanvas;
+  const measured = sizeCanvas(activeCanvas, css);
+  calibrationAllocation = planBackingAllocation(measured, scale);
+  const backingChanged = setCanvasBacking(activeCanvas, calibrationAllocation.applied);
   lastCssSize = measured;
-  if (calibrationMode === "generic") {
-    drawGenericCalibration(measured, backing);
+  if (surface) {
+    if (surface.renderer && drawingBufferSize(surface.context)) drawOmgCalibration(surface.renderer);
   } else {
-    drawOmgCalibration(backing);
+    drawGenericCalibration(measured, calibrationAllocation.applied, backingChanged);
   }
-  positionResizeHandle(measured);
-  requestedSizeValue.textContent = `${css.width.toFixed(1)} × ${css.height.toFixed(1)} CSS px`;
-  canvasSizeValue.textContent = `${measured.width.toFixed(1)} × ${measured.height.toFixed(1)} CSS px`;
-  const activeCanvas = calibrationMode === "generic" ? genericCanvas : omgCanvas;
-  backingSizeValue.textContent = `${activeCanvas.width} × ${activeCanvas.height} px`;
-  mappingValue.textContent = calibrationMode === "omg1" ? `${logicalExtent()} logical · ${ratioLabel} canvas` : `${virtualSize.width} × ${virtualSize.height} · ${mappingMode}`;
-  scaleValue.textContent = `${scale.toFixed(2)}×${backingScaleSelect.value === "robots" ? " · cap 2" : backingScaleSelect.value === "device" ? " · device" : " · manual"}`;
-  widthInput.value = `${Math.round(css.width)}`;
-  widthRange.value = `${Math.max(64, Math.min(4096, Math.round(css.width)))}`;
-  calibrationModeLabel.textContent = `${calibrationMode === "omg1" ? "OMG-1" : "GENERIC"} / ${calibrationOrientation.toUpperCase()}`;
-  scheduleMeasurements("settings");
+  positionResizeHandle(measured, stage);
+  if (automaticSize) widthInput.value = String(Math.round(measured.width));
+  calibrationModeLabel.textContent = calibrationMode === "omg1" ? `OMG-1 / ${calibrationOrientation.toUpperCase()}` : "CANVAS 2D";
+  scheduleMeasurements(trigger);
 }
 
-function logicalExtent(): string {
-  return calibrationOrientation === "landscape" ? "1024 × 768" : "768 × 1024";
+function logicalSize(orientation: DisplayOrientation): CanvasSize {
+  return orientation === "landscape" ? { width: 1024, height: 768 } : { width: 768, height: 1024 };
+}
+
+function drawingBufferSize(context: WebGL2RenderingContext | null): CanvasSize | null {
+  if (!context || context.isContextLost()) return null;
+  const { drawingBufferWidth: width, drawingBufferHeight: height } = context;
+  return width > 0 && height > 0 ? { width, height } : null;
 }
 
 function roundMeasurement(value: number): number {
   return Math.round(value * 100) / 100;
 }
 
-function rectSnapshot(rect: DOMRect): { left: number; top: number; width: number; height: number } {
+function rectSnapshot(rect: { left: number; top: number; width: number; height: number }): typeof rect {
   return { left: roundMeasurement(rect.left), top: roundMeasurement(rect.top), width: roundMeasurement(rect.width), height: roundMeasurement(rect.height) };
 }
 
@@ -505,43 +610,73 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
   const canvas = environmentActive
     ? calibrationMode === "generic" ? genericCanvas : omgCanvas
     : screen;
-  const stage = environmentActive
-    ? calibrationViewport
-    : requireElement(document.querySelector<HTMLElement>(".canvas-frame"), ".canvas-frame");
+  const stage = environmentActive ? calibrationViewport : studyStage;
+  const allocation = environmentActive ? calibrationAllocation : studyAllocation;
+  if (!allocation) return null;
   const canvasRect = canvas.getBoundingClientRect();
-  const stageRect = stage.getBoundingClientRect();
+  const stageRect = stageBounds(stage);
   if (canvasRect.width <= 0 || canvasRect.height <= 0 || stageRect.width <= 0 || stageRect.height <= 0) return null;
+  const containingStage = { ...stageRect, right: stageRect.left + stageRect.width, bottom: stageRect.top + stageRect.height };
   const visual = window.visualViewport;
   const viewportBounds = visual
     ? { left: visual.offsetLeft, top: visual.offsetTop, right: visual.offsetLeft + visual.width, bottom: visual.offsetTop + visual.height, label: "visual viewport" }
     : { left: 0, top: 0, right: document.documentElement.clientWidth, bottom: document.documentElement.clientHeight, label: "layout viewport" };
-  const visibleBounds = {
-    left: Math.max(stageRect.left, viewportBounds.left),
-    top: Math.max(stageRect.top, viewportBounds.top),
-    right: Math.min(stageRect.right, viewportBounds.right),
-    bottom: Math.min(stageRect.bottom, viewportBounds.bottom),
+  const isInside = (bounds: { left: number; top: number; right: number; bottom: number }): boolean => {
+    const tolerance = 0.05;
+    return canvasRect.left >= bounds.left - tolerance && canvasRect.top >= bounds.top - tolerance
+      && canvasRect.right <= bounds.right + tolerance && canvasRect.bottom <= bounds.bottom + tolerance;
   };
-  const clippedByStage = canvasRect.left < stageRect.left || canvasRect.top < stageRect.top || canvasRect.right > stageRect.right || canvasRect.bottom > stageRect.bottom;
-  const wholeCanvasVisible = canvasRect.left >= visibleBounds.left && canvasRect.top >= visibleBounds.top
-    && canvasRect.right <= visibleBounds.right && canvasRect.bottom <= visibleBounds.bottom;
+  const generic = environmentActive && calibrationMode === "generic";
+  const surface = environmentActive ? omgSurfaces.get(calibrationOrientation) : undefined;
+  const gl = environmentActive ? surface?.context ?? null : studyContext;
+  const rendererReady = environmentActive ? !!surface?.renderer : contextStatus === "ready";
+  const attributes = { width: canvas.width, height: canvas.height };
+  const buffer = generic && genericBufferAvailable ? attributes : generic || !rendererReady ? null : drawingBufferSize(gl);
+  const renderingError = environmentActive ? surface?.error : rendererError;
+  const status = buffer ? "Ready"
+    : generic ? "Canvas 2D buffer unavailable"
+    : gl?.isContextLost() || (!environmentActive && contextStatus === "lost") ? "Context lost · awaiting restoration"
+    : renderingError ?? "Drawing buffer unavailable";
+  const dpr = window.devicePixelRatio || 1;
+  const choice = environmentActive ? backingScaleSelect.value : scene === "game" ? workloadScale.value : "device";
+  const requestedScale = choice === "robots" ? Math.min(dpr, 2) : choice === "device" ? dpr : Number(choice);
+  const policy = choice === "robots" ? "Device scale (max 2×)" : choice === "device" ? "Device scale" : "Manual scale";
+  const reasons: string[] = [];
+  if (choice === "robots" && dpr > 2) reasons.push(`Device scale ${dpr.toFixed(2)}× capped at 2×`);
+  if (choice !== "robots" && choice !== "device" && requestedScale !== dpr) reasons.push(`Manual scale at ${dpr.toFixed(2)}× DPR`);
+  if (allocation.limit) reasons.push(allocation.limit);
+  if (buffer && (buffer.width !== attributes.width || buffer.height !== attributes.height)) reasons.push("Browser allocated a different buffer");
+  if (!allocation.limit && (Math.abs(attributes.width - canvasRect.width * requestedScale) > 0.01
+    || Math.abs(attributes.height - canvasRect.height * requestedScale) > 0.01)) reasons.push("Rounded to whole backing pixels");
+  const logical = generic ? virtualSize : logicalSize(environmentActive ? calibrationOrientation : orientation);
+  const map = genericMap(canvasRect, logical, generic ? mappingMode : "fit");
+  const mapping = generic && mappingMode === "stretch" && Math.abs(canvasRect.width - canvasRect.height * logical.width / logical.height) > 0.5
+    ? (map.scaleX > map.scaleY ? "Stretched wider" : "Stretched taller")
+    : map.offsetX > 0.25 ? "Proportions preserved · side bars"
+    : map.offsetY > 0.25 ? "Proportions preserved · top and bottom bars" : "Proportions preserved";
   const actualRatio = canvasRect.width / canvasRect.height;
   const target = environmentActive ? targetRatio : aspectRatio();
   const root = document.documentElement;
   const screenOrientation = window.screen.orientation;
-  const dpr = window.devicePixelRatio || 1;
   return {
     trigger,
     timestamp: new Date().toISOString(),
     screen: activeScreen,
+    test: environmentActive ? generic ? "Canvas 2D calibration" : `OMG-1 calibration · ${calibrationOrientation}` : studyNames[scene],
+    settings: environmentActive
+      ? { sizeMode: automaticSize ? "auto" : "manual", requestedWidth: automaticSize ? null : manualWidth, canvasAspect: ratioLabel, mapping: generic ? mappingMode : "fit" }
+      : { orientation, profile: activeDisplayProfile() },
     stage: rectSnapshot(stageRect),
-    canvas: {
-      ...rectSnapshot(canvasRect),
-      backingWidth: canvas.width,
-      backingHeight: canvas.height,
+    canvas: rectSnapshot(canvasRect),
+    visibility: { withinBrowserViewport: isInside(viewportBounds), clippedByStage: !isInside(containingStage), viewport: viewportBounds.label },
+    aspect: { actual: roundMeasurement(actualRatio * 100) / 100, target: roundMeasurement(target * 100) / 100 },
+    mapping: `${mapping} · ${logical.width} × ${logical.height} content`,
+    backing: {
+      policy, requestedScale, appliedScale: allocation.scale, requested: allocation.requested, attributes, buffer,
+      effectiveScale: buffer ? { x: roundMeasurement(buffer.width / canvasRect.width), y: roundMeasurement(buffer.height / canvasRect.height) } : null,
+      reasons,
     },
-    visibility: { wholeCanvasVisible, clippedByStage, viewport: viewportBounds.label },
-    aspect: { actual: roundMeasurement(actualRatio), target: roundMeasurement(target) },
-    effectiveScale: { x: roundMeasurement(canvas.width / canvasRect.width), y: roundMeasurement(canvas.height / canvasRect.height) },
+    rendering: { backend: generic ? "Canvas 2D" : "WebGL2", status },
     pageOverflow: {
       horizontal: root.scrollWidth > root.clientWidth,
       vertical: root.scrollHeight > root.clientHeight,
@@ -569,37 +704,58 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
   };
 }
 
+function dimensions(size: CanvasSize): string {
+  return `${size.width} × ${size.height}`;
+}
+
+function backingSummary(backing: MeasurementSnapshot["backing"]): string {
+  const request = `${dimensions(backing.requested)} px requested at ${backing.requestedScale.toFixed(2)}×`;
+  if (!backing.buffer || !backing.effectiveScale) return ["Buffer unavailable", request, ...backing.reasons].join(" · ");
+  const { x, y } = backing.effectiveScale;
+  const effective = x === y ? `${x.toFixed(2)}×` : `${x.toFixed(2)}× / ${y.toFixed(2)}×`;
+  const buffer = `${dimensions(backing.buffer)} px · ${effective} effective`;
+  const changed = backing.buffer.width !== backing.requested.width || backing.buffer.height !== backing.requested.height;
+  const roundingVisible = Math.abs(x - backing.requestedScale) >= 0.01 || Math.abs(y - backing.requestedScale) >= 0.01;
+  const reasons = backing.reasons.filter((reason) => roundingVisible || reason !== "Rounded to whole backing pixels");
+  return [buffer, ...(changed ? [request] : []), ...reasons].join(" · ");
+}
+
 function conciseMeasurement(snapshot: MeasurementSnapshot): string {
-  return `${snapshot.canvas.width} × ${snapshot.canvas.height} CSS px at ${snapshot.canvas.left}, ${snapshot.canvas.top}; ${snapshot.canvas.backingWidth} × ${snapshot.canvas.backingHeight} px; fit ${snapshot.visibility.wholeCanvasVisible ? "yes" : "no"}; DPR ${snapshot.display.devicePixelRatio}`;
+  const { canvas, backing, visibility } = snapshot;
+  return `${snapshot.test} · ${dimensions(canvas)} CSS px at ${canvas.left}, ${canvas.top} · ${backing.buffer ? dimensions(backing.buffer) : "buffer unavailable"} · ${visibility.clippedByStage ? "stage clipped" : "inside stage"} · ${visibility.withinBrowserViewport ? "in view" : "outside view"} · DPR ${snapshot.display.devicePixelRatio}`;
+}
+
+function writeValue(id: string, text: string): void {
+  const element = requireElement(document.getElementById(id), id);
+  if (element.textContent !== text) element.textContent = text;
 }
 
 function renderMeasurement(snapshot: MeasurementSnapshot): void {
-  const fit = snapshot.visibility.wholeCanvasVisible ? "Yes" : `No${snapshot.visibility.clippedByStage ? " · stage clipped" : ""}`;
-  const ratio = `${snapshot.aspect.actual.toFixed(3)} / ${snapshot.aspect.target.toFixed(3)}`;
-  const stage = `${snapshot.stage.width.toFixed(0)} × ${snapshot.stage.height.toFixed(0)} CSS px`;
-  const effective = `${snapshot.effectiveScale.x.toFixed(2)}× / ${snapshot.effectiveScale.y.toFixed(2)}×`;
-  const orientationText = `${snapshot.display.devicePixelRatio}× / ${snapshot.orientation.viewport}${snapshot.orientation.screenType ? ` · ${snapshot.orientation.screenType}` : ""}`;
-  const overflow = `H ${snapshot.pageOverflow.horizontal ? "yes" : "no"} · V ${snapshot.pageOverflow.vertical ? "yes" : "no"}`;
+  const testArea = snapshot.visibility.clippedByStage ? "Canvas clipped" : "Canvas fits";
+  const browser = snapshot.visibility.withinBrowserViewport ? "Whole canvas in view" : "Canvas extends outside view";
+  const css = `${dimensions(snapshot.canvas)} CSS px`;
+  const backing = backingSummary(snapshot.backing);
   if (snapshot.screen === "environment") {
-    requireElement(document.querySelector<HTMLElement>("#fit-summary"), "#fit-summary").textContent = fit;
-    requireElement(document.querySelector<HTMLElement>("#ratio-summary"), "#ratio-summary").textContent = ratio;
-    requireElement(document.querySelector<HTMLElement>("#stage-summary"), "#stage-summary").textContent = stage;
-    requireElement(document.querySelector<HTMLElement>("#effective-scale-summary"), "#effective-scale-summary").textContent = effective;
-    requireElement(document.querySelector<HTMLElement>("#display-summary"), "#display-summary").textContent = orientationText;
-    requireElement(document.querySelector<HTMLElement>("#overflow-summary"), "#overflow-summary").textContent = overflow;
-    requireElement(document.querySelector<HTMLElement>("#fullscreen-summary"), "#fullscreen-summary").textContent = snapshot.fullscreen.active ? "Active" : "Off";
-    requireElement(document.querySelector<HTMLElement>("#raw-measurements"), "#raw-measurements").textContent = JSON.stringify(snapshot, null, 2);
+    writeValue("stage-clipping-summary", testArea);
+    writeValue("fit-summary", browser);
+    mappingValue.textContent = snapshot.mapping;
+    canvasSizeValue.textContent = css;
+    backingSizeValue.textContent = backing;
+    writeValue("calibration-rendering-status", `${snapshot.rendering.backend} · ${snapshot.rendering.status}`);
+    writeValue("raw-measurements", JSON.stringify(snapshot, null, 2));
   } else {
-    requireElement(document.querySelector<HTMLElement>("#renderer-fit-summary"), "#renderer-fit-summary").textContent = fit;
-    requireElement(document.querySelector<HTMLElement>("#renderer-rect-summary"), "#renderer-rect-summary").textContent = `${snapshot.canvas.width} × ${snapshot.canvas.height} / ${stage}`;
-    requireElement(document.querySelector<HTMLElement>("#renderer-overflow-summary"), "#renderer-overflow-summary").textContent = overflow;
-    requireElement(document.querySelector<HTMLElement>("#renderer-fullscreen-summary"), "#renderer-fullscreen-summary").textContent = snapshot.fullscreen.active ? "Active" : "Off";
-    requireElement(document.querySelector<HTMLElement>("#renderer-raw-measurements"), "#renderer-raw-measurements").textContent = JSON.stringify(snapshot, null, 2);
+    writeValue("renderer-stage-clipping-summary", testArea);
+    writeValue("renderer-fit-summary", browser);
+    writeValue("renderer-rect-summary", css);
+    writeValue("context-status", snapshot.rendering.status);
+    writeValue("drawing-buffer-size", backing);
+    writeValue("renderer-raw-measurements", JSON.stringify(snapshot, null, 2));
   }
+  renderCapabilities();
 }
 
 function renderHistory(): void {
-  for (const list of document.querySelectorAll<HTMLOListElement>("#measurement-history")) {
+  for (const list of document.querySelectorAll<HTMLOListElement>(".measurement-history")) {
     list.replaceChildren();
     if (measurementHistory.length === 0) {
       const empty = document.createElement("li");
@@ -656,51 +812,37 @@ async function toggleFullscreen(): Promise<void> {
 
 function createReport(): string {
   const snapshot = collectMeasurement("report");
-  if (snapshot) {
-    previousMeasurement = snapshot;
-    renderMeasurement(snapshot);
-  }
-  const frameTiming = !animate
-    ? "Idle"
-    : timingResult
-      ? `Results · ${timingResult.fps.toFixed(1)} FPS · median ${timingResult.median.toFixed(2)} ms · p95 ${timingResult.p95.toFixed(2)} ms · ${timingResult.duration.toFixed(0)} ms · ${timingResult.count} intervals`
-      : contextStatus !== "ready" || activeScreen !== "renderer" || document.hidden
-        ? `Collecting paused · ${timingIntervals.length} intervals`
-        : `Collecting · ${timingIntervals.length} intervals`;
+  if (!snapshot) return "One More Glow · Diagnostics report\nActive canvas measurements are unavailable.";
+  renderMeasurement(snapshot);
   return [
-    "One More Glow · Diagnostics report",
-    `Captured: ${new Date().toISOString()}`,
-    `Screen: ${activeScreen}`,
-    `Study: ${scene}${scene === "game" ? ` · animation ${animate ? "on" : "off"}` : ""}`,
-    `Workload backing scale: ${workloadScale.value === "device" ? `device (${(window.devicePixelRatio || 1).toFixed(2)}×)` : `${workloadScale.value}×`}`,
-    `WebGL2: ${contextStatus === "ready" ? "started · context ready" : contextStatus === "lost" ? "context lost" : `unavailable${rendererError ? ` · ${rendererError}` : ""}`}`,
-    `Requested drawing buffer: ${screen.width} × ${screen.height} px`,
-    `Actual drawing buffer: ${studyContext && contextStatus === "ready" ? `${studyContext.drawingBufferWidth} × ${studyContext.drawingBufferHeight} px` : "unavailable"}`,
-    `Workload: ${scene === "game" ? `rotating Game scene · ${animate ? "running" : "stopped"}` : "inactive for selected study"}`,
-    `Frame timing: ${frameTiming}`,
-    "WebGL2 capabilities:",
-    studyContext && contextStatus === "ready" ? JSON.stringify(readWebGLCapabilities(studyContext), null, 2) : "Unavailable.",
-    `Calibration: ${calibrationMode} · ${calibrationOrientation} · ${ratioLabel} · ${autoFitInput.checked ? "auto fit" : `manual ${manualWidth} CSS px`}`,
-    `Mapping: ${mappingMode} · virtual ${virtualSize.width} × ${virtualSize.height} · backing choice ${backingScaleSelect.value}`,
-    `Display profile: beam ${profile.lineWidth}, point ${profile.pointRadius}, glow ${profile.glowStrength}, spread ${profile.glowSpread}`,
+    `One More Glow · ${snapshot.test}`,
+    `Captured: ${snapshot.timestamp}`,
+    `Test area: ${snapshot.visibility.clippedByStage ? "Canvas clipped" : "Canvas fits"}`,
+    `Browser view: ${snapshot.visibility.withinBrowserViewport ? "Whole canvas in view" : "Canvas extends outside view"}`,
+    `Canvas: ${dimensions(snapshot.canvas)} CSS px`,
+    `Mapping: ${snapshot.mapping}`,
+    `Backing resolution: ${backingSummary(snapshot.backing)}`,
+    `Rendering: ${snapshot.rendering.backend} · ${snapshot.rendering.status}`,
+    ...(snapshot.screen === "renderer" ? [`Display profile: ${profileSummary()}`] : []),
+    ...(snapshot.screen === "renderer" && scene === "game" ? timingReportLines() : []),
     "",
-    "Browser measurements:",
-    snapshot ? JSON.stringify(snapshot, null, 2) : "Unavailable: active canvas or stage has no measurable area.",
-    "",
-    "Recent changes:",
-    ...(measurementHistory.length ? measurementHistory.map((entry) => `${entry.time} · ${entry.trigger}: ${entry.before} -> ${entry.after}`) : ["No changes recorded."]),
+    "Browser and canvas details:",
+    JSON.stringify(snapshot, null, 2),
   ].join("\n");
 }
 
 fullscreenToggle.addEventListener("click", () => void toggleFullscreen());
 document.addEventListener("fullscreenchange", () => {
   updateFullscreenControl();
+  renderCalibration();
+  resizeStudyCanvas();
+  renderCurrentScene();
   scheduleMeasurements("fullscreen");
 });
 
 for (const button of document.querySelectorAll<HTMLButtonElement>(".report-button")) {
   button.addEventListener("click", async () => {
-    const panel = button.closest<HTMLElement>(".panel");
+    const panel = button.closest<HTMLElement>(".panel, .study-report");
     const status = panel?.querySelector<HTMLElement>(".action-status");
     const fallback = panel?.querySelector<HTMLTextAreaElement>(".report-fallback");
     const report = createReport();
@@ -742,118 +884,87 @@ function point(x: number, y: number): void {
 }
 
 function drawTestCard(): void {
+  const { width, height } = logicalSize(orientation);
+  const w = (fraction: number): number => width * fraction;
+  const h = (fraction: number): number => height * fraction;
+  const left = w(-0.41);
+  const right = w(0.41);
+  const heading = (label: string, y: number): void => {
+    renderer.setColor(amber);
+    renderer.setIntensity(0.72);
+    drawText(renderer, label, left, y, { font: "segment16", height: w(0.027) });
+  };
+  const rule = (y: number): void => {
+    renderer.setColor(cyan);
+    renderer.setIntensity(0.15);
+    renderer.moveTo(left, y);
+    renderer.lineTo(right, y);
+  };
+
   renderer.beginFrame();
-  renderer.pushTransform();
-  renderer.translate(...project(0, 115));
-  renderer.scale(0.65, 0.65);
-
-  // A dim frame gives the samples a shared boundary without competing with them.
-  renderer.setColor(cyan);
-  renderer.setIntensity(0.25);
-  drawPolygonOutline(renderer, [
-    [-470, -330], [470, -330], [470, 330], [-470, 330],
-  ].map(([x, y]) => project(x, y)));
-
-  // Open connected paths, stepping down in intensity.
-  renderer.setColor(magenta);
-  for (const [intensity, y] of [[1, 220], [0.75, 145], [0.5, 70], [0.25, -5]]) {
+  heading("JOINS AND ENDPOINTS", h(0.36));
+  const joinsY = h(0.237);
+  for (const [intensity, y] of [[1, joinsY], [0.55, joinsY - h(0.076)]]) {
     renderer.setIntensity(intensity);
+    renderer.setColor(magenta);
     drawPolyline(renderer, [
-      [-430, y - 28], [-385, y + 28], [-340, y - 28], [-295, y + 28],
-    ].map(([x, py]) => project(x, py)));
-  }
-
-  // Closed outlines use the same geometry at matching intensity steps.
-  renderer.setColor(green);
-  for (const [intensity, y] of [[1, 220], [0.75, 145], [0.5, 70], [0.25, -5]]) {
-    renderer.setIntensity(intensity);
+      [left, y - h(0.022)], [w(-0.35), y + h(0.022)],
+      [w(-0.29), y - h(0.022)], [w(-0.23), y + h(0.022)],
+    ]);
+    renderer.setColor(green);
     drawPolygonOutline(renderer, [
-      [295, y + 28], [430, y + 28], [412, y - 28], [313, y - 28],
-    ].map(([x, py]) => project(x, py)));
+      [w(-0.1), y + h(0.024)], [w(0.10), y + h(0.024)],
+      [w(0.07), y - h(0.024)], [w(-0.07), y - h(0.024)],
+    ]);
   }
-
-  // A central beam study: line crossing a closed vector shape and a point.
   renderer.setColor(amber);
-  renderer.setIntensity(0.75);
-  drawPolygonOutline(renderer, [
-    [-78, -72], [0, 108], [78, -72],
-  ].map(([x, y]) => project(x, y)));
+  renderer.setIntensity(0.8);
+  drawPolygonOutline(renderer, [[w(0.23), h(0.146)], [w(0.30), h(0.28)], [w(0.37), h(0.146)]]);
   renderer.setColor(cyan);
   renderer.setIntensity(1);
-  move(-178, 15);
-  line(178, 15);
-  point(0, 15);
+  renderer.moveTo(w(0.19), h(0.198));
+  renderer.lineTo(right, h(0.198));
+  renderer.point(w(0.3), h(0.198));
 
-  // A small local-coordinate craft row shows translation, rotation and scaling.
+  rule(h(0.105));
+  heading("CURVES AND TRANSFORMS", h(0.042));
+  const curvesY = h(-0.078);
+  renderer.setIntensity(0.8);
   renderer.setColor(amber);
-  for (const [x, angle, size] of [[-150, -25, 0.8], [0, 0, 1], [150, 25, 1.2]]) {
+  drawCircle(renderer, [w(-0.34), curvesY], w(0.038));
+  renderer.setColor(magenta);
+  drawArc(renderer, [w(-0.34), curvesY], w(0.056), 24, 154);
+  renderer.setColor(green);
+  drawEllipse(renderer, [w(-0.14), curvesY], w(0.052), w(0.03));
+  renderer.setColor(cyan);
+  drawEllipseArc(renderer, [w(-0.14), curvesY], w(0.067), w(0.045), 204, 336);
+  renderer.setColor(amber);
+  for (const [x, angle, scale] of [[0.09, -22, 0.8], [0.22, 0, 1], [0.36, 22, 1.25]]) {
     renderer.pushTransform();
-    renderer.translate(...project(x, 205));
+    renderer.translate(w(x), curvesY);
     renderer.rotate(angle);
-    renderer.scale(size, size);
-    drawPolygonOutline(renderer, [
-      [0, 30], [-18, -20], [0, -10], [18, -20],
-    ]);
+    renderer.scale(scale, scale);
+    drawPolygonOutline(renderer, [[0, w(0.035)], [w(-0.024), w(-0.025)], [0, w(-0.012)], [w(0.024), w(-0.025)]]);
     renderer.popTransform();
   }
 
-  // Short line and point samples show three distinct intensity levels.
-  renderer.setColor(cyan);
-  for (const [intensity, y] of [[0.25, -170], [0.6, -225], [1, -280]]) {
-    renderer.setIntensity(intensity);
-    move(-430, y);
-    line(-270, y);
-    point(-238, y);
-  }
-
-  renderer.setIntensity(0.75);
-  renderer.setColor(amber);
-  drawCircle(renderer, project(-75, -215), 43);
-  renderer.setColor(green);
-  const ellipseRadii: readonly [number, number] = orientation === "portrait" ? [40, 72] : [72, 40];
-  drawEllipse(renderer, project(75, -215), ...ellipseRadii);
-
-  // Open arcs contrast with the closed circle and ellipse outlines.
-  renderer.setColor(magenta);
-  renderer.setIntensity(0.8);
-  drawArc(renderer, project(-75, -215), 58, 25, 155);
-  renderer.setColor(cyan);
-  const arcRadii: readonly [number, number] = orientation === "portrait" ? [52, 86] : [86, 52];
-  drawEllipseArc(renderer, project(75, -215), arcRadii[0], arcRadii[1], 205, 335);
-
-  // Nested rectangles make the high-intensity halo response easy to compare.
-  renderer.setColor(cyan);
-  for (const [intensity, inset] of [[1, 0], [0.75, 16], [0.5, 32], [0.25, 48]]) {
-    renderer.setIntensity(intensity);
-    drawPolygonOutline(renderer, [
-      [210 + inset, -115 - inset],
-      [450 - inset, -115 - inset],
-      [450 - inset, -310 + inset],
-      [210 + inset, -310 + inset],
-    ].map(([x, y]) => project(x, y)));
-  }
-
-  renderer.popTransform();
-
-  // Keep geometry and colours constant to make the overdrive response visible.
-  const intensities = [0.5, 1, 1.25, 1.5, 2];
-  intensities.forEach((intensity, index) => {
-    const x = -440 + index * 180;
-    renderer.setColor([0.75, 0.8, 0.85]);
+  rule(h(-0.175));
+  heading("OVERDRIVE", h(-0.238));
+  for (const [index, intensity] of [0.5, 1, 1.25, 1.5, 2].entries()) {
+    const x = left + index * w(0.178);
+    renderer.setColor([0.7, 0.82, 0.85]);
     renderer.setIntensity(0.8);
-    const [labelX, labelY] = project(x, -150);
-    drawText(renderer, intensity.toFixed(intensity === 1.25 ? 2 : 1), labelX, labelY, {
-      font: "segment16", height: 20,
+    drawText(renderer, intensity.toFixed(intensity === 1.25 ? 2 : 1), x, h(-0.325), {
+      font: "segment16", height: w(0.023),
     });
-    for (const [color, y] of [[cyan, -190], [magenta, -260]] as const) {
+    for (const [color, y] of [[cyan, h(-0.378)], [magenta, h(-0.432)]] as const) {
       renderer.setColor(color);
       renderer.setIntensity(intensity);
-      move(x, y);
-      line(x + 100, y);
-      point(x + 130, y);
+      renderer.moveTo(x, y);
+      renderer.lineTo(x + w(0.085), y);
+      renderer.point(x + w(0.111), y);
     }
-  });
-
+  }
   renderer.endFrame();
 }
 
@@ -972,59 +1083,42 @@ function drawDiagnostic(): void {
 }
 
 function drawProfileStudy(): void {
-  const width = orientation === "portrait" ? 768 : 1024;
-  const height = orientation === "portrait" ? 1024 : 768;
-  const x = -width * 0.35;
-  const right = width * 0.35;
-  const textHeight = width * 0.024;
-  const rows = [
-    { label: "BEAM WIDTH", key: "lineWidth", min: 0.5, max: 4, y: 0.25 },
-    { label: "POINT RADIUS", key: "pointRadius", min: 0.5, max: 4, y: 0.38 },
-    { label: "GLOW STRENGTH", key: "glowStrength", min: 0, max: 2, y: 0.51 },
-    { label: "GLOW SPREAD", key: "glowSpread", min: 0.5, max: 2, y: 0.64 },
-  ] as const;
-  const atY = (fraction: number): number => (0.5 - fraction) * height;
+  const { width, height } = logicalSize(orientation);
+  const left = -width * 0.43;
+  const right = width * 0.07;
+  const upper = height * 0.23;
+  const lower = -height * 0.21;
+  const labelSize = width * 0.026;
+  const label = (text: string, x: number, y: number): void => {
+    renderer.setColor(amber);
+    renderer.setIntensity(0.75);
+    drawText(renderer, text, x, y, { font: "segment16", height: labelSize });
+    renderer.setColor(cyan);
+    renderer.setIntensity(1);
+  };
 
   renderer.beginFrame();
-  renderer.setColor(cyan);
-  renderer.setIntensity(1);
-  drawText(renderer, "DISPLAY PROFILE", x, atY(0.12), { font: "segment16", height: textHeight * 1.25 });
-  for (const row of rows) {
-    const y = atY(row.y);
-    renderer.setColor(amber);
-    renderer.setIntensity(1);
-    drawText(renderer, `${row.label} ${profile[row.key].toFixed(1)}`, x, atY(row.y - 0.045), { font: "segment16", height: textHeight });
-    renderer.setColor(cyan);
-    renderer.setIntensity(0.7);
-    renderer.moveTo(x, y);
-    renderer.lineTo(right, y);
-    const knob = x + (right - x) * (profile[row.key] - row.min) / (row.max - row.min);
-    renderer.setIntensity(1.5);
-    renderer.moveTo(knob, y - textHeight * 0.45);
-    renderer.lineTo(knob, y + textHeight * 0.45);
-  }
-  renderer.setColor(amber);
-  renderer.setIntensity(1);
-  drawText(renderer, "RESET", x, atY(0.76), { font: "segment16", height: textHeight });
-  [1, 1.5, 2].forEach((intensity, index) => {
-    const sampleX = x + index * width * 0.23;
-    renderer.setColor(amber);
-    renderer.setIntensity(1);
-    drawText(renderer, intensity.toFixed(1), sampleX, atY(0.81), { font: "segment16", height: textHeight });
-    renderer.setColor(cyan);
+  label("STRAIGHT LINE", left, upper + height * 0.1);
+  renderer.moveTo(left, upper);
+  renderer.lineTo(left + width * 0.35, upper);
+
+  label("CROSSING LINES", right, upper + height * 0.1);
+  renderer.moveTo(right, upper - height * 0.055);
+  renderer.lineTo(right + width * 0.35, upper + height * 0.055);
+  renderer.moveTo(right, upper + height * 0.055);
+  renderer.lineTo(right + width * 0.35, upper - height * 0.055);
+
+  label("POINTS", left, lower + height * 0.13);
+  for (const offset of [0.045, 0.125, 0.205, 0.285]) renderer.point(left + width * offset, lower);
+
+  label("OVERDRIVE", right, lower + height * 0.13);
+  for (const [intensity, y] of [[1, lower], [2, lower - height * 0.09]]) {
+    label(intensity.toFixed(1), right, y - labelSize * 0.35);
     renderer.setIntensity(intensity);
-    renderer.moveTo(sampleX, atY(0.85));
-    renderer.lineTo(sampleX + width * 0.12, atY(0.85));
-    renderer.moveTo(sampleX + width * 0.04, atY(0.84));
-    renderer.lineTo(sampleX + width * 0.08, atY(0.86));
-    renderer.point(sampleX + width * 0.16, atY(0.85));
-    renderer.setColor(magenta);
-    renderer.moveTo(sampleX, atY(0.93));
-    renderer.lineTo(sampleX + width * 0.12, atY(0.93));
-    renderer.moveTo(sampleX + width * 0.04, atY(0.92));
-    renderer.lineTo(sampleX + width * 0.08, atY(0.94));
-    renderer.point(sampleX + width * 0.16, atY(0.93));
-  });
+    renderer.moveTo(right + width * 0.105, y);
+    renderer.lineTo(right + width * 0.28, y);
+    renderer.point(right + width * 0.33, y);
+  }
   renderer.endFrame();
 }
 
@@ -1035,6 +1129,10 @@ function stopAnimation(): void {
 
 function animateGame(time: number): void {
   if (!animate || scene !== "game" || activeScreen !== "renderer" || document.hidden || contextStatus !== "ready") return;
+  if (!drawingBufferSize(studyContext)) {
+    renderRendererStatus();
+    return;
+  }
   drawGameScene((time * 0.03) % 360);
   updateTimingSample(time);
   animationFrame = requestAnimationFrame(animateGame);
@@ -1042,11 +1140,13 @@ function animateGame(time: number): void {
 
 function renderCurrentScene(): void {
   stopAnimation();
-  if (contextStatus !== "ready") {
+  writeValue("active-profile", profileSummary());
+  if (contextStatus !== "ready" || !drawingBufferSize(studyContext)) {
     renderRendererStatus();
     return;
   }
   if (activeScreen !== "renderer" || document.hidden) return;
+  renderer.setDisplayProfile(activeDisplayProfile());
   if (animate && scene === "game") {
     animationFrame = requestAnimationFrame(animateGame);
   } else {
@@ -1076,17 +1176,27 @@ function syncControls(): void {
   customRatio.hidden = ratioLabel !== "custom";
   genericControls.hidden = calibrationMode !== "generic";
   orientationControl.hidden = calibrationMode !== "omg1";
-  widthInput.disabled = autoFitInput.checked;
-  widthRange.disabled = autoFitInput.checked;
+  requireElement(document.getElementById("calibration-capability-section"), "#calibration-capability-section").hidden = calibrationMode !== "omg1";
+  widthControl.hidden = automaticSize;
+  for (const button of sizeModeButtons) {
+    button.setAttribute("aria-pressed", String(button.dataset.sizeMode === (automaticSize ? "auto" : "manual")));
+  }
+  const robotsSettings = automaticSize && calibrationMode === "omg1" && calibrationOrientation === "landscape"
+    && targetRatio === 4 / 3 && backingScaleSelect.value === "robots";
+  referenceStatus.textContent = robotsSettings ? "Robots settings active" : "Modified";
+  const segmentStudy = scene === "segments" || scene === "spacing";
+  requireElement(document.getElementById("segment-study-views"), "#segment-study-views").hidden = !segmentStudy;
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-scene]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.scene === scene));
+    button.setAttribute("aria-pressed", String(button.id === "segment-study-select" ? segmentStudy : button.dataset.scene === scene));
   }
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-orientation]")) {
     button.setAttribute("aria-pressed", String(button.dataset.orientation === orientation));
   }
   workloadControls.hidden = scene !== "game";
   profileControls.hidden = scene !== "profile";
-  studyStageLabel.textContent = `${scene.toUpperCase()} STUDY`;
+  studyStageLabel.textContent = studyNames[scene];
+  writeValue("study-inspection", studyCues[scene]);
+  profileCompare.setAttribute("aria-pressed", String(compareWithDefaults));
   for (const input of profileControls.querySelectorAll<HTMLInputElement>("input[data-profile]")) {
     const key = input.dataset.profile;
     if (key === "lineWidth" || key === "pointRadius" || key === "glowStrength" || key === "glowSpread") {
@@ -1130,6 +1240,7 @@ document.addEventListener("click", (event: MouseEvent) => {
     }
     activeScreen = "renderer";
     syncControls();
+    resizeStudyCanvas();
     renderCurrentScene();
     scheduleMeasurements("study selection");
     return;
@@ -1139,7 +1250,6 @@ document.addEventListener("click", (event: MouseEvent) => {
   if (selectedOrientation === "landscape" || selectedOrientation === "portrait") {
     if (orientation !== selectedOrientation) {
       orientation = selectedOrientation;
-      calibrationOrientation = selectedOrientation;
       stopAnimation();
       const replacement = document.createElement("canvas");
       replacement.id = "screen";
@@ -1161,37 +1271,55 @@ workloadToggle.addEventListener("click", () => {
   animate = !animate && scene === "game";
   resetTimingSample();
   syncControls();
-  if (!animate) drawDiagnostic();
-  else renderCurrentScene();
+  renderCurrentScene();
 });
 
 workloadScale.addEventListener("change", () => {
   resizeStudyCanvas();
   resetTimingSample();
-  if (activeScreen === "renderer" && !animate && contextStatus === "ready") drawDiagnostic();
-  renderRendererStatus();
+  renderCurrentScene();
+  scheduleMeasurements("backing scale");
 });
+
+function activeDisplayProfile(): DisplayProfile {
+  return scene === "profile" && compareWithDefaults ? DEFAULT_DISPLAY_PROFILE : profile;
+}
+
+function profileSummary(settings = activeDisplayProfile()): string {
+  const defaults = settings.lineWidth === DEFAULT_DISPLAY_PROFILE.lineWidth
+    && settings.pointRadius === DEFAULT_DISPLAY_PROFILE.pointRadius
+    && settings.glowStrength === DEFAULT_DISPLAY_PROFILE.glowStrength
+    && settings.glowSpread === DEFAULT_DISPLAY_PROFILE.glowSpread;
+  return `${defaults ? "Defaults" : "Edited"} · beam ${settings.lineWidth.toFixed(1)} px · point ${settings.pointRadius.toFixed(1)} px · glow ${settings.glowStrength.toFixed(1)} · spread ${settings.glowSpread.toFixed(1)}`;
+}
 
 profileControls.addEventListener("input", (event: Event) => {
   const target = event.target;
   if (!(target instanceof HTMLInputElement)) return;
   const key = target.dataset.profile;
   if (key !== "lineWidth" && key !== "pointRadius" && key !== "glowStrength" && key !== "glowSpread") return;
-  profile = { ...profile, [key]: Number(target.value) };
-  renderer.setDisplayProfile(profile);
+  profile = { ...profile, [key]: target.valueAsNumber };
+  compareWithDefaults = false;
+  syncControls();
+  renderCurrentScene();
+});
+
+profileCompare.addEventListener("click", () => {
+  compareWithDefaults = !compareWithDefaults;
+  syncControls();
   renderCurrentScene();
 });
 
 profileReset.addEventListener("click", () => {
   profile = { ...DEFAULT_DISPLAY_PROFILE };
-  renderer.setDisplayProfile(profile);
+  compareWithDefaults = false;
   syncControls();
   renderCurrentScene();
 });
 
 window.addEventListener("resize", () => {
   resizeStudyCanvas();
-  if (!animate && activeScreen === "renderer" && contextStatus === "ready") drawDiagnostic();
+  if (activeScreen === "renderer") renderCurrentScene();
   renderCalibration();
   scheduleMeasurements("resize");
 });
@@ -1209,7 +1337,7 @@ function watchDevicePixelRatio(): void {
 function onDevicePixelRatioChange(): void {
   watchDevicePixelRatio();
   resizeStudyCanvas();
-  if (!animate && activeScreen === "renderer" && contextStatus === "ready") drawDiagnostic();
+  if (activeScreen === "renderer") renderCurrentScene();
   renderCalibration();
   scheduleMeasurements("DPR change");
 }
@@ -1219,9 +1347,12 @@ document.addEventListener("visibilitychange", () => {
   resetTimingSample();
   if (document.hidden) stopAnimation();
   else if (activeScreen === "renderer") renderCurrentScene();
+  scheduleMeasurements("visibility");
 });
 
 syncControls();
+resizeStudyCanvas();
+startRenderer(screen);
 renderCalibration();
 renderCurrentScene();
 scheduleMeasurements("initial");
@@ -1230,7 +1361,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-mod
   button.addEventListener("click", () => {
     if (button.dataset.calMode !== "omg1" && button.dataset.calMode !== "generic") return;
     calibrationMode = button.dataset.calMode;
-    chooseManualPreset();
+    setCalibrationError();
     syncControls();
     renderCalibration();
   });
@@ -1245,23 +1376,30 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-ori
   });
 }
 
+function updateCustomRatio(): boolean {
+  const width = boundedValue(ratioWidthInput, "Canvas aspect width");
+  if (width === null) return false;
+  const height = boundedValue(ratioHeightInput, "Canvas aspect height");
+  if (height === null) return false;
+  targetRatio = width / height;
+  return true;
+}
+
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-ratio]")) {
   button.addEventListener("click", () => {
     const value = button.dataset.ratio;
-    const ratios: Record<string, [number, number]> = { "4:3": [4, 3], "16:9": [16, 9], "1:1": [1, 1], "3:4": [3, 4] };
+    if (!value) return;
     if (value === "custom") {
-      const width = boundedValue(ratioWidthInput, "Ratio width", 10000);
-      const height = boundedValue(ratioHeightInput, "Ratio height", 10000);
-      if (width === null || height === null) return;
+      // Expose the fields even when an incomplete edit needs correction.
+      updateCustomRatio();
+    } else {
+      const [width, height] = value.split(":").map(Number);
       targetRatio = width / height;
-      ratioLabel = "custom";
-    } else if (value && ratios[value]) {
-      targetRatio = ratios[value][0] / ratios[value][1];
-      ratioLabel = value;
+      setCalibrationError();
     }
-    chooseManualPreset();
-    renderCalibration();
+    ratioLabel = value;
     syncControls();
+    renderCalibration();
   });
 }
 
@@ -1269,113 +1407,118 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-mapping
   button.addEventListener("click", () => {
     if (button.dataset.mapping !== "fit" && button.dataset.mapping !== "stretch") return;
     mappingMode = button.dataset.mapping;
-    chooseManualPreset();
     syncControls();
     renderCalibration();
   });
 }
 
-autoFitInput.addEventListener("change", () => {
-  if (!autoFitInput.checked) manualWidth = lastCssSize.width;
-  syncControls();
-  renderCalibration();
-});
-
-function acceptManualWidth(input: HTMLInputElement): void {
-  const value = boundedValue(input, "Canvas width", 4096);
-  if (value === null) return;
-  if (value < 64) {
-    setCalibrationError("Canvas width must be at least 64 CSS pixels. The previous setting is still active.");
-    return;
+function startManualSize(): void {
+  if (automaticSize) {
+    manualWidth = Math.max(64, Math.round(lastCssSize.width));
+    widthInput.value = String(manualWidth);
   }
-  manualWidth = value;
-  autoFitInput.checked = false;
-  chooseManualPreset();
-  syncControls();
-  renderCalibration();
+  automaticSize = false;
 }
 
-widthInput.addEventListener("input", () => acceptManualWidth(widthInput));
-widthRange.addEventListener("input", () => {
-  widthInput.value = widthRange.value;
-  acceptManualWidth(widthRange);
+for (const button of sizeModeButtons) {
+  button.addEventListener("click", () => {
+    if (button.dataset.sizeMode === "auto") automaticSize = true;
+    else startManualSize();
+    setCalibrationError();
+    syncControls();
+    renderCalibration();
+  });
+}
+
+widthInput.addEventListener("input", () => {
+  const width = boundedValue(widthInput, "Canvas width");
+  if (width === null) return;
+  manualWidth = width;
+  renderCalibration();
 });
 
-presetSelect.addEventListener("change", () => {
-  if (presetSelect.value === "robots") {
-    calibrationMode = "omg1";
-    calibrationOrientation = "landscape";
-    orientation = "landscape";
-    targetRatio = 4 / 3;
-    ratioLabel = "4:3";
-    autoFitInput.checked = true;
-    backingScaleSelect.value = "robots";
-    manualWidth = 1024;
-  } else {
-    autoFitInput.checked = false;
-    manualWidth = lastCssSize.width;
-  }
+robotsReset.addEventListener("click", () => {
+  calibrationMode = "omg1";
+  calibrationOrientation = "landscape";
+  targetRatio = 4 / 3;
+  ratioLabel = "4:3";
+  ratioWidthInput.value = "4";
+  ratioHeightInput.value = "3";
+  virtualSize = { width: 1024, height: 768 };
+  virtualWidthInput.value = "1024";
+  virtualHeightInput.value = "768";
+  mappingMode = "fit";
+  backingScaleSelect.value = "robots";
+  automaticSize = true;
+  setCalibrationError();
   syncControls();
   renderCalibration();
 });
 
-backingScaleSelect.addEventListener("change", renderCalibration);
-
+backingScaleSelect.addEventListener("change", () => {
+  syncControls();
+  renderCalibration();
+});
 for (const input of [ratioWidthInput, ratioHeightInput]) {
-  input.addEventListener("change", () => {
-    if (ratioLabel !== "custom") return;
-    const width = boundedValue(ratioWidthInput, "Ratio width", 10000);
-    const height = boundedValue(ratioHeightInput, "Ratio height", 10000);
-    if (width === null || height === null) return;
-    targetRatio = width / height;
+  input.addEventListener("input", () => {
+    if (ratioLabel !== "custom" || !updateCustomRatio()) return;
+    syncControls();
     renderCalibration();
   });
 }
 
 for (const input of [virtualWidthInput, virtualHeightInput]) {
-  input.addEventListener("change", () => {
-    const width = boundedValue(virtualWidthInput, "Virtual width", 10000);
-    const height = boundedValue(virtualHeightInput, "Virtual height", 10000);
-    if (width === null || height === null) return;
+  input.addEventListener("input", () => {
+    const width = boundedValue(virtualWidthInput, "Content width");
+    if (width === null) return;
+    const height = boundedValue(virtualHeightInput, "Content height");
+    if (height === null) return;
     virtualSize = { width, height };
-    chooseManualPreset();
     renderCalibration();
   });
 }
 
+function changeManualWidthBy(width: number): void {
+  manualWidth = Math.max(64, Math.min(4096, Math.round(width)));
+  widthInput.value = String(manualWidth);
+  renderCalibration();
+}
+
 resizeHandle.addEventListener("pointerdown", (event: PointerEvent) => {
+  if (event.button !== 0) return;
   event.preventDefault();
-  resizePointer = { id: event.pointerId, x: event.clientX, width: lastCssSize.width };
+  startManualSize();
+  resizePointer = { id: event.pointerId, x: event.clientX, width: manualWidth };
   resizeHandle.setPointerCapture(event.pointerId);
-  autoFitInput.checked = false;
-  chooseManualPreset();
+  setCalibrationError();
   syncControls();
+  renderCalibration();
 });
 resizeHandle.addEventListener("pointermove", (event: PointerEvent) => {
   if (!resizePointer || resizePointer.id !== event.pointerId) return;
-  manualWidth = Math.max(64, Math.min(4096, resizePointer.width + event.clientX - resizePointer.x));
-  widthInput.value = `${Math.round(manualWidth)}`;
-  widthRange.value = `${Math.round(manualWidth)}`;
-  renderCalibration();
+  changeManualWidthBy(resizePointer.width + 2 * (event.clientX - resizePointer.x));
 });
-const stopResize = (event: PointerEvent): void => {
+resizeHandle.addEventListener("lostpointercapture", (event: PointerEvent) => {
   if (resizePointer?.id === event.pointerId) resizePointer = null;
-};
-resizeHandle.addEventListener("pointerup", stopResize);
-resizeHandle.addEventListener("pointercancel", stopResize);
+});
 resizeHandle.addEventListener("keydown", (event: KeyboardEvent) => {
   if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) return;
   event.preventDefault();
   const direction = event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1;
-  const amount = event.shiftKey ? 10 : 1;
-  autoFitInput.checked = false;
-  manualWidth = Math.max(64, Math.min(4096, manualWidth + direction * amount));
-  widthInput.value = String(manualWidth);
-  widthRange.value = String(manualWidth);
-  chooseManualPreset();
+  startManualSize();
+  setCalibrationError();
   syncControls();
-  renderCalibration();
+  changeManualWidthBy(manualWidth + direction * (event.shiftKey ? 10 : 1));
 });
+
+genericCanvas.addEventListener("contextlost", () => {
+  genericBufferAvailable = false;
+  scheduleMeasurements("Canvas 2D context lost");
+});
+genericCanvas.addEventListener("contextrestored", () => renderCalibration("Canvas 2D context restored"));
+for (const id of ["calibration-capabilities", "webgl-capabilities"]) {
+  document.getElementById(id)?.closest("details")?.addEventListener("toggle", renderCapabilities);
+}
 
 type NumericEdit = { input: HTMLInputElement; originalValue: string };
 type SelectEdit = { select: HTMLSelectElement; originalValue: string };
@@ -1432,7 +1575,8 @@ function moveControlFocus(direction: -1 | 1): void {
 function closeOpenDetails(): boolean {
   const active = document.activeElement;
   const focusedDetails = active instanceof HTMLElement ? active.closest<HTMLDetailsElement>("details[open]") : null;
-  const details = focusedDetails ?? [...document.querySelectorAll<HTMLDetailsElement>("details[open]")].at(-1) ?? null;
+  const details = focusedDetails ?? document.querySelector<HTMLDetailsElement>(".controls-help[open]")
+    ?? [...document.querySelectorAll<HTMLDetailsElement>("details[open]")].filter((element) => !element.closest("[hidden]")).at(-1);
   if (!details) return false;
   const summary = details.querySelector<HTMLElement>("summary");
   details.open = false;
@@ -1705,10 +1849,15 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
 fullscreenToggle.addEventListener("click", () => { fullscreenInitiator = fullscreenToggle; });
 requestAnimationFrame(pollGamepad);
 
-const calibrationObserver = new ResizeObserver(() => renderCalibration());
+const calibrationObserver = new ResizeObserver(() => renderCalibration("stage resize"));
 calibrationObserver.observe(calibrationViewport);
-const studyStage = document.querySelector<HTMLElement>(".canvas-frame");
-if (studyStage) new ResizeObserver(() => scheduleMeasurements("stage resize")).observe(studyStage);
+const studyObserver = new ResizeObserver(() => {
+  if (rendererScreen.hidden) return;
+  resizeStudyCanvas();
+  renderCurrentScene();
+  scheduleMeasurements("stage resize");
+});
+studyObserver.observe(studyStage);
 
 function requireElement<T extends Element>(element: T | null, name: string): T {
   if (!element) throw new Error(`Missing ${name}`);
