@@ -40,12 +40,12 @@ export function backingSize(css: CanvasSize, scale: number): CanvasSize {
 export function genericMap(
   output: CanvasSize,
   virtual: CanvasSize,
-  mapping: "fit" | "stretch",
+  mapping: "letterbox" | "stretch" | "crop",
 ): { scaleX: number; scaleY: number; offsetX: number; offsetY: number } {
   const x = output.width / virtual.width;
   const y = output.height / virtual.height;
   if (mapping === "stretch") return { scaleX: x, scaleY: y, offsetX: 0, offsetY: 0 };
-  const scale = Math.min(x, y);
+  const scale = mapping === "crop" ? Math.max(x, y) : Math.min(x, y);
   return {
     scaleX: scale,
     scaleY: scale,

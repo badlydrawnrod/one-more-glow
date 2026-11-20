@@ -24,8 +24,8 @@ test("a very tall canvas can hit the side limit without hitting the area limit",
   assert.equal(allocation.limit, "8192 px side limit");
 });
 
-test("Generic Fit preserves proportions and centers while Stretch uses both axes", () => {
-  assert.deepEqual(genericMap({ width: 1600, height: 900 }, { width: 1024, height: 768 }, "fit"), {
+test("Letterbox preserves proportions and centers while Stretch uses both axes", () => {
+  assert.deepEqual(genericMap({ width: 1600, height: 900 }, { width: 1024, height: 768 }, "letterbox"), {
     scaleX: 1.171875,
     scaleY: 1.171875,
     offsetX: 200,

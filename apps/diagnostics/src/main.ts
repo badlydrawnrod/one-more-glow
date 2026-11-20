@@ -61,9 +61,9 @@ let profile: DisplayProfile = { ...DEFAULT_DISPLAY_PROFILE };
 let compareWithDefaults = false;
 
 type CalibrationMode = "omg1" | "generic";
-type MappingMode = "fit" | "stretch";
+type MappingMode = "letterbox" | "stretch" | "crop";
 let calibrationMode: CalibrationMode = "omg1";
-let mappingMode: MappingMode = "fit";
+let mappingMode: MappingMode = "letterbox";
 let calibrationOrientation: DisplayOrientation = "landscape";
 let targetRatio = 4 / 3;
 let ratioLabel = "4:3";
@@ -522,8 +522,8 @@ function drawGenericCalibration(css: CanvasSize, backing: CanvasSize, backingCha
   ctx.beginPath(); ctx.moveTo(-halfW * 0.82, -halfH * 0.82); ctx.lineTo(halfW * 0.82, halfH * 0.82); ctx.moveTo(halfW * 0.82, -halfH * 0.82); ctx.lineTo(-halfW * 0.82, halfH * 0.82); ctx.stroke();
   ctx.strokeStyle = "#baff81";
   ctx.lineWidth *= 1.5;
-  ctx.strokeRect(-halfW * 0.9, -halfH * 0.9, halfW * 1.8, halfH * 1.8);
-  for (const [x, y] of [[-halfW * 0.9, -halfH * 0.9], [halfW * 0.9, -halfH * 0.9], [-halfW * 0.9, halfH * 0.9], [halfW * 0.9, halfH * 0.9]]) {
+  ctx.strokeRect(-halfW, -halfH, virtualSize.width, virtualSize.height);
+  for (const [x, y] of [[-halfW, -halfH], [halfW, -halfH], [-halfW, halfH], [halfW, halfH]]) {
     ctx.fillStyle = "#fff4ce"; ctx.fillRect(x - 5, y - 5, 10, 10);
   }
   ctx.restore();
@@ -531,9 +531,14 @@ function drawGenericCalibration(css: CanvasSize, backing: CanvasSize, backingCha
 
 function drawOmgCalibration(target: DisplayRenderer): void {
   const logical = logicalSize(calibrationOrientation);
+  const backing = { width: omgCanvas.width, height: omgCanvas.height };
+  const mapped = genericMap(backing, logical, mappingMode);
+  const fitScale = Math.min(backing.width / logical.width, backing.height / logical.height);
   const edgeX = logical.width * 0.44;
   const edgeY = logical.height * 0.44;
   target.beginFrame();
+  target.pushTransform();
+  target.scale(mapped.scaleX / fitScale, mapped.scaleY / fitScale);
   target.setColor([0.3, 0.75, 0.82]); target.setIntensity(0.25);
   for (let i = -4; i <= 4; i++) {
     target.moveTo(i * logical.width / 10, -edgeY); target.lineTo(i * logical.width / 10, edgeY);
@@ -550,8 +555,11 @@ function drawOmgCalibration(target: DisplayRenderer): void {
   target.moveTo(-edgeX * 0.88, -edgeY * 0.88); target.lineTo(edgeX * 0.88, edgeY * 0.88);
   target.moveTo(edgeX * 0.88, -edgeY * 0.88); target.lineTo(-edgeX * 0.88, edgeY * 0.88);
   target.setColor([0.7, 1, 0.45]);
-  target.moveTo(-edgeX, -edgeY); target.lineTo(edgeX, -edgeY); target.lineTo(edgeX, edgeY); target.lineTo(-edgeX, edgeY); target.lineTo(-edgeX, -edgeY);
-  for (const [px, py] of [[-edgeX, -edgeY], [edgeX, -edgeY], [-edgeX, edgeY], [edgeX, edgeY]]) target.point(px, py);
+  const halfWidth = logical.width / 2;
+  const halfHeight = logical.height / 2;
+  target.moveTo(-halfWidth, -halfHeight); target.lineTo(halfWidth, -halfHeight); target.lineTo(halfWidth, halfHeight); target.lineTo(-halfWidth, halfHeight); target.lineTo(-halfWidth, -halfHeight);
+  for (const [px, py] of [[-halfWidth, -halfHeight], [halfWidth, -halfHeight], [-halfWidth, halfHeight], [halfWidth, halfHeight]]) target.point(px, py);
+  target.popTransform();
   target.endFrame();
 }
 
@@ -649,11 +657,15 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
   if (!allocation.limit && (Math.abs(attributes.width - canvasRect.width * requestedScale) > 0.01
     || Math.abs(attributes.height - canvasRect.height * requestedScale) > 0.01)) reasons.push("Rounded to whole backing pixels");
   const logical = generic ? virtualSize : logicalSize(environmentActive ? calibrationOrientation : orientation);
-  const map = genericMap(canvasRect, logical, generic ? mappingMode : "fit");
-  const mapping = generic && mappingMode === "stretch" && Math.abs(canvasRect.width - canvasRect.height * logical.width / logical.height) > 0.5
-    ? (map.scaleX > map.scaleY ? "Stretched wider" : "Stretched taller")
-    : map.offsetX > 0.25 ? "Proportions preserved · side bars"
-    : map.offsetY > 0.25 ? "Proportions preserved · top and bottom bars" : "Proportions preserved";
+  const map = genericMap(canvasRect, logical, mappingMode);
+  const mapping = mappingMode === "stretch"
+    ? Math.abs(map.scaleX - map.scaleY) < 0.001 ? "Stretch · proportions preserved"
+      : map.scaleX > map.scaleY ? "Stretch · content stretched wider" : "Stretch · content stretched taller"
+    : mappingMode === "crop"
+      ? map.offsetX < -0.25 ? "Crop · cropped at the sides"
+        : map.offsetY < -0.25 ? "Crop · cropped top and bottom" : "Crop · no cropping"
+      : map.offsetX > 0.25 ? "Letterbox · empty space at the sides"
+        : map.offsetY > 0.25 ? "Letterbox · empty space above and below" : "Letterbox · no empty bars";
   const actualRatio = canvasRect.width / canvasRect.height;
   const target = environmentActive ? targetRatio : aspectRatio();
   const root = document.documentElement;
@@ -664,7 +676,7 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
     screen: activeScreen,
     test: environmentActive ? generic ? "Canvas 2D calibration" : `OMG-1 calibration · ${calibrationOrientation}` : studyNames[scene],
     settings: environmentActive
-      ? { sizeMode: automaticSize ? "auto" : "manual", requestedWidth: automaticSize ? null : manualWidth, canvasAspect: ratioLabel, mapping: generic ? mappingMode : "fit" }
+      ? { sizeMode: automaticSize ? "auto" : "manual", requestedWidth: automaticSize ? null : manualWidth, canvasAspect: ratioLabel, mapping: mappingMode }
       : { orientation, profile: activeDisplayProfile() },
     stage: rectSnapshot(stageRect),
     canvas: rectSnapshot(canvasRect),
@@ -1182,7 +1194,7 @@ function syncControls(): void {
     button.setAttribute("aria-pressed", String(button.dataset.sizeMode === (automaticSize ? "auto" : "manual")));
   }
   const robotsSettings = automaticSize && calibrationMode === "omg1" && calibrationOrientation === "landscape"
-    && targetRatio === 4 / 3 && backingScaleSelect.value === "robots";
+    && targetRatio === 4 / 3 && mappingMode === "letterbox" && backingScaleSelect.value === "robots";
   referenceStatus.textContent = robotsSettings ? "Robots settings active" : "Modified";
   const segmentStudy = scene === "segments" || scene === "spacing";
   requireElement(document.getElementById("segment-study-views"), "#segment-study-views").hidden = !segmentStudy;
@@ -1405,7 +1417,7 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-ratio]"
 
 for (const button of document.querySelectorAll<HTMLButtonElement>("[data-mapping]")) {
   button.addEventListener("click", () => {
-    if (button.dataset.mapping !== "fit" && button.dataset.mapping !== "stretch") return;
+    if (button.dataset.mapping !== "letterbox" && button.dataset.mapping !== "stretch" && button.dataset.mapping !== "crop") return;
     mappingMode = button.dataset.mapping;
     syncControls();
     renderCalibration();
@@ -1447,7 +1459,7 @@ robotsReset.addEventListener("click", () => {
   virtualSize = { width: 1024, height: 768 };
   virtualWidthInput.value = "1024";
   virtualHeightInput.value = "768";
-  mappingMode = "fit";
+  mappingMode = "letterbox";
   backingScaleSelect.value = "robots";
   automaticSize = true;
   setCalibrationError();

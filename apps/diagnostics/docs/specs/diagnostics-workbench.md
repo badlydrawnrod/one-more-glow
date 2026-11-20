@@ -44,13 +44,17 @@ screens for the current session.
   1:1, 3:4, and custom canvas ratios. OMG-1 content uses the library's fixed
   1024 × 768 landscape or 768 × 1024 portrait extent. Generic content has
   independent virtual width and height and is rendered with **Canvas 2D**.
-  Calibration orientation changes the content extent; study orientation is
-  independent.
-- Generic mapping offers **Preserve proportions** (uniform scale, centred
-  with empty space when needed) and **Fill and stretch** (independent axis
-  scales). Keep virtual coordinates, CSS canvas dimensions, and backing pixels
-  distinct. The grid, square, circle, diagonals, and edge markers expose
-  mapping, letterboxing, stretching, and clipping.
+  Calibration orientation changes the OMG-1 content extent; study orientation
+  is independent.
+- **Content mapping** is available for both calibration renderers. **Letterbox**
+  uniformly scales content to fit inside the canvas, leaving empty bars on two
+  sides when their aspects differ. **Stretch** independently scales each axis
+  to fill the canvas. **Crop** uniformly scales content until the
+  canvas is covered, clipping content beyond one pair of canvas edges. Keep
+  virtual coordinates, CSS canvas dimensions, and backing pixels distinct.
+  The green guide traces the full mapped content boundary; the grid, square,
+  circle, diagonals, and edge markers expose letterboxing, stretching, and
+  clipping.
 - Backing scale offers device scale, the Robots device-scale cap of 2×, and
   explicit scales. Calculate the requested allocation from the measured CSS
   rectangle and scale, rounding to whole pixels. Respect allocation limits;
@@ -66,8 +70,8 @@ snapshot. Keep these diagnoses independent:
 - **Browser visibility** compares the whole canvas with the visible browser
   viewport. Report horizontal and vertical page overflow separately; page
   scrolling does not itself mean the canvas is clipped.
-- **Content mapping** reports the selected content mapping and whether it
-  preserves proportions, letterboxes, or stretches content.
+- **Content mapping** reports the selected mapping and whether it adds bars,
+  stretches content, or crops it to fill the canvas.
 - **Backing resolution** distinguishes requested dimensions, `canvas.width`
   and `canvas.height` attributes, and the actual WebGL2 drawing-buffer size.
   Show effective backing pixels per CSS pixel on each axis and explain
@@ -146,13 +150,18 @@ restrictions at the affected action.
 ## App boundary
 
 The diagnostics app owns HTML, input, browser measurements, report generation,
-and generic virtual-coordinate mapping. OMG-1 uses the public
+and content mapping for both calibration renderers. OMG-1 uses the public
 `one-more-glow` API and the app's WebGL2 context for renderer measurements.
 The Generic calibration pattern uses app-owned Canvas 2D. The library's
 renderer-independent `DrawingContext` and fixed OMG-1 logical extent remain
 defined by the [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md).
 
 ## Verification status
+
+**2026-11-20.** The diagnostics TypeScript check and production build passed.
+Chrome walkthroughs at a 16:9 canvas with 4:3 content confirmed Letterbox,
+Stretch, and Crop in both renderers, including the mapped green
+boundary and the reported bars, stretching, or cropping.
 
 **2026-11-19.** Seven diagnostics tests, the workspace checks, and diagnostics
 and project-base Pages production builds passed. Chrome checks covered the

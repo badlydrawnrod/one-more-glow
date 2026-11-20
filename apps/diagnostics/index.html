@@ -49,7 +49,7 @@
               <canvas id="calibration-omg" class="calibration-canvas" aria-label="OMG-1 calibration pattern"></canvas>
               <button id="resize-handle" class="resize-handle" type="button" aria-label="Drag to resize calibration canvas" title="Drag to resize"></button>
             </div>
-            <p class="stage-footnote">Test area in slate, canvas edge in cyan, content guide in green.</p>
+            <p class="stage-footnote">Test area in slate, canvas edge in cyan, content boundary in green.</p>
           </section>
           <aside class="environment-readout panel" aria-label="Calibration results and settings">
             <section class="measurement-summary" aria-labelledby="measurement-summary-heading">
@@ -101,7 +101,10 @@
                 <div id="generic-controls" class="generic-controls" hidden>
                   <p class="control-title">Content aspect</p>
                   <div class="inline-fields"><label class="field-control">Width<input id="virtual-width" type="number" min="1" max="10000" step="1" value="1024" /></label><span aria-hidden="true">×</span><label class="field-control">Height<input id="virtual-height" type="number" min="1" max="10000" step="1" value="768" /></label></div>
-                  <div class="choice-pair" role="group" aria-label="Content mapping"><button type="button" data-mapping="fit" aria-pressed="true">Preserve proportions</button><button type="button" data-mapping="stretch" aria-pressed="false">Fill and stretch</button></div>
+                </div>
+                <div class="control-block">
+                  <p class="control-title">Content mapping</p>
+                  <div class="choice-pair" role="group" aria-label="Content mapping"><button type="button" data-mapping="letterbox" aria-pressed="true">Letterbox</button><button type="button" data-mapping="stretch" aria-pressed="false">Stretch</button><button type="button" data-mapping="crop" aria-pressed="false">Crop</button></div>
                 </div>
                 <label class="field-control">Backing scale
                   <select id="backing-scale"><option value="robots">Device scale (max 2×)</option><option value="device">Device scale</option><option value="1">1×</option><option value="1.5">1.5×</option><option value="2">2×</option><option value="3">3×</option></select>
