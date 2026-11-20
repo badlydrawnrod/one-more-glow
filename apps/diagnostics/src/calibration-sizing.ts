@@ -3,6 +3,41 @@ export interface CanvasSize {
   height: number;
 }
 
+export const ASPECT_PRESETS = ["16:9", "16:10", "3:2", "4:3", "1:1"] as const;
+export type AspectPreset = typeof ASPECT_PRESETS[number] | "custom";
+export type AspectOrientation = "landscape" | "portrait";
+
+export function aspectRatio(
+  preset: AspectPreset,
+  orientation: AspectOrientation,
+  custom: CanvasSize,
+): number {
+  const base = preset === "custom"
+    ? custom.width / custom.height
+    : (() => {
+      const [width, height] = preset.split(":").map(Number);
+      return width / height;
+    })();
+  return preset !== "custom" && orientation === "portrait" && base !== 1 ? 1 / base : base;
+}
+
+export function aspectDimensions(
+  preset: AspectPreset,
+  orientation: AspectOrientation,
+  custom: CanvasSize,
+  longSide = 1024,
+): CanvasSize {
+  if (preset === "custom") return { ...custom };
+  const ratio = aspectRatio(preset, orientation, custom);
+  return ratio >= 1
+    ? { width: longSide, height: longSide / ratio }
+    : { width: longSide * ratio, height: longSide };
+}
+
+export function swapDimensions(size: CanvasSize): CanvasSize {
+  return { width: size.height, height: size.width };
+}
+
 export function fitCanvasSize(
   stage: CanvasSize,
   ratio: number,

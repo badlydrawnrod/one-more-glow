@@ -85,22 +85,29 @@
                 </div>
                 <div class="control-block">
                   <p class="control-title">Canvas aspect</p>
-                  <div class="choice-pair ratio-choices" role="group" aria-label="Canvas aspect">
-                    <button type="button" data-ratio="4:3" aria-pressed="true">4:3</button><button type="button" data-ratio="16:9" aria-pressed="false">16:9</button><button type="button" data-ratio="1:1" aria-pressed="false">1:1</button><button type="button" data-ratio="3:4" aria-pressed="false">3:4</button><button type="button" data-ratio="custom" aria-pressed="false">Custom</button>
+                  <div class="choice-pair ratio-choices" role="group" aria-label="Canvas aspect preset">
+                    <button type="button" data-canvas-ratio="16:9" aria-pressed="false">16:9</button><button type="button" data-canvas-ratio="16:10" aria-pressed="false">16:10</button><button type="button" data-canvas-ratio="3:2" aria-pressed="false">3:2</button><button type="button" data-canvas-ratio="4:3" aria-pressed="true">4:3</button><button type="button" data-canvas-ratio="1:1" aria-pressed="false">1:1</button><button type="button" data-canvas-ratio="custom" aria-pressed="false">Custom</button>
                   </div>
-                  <div id="custom-ratio" class="inline-fields" hidden>
-                    <label class="field-control">Width<input id="ratio-width" type="number" min="1" max="10000" step="1" value="4" /></label>
+                  <div class="choice-pair" role="group" aria-label="Canvas orientation">
+                    <button type="button" data-canvas-orientation="landscape" aria-pressed="true">Landscape</button><button type="button" data-canvas-orientation="portrait" aria-pressed="false">Portrait</button>
+                  </div>
+                  <div id="canvas-custom-aspect" class="inline-fields" hidden>
+                    <label class="field-control">Width<input id="canvas-ratio-width" type="number" min="1" max="10000" step="1" value="4" /></label>
                     <span aria-hidden="true">:</span>
-                    <label class="field-control">Height<input id="ratio-height" type="number" min="1" max="10000" step="1" value="3" /></label>
+                    <label class="field-control">Height<input id="canvas-ratio-height" type="number" min="1" max="10000" step="1" value="3" /></label>
                   </div>
                 </div>
-                <div id="orientation-control" class="control-block">
+                <div class="control-block">
                   <p class="control-title">Content aspect</p>
-                  <div class="choice-pair" role="group" aria-label="OMG-1 content aspect"><button type="button" data-cal-orientation="landscape" aria-pressed="true">Landscape 4:3</button><button type="button" data-cal-orientation="portrait" aria-pressed="false">Portrait 3:4</button></div>
-                </div>
-                <div id="generic-controls" class="generic-controls" hidden>
-                  <p class="control-title">Content aspect</p>
-                  <div class="inline-fields"><label class="field-control">Width<input id="virtual-width" type="number" min="1" max="10000" step="1" value="1024" /></label><span aria-hidden="true">×</span><label class="field-control">Height<input id="virtual-height" type="number" min="1" max="10000" step="1" value="768" /></label></div>
+                  <div class="choice-pair ratio-choices" role="group" aria-label="Content aspect preset">
+                    <button type="button" data-content-ratio="16:9" aria-pressed="false">16:9</button><button type="button" data-content-ratio="16:10" aria-pressed="false">16:10</button><button type="button" data-content-ratio="3:2" aria-pressed="false">3:2</button><button type="button" data-content-ratio="4:3" aria-pressed="true">4:3</button><button type="button" data-content-ratio="1:1" aria-pressed="false">1:1</button><button type="button" data-content-ratio="custom" aria-pressed="false">Custom</button>
+                  </div>
+                  <div class="choice-pair" role="group" aria-label="Content orientation">
+                    <button type="button" data-content-orientation="landscape" aria-pressed="true">Landscape</button><button type="button" data-content-orientation="portrait" aria-pressed="false">Portrait</button>
+                  </div>
+                  <div id="content-custom-aspect" class="inline-fields" hidden>
+                    <label class="field-control">Width<input id="virtual-width" type="number" min="1" max="10000" step="1" value="1024" /></label><span aria-hidden="true">×</span><label class="field-control">Height<input id="virtual-height" type="number" min="1" max="10000" step="1" value="768" /></label>
+                  </div>
                 </div>
                 <div class="control-block">
                   <p class="control-title">Content mapping</p>

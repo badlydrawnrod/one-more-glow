@@ -15,7 +15,7 @@ import {
 } from "one-more-glow";
 import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 import { registerAppServiceWorker } from "./pwa.ts";
-import { fitCanvasSize, genericMap, planBackingAllocation, type CanvasSize } from "./calibration-sizing.ts";
+import { ASPECT_PRESETS, aspectDimensions, aspectRatio, fitCanvasSize, genericMap, planBackingAllocation, swapDimensions, type AspectOrientation, type AspectPreset, type CanvasSize } from "./calibration-sizing.ts";
 import { hasEnoughFrameSample, summarizeFrameIntervals, type FrameTimingResult } from "./frame-timing.ts";
 
 registerAppServiceWorker();
@@ -42,13 +42,12 @@ const robotsReset = requireElement(document.querySelector<HTMLButtonElement>("#u
 const referenceStatus = requireElement(document.querySelector<HTMLElement>("#reference-status"), "#reference-status");
 const sizeModeButtons = document.querySelectorAll<HTMLButtonElement>("[data-size-mode]");
 const backingScaleSelect = requireElement(document.querySelector<HTMLSelectElement>("#backing-scale"), "#backing-scale");
-const ratioWidthInput = requireElement(document.querySelector<HTMLInputElement>("#ratio-width"), "#ratio-width");
-const ratioHeightInput = requireElement(document.querySelector<HTMLInputElement>("#ratio-height"), "#ratio-height");
+const canvasRatioWidthInput = requireElement(document.querySelector<HTMLInputElement>("#canvas-ratio-width"), "#canvas-ratio-width");
+const canvasRatioHeightInput = requireElement(document.querySelector<HTMLInputElement>("#canvas-ratio-height"), "#canvas-ratio-height");
 const virtualWidthInput = requireElement(document.querySelector<HTMLInputElement>("#virtual-width"), "#virtual-width");
 const virtualHeightInput = requireElement(document.querySelector<HTMLInputElement>("#virtual-height"), "#virtual-height");
-const customRatio = requireElement(document.querySelector<HTMLElement>("#custom-ratio"), "#custom-ratio");
-const genericControls = requireElement(document.querySelector<HTMLElement>("#generic-controls"), "#generic-controls");
-const orientationControl = requireElement(document.querySelector<HTMLElement>("#orientation-control"), "#orientation-control");
+const canvasCustomAspect = requireElement(document.querySelector<HTMLElement>("#canvas-custom-aspect"), "#canvas-custom-aspect");
+const contentCustomAspect = requireElement(document.querySelector<HTMLElement>("#content-custom-aspect"), "#content-custom-aspect");
 const calibrationError = requireElement(document.querySelector<HTMLElement>("#calibration-error"), "#calibration-error");
 const advancedCalibrationError = requireElement(document.querySelector<HTMLElement>("#advanced-calibration-error"), "#advanced-calibration-error");
 const calibrationModeLabel = requireElement(document.querySelector<HTMLElement>("#calibration-mode-label"), "#calibration-mode-label");
@@ -64,10 +63,15 @@ type CalibrationMode = "omg1" | "generic";
 type MappingMode = "letterbox" | "stretch" | "crop";
 let calibrationMode: CalibrationMode = "omg1";
 let mappingMode: MappingMode = "letterbox";
-let calibrationOrientation: DisplayOrientation = "landscape";
+let canvasOrientation: AspectOrientation = "landscape";
+let contentOrientation: AspectOrientation = "landscape";
+let canvasAspectPreset: AspectPreset = "4:3";
+let contentAspectPreset: AspectPreset = "4:3";
 let targetRatio = 4 / 3;
 let ratioLabel = "4:3";
 let virtualSize: CanvasSize = { width: 1024, height: 768 };
+let canvasCustomSize: CanvasSize = { width: 4, height: 3 };
+let contentCustomSize: CanvasSize = { width: 1024, height: 768 };
 let automaticSize = true;
 let manualWidth = 1024;
 let lastCssSize: CanvasSize = { width: 1, height: 1 };
@@ -87,7 +91,7 @@ type MeasurementSnapshot = {
   timestamp: string;
   screen: "environment" | "renderer";
   test: string;
-  settings: { sizeMode: "auto" | "manual"; requestedWidth: number | null; canvasAspect: string; mapping: MappingMode }
+  settings: { sizeMode: "auto" | "manual"; requestedWidth: number | null; canvasAspect: string; contentAspect: string; mapping: MappingMode }
     | { orientation: DisplayOrientation; profile: DisplayProfile };
   stage: { left: number; top: number; width: number; height: number };
   canvas: { left: number; top: number; width: number; height: number };
@@ -173,7 +177,7 @@ function createNullRenderer(): DisplayRenderer {
   };
 }
 
-function aspectRatio(): number {
+function studyAspectRatio(): number {
   return orientation === "landscape" ? 4 / 3 : 3 / 4;
 }
 
@@ -212,8 +216,8 @@ function setCanvasBacking(canvas: HTMLCanvasElement, size: CanvasSize): boolean 
 
 function resizeStudyCanvas(): void {
   if (rendererScreen.hidden) return;
-  const stage = fitStageToViewport(studyStage, aspectRatio());
-  const measured = sizeCanvas(screen, fitCanvasSize(stage, aspectRatio(), 800));
+  const stage = fitStageToViewport(studyStage, studyAspectRatio());
+  const measured = sizeCanvas(screen, fitCanvasSize(stage, studyAspectRatio(), 800));
   const configuredScale = scene !== "game" || workloadScale.value === "device" ? (window.devicePixelRatio || 1) : Number(workloadScale.value);
   const requestedScale = Number.isFinite(configuredScale) && configuredScale > 0 ? configuredScale : 1;
   studyAllocation = planBackingAllocation(measured, requestedScale);
@@ -314,7 +318,7 @@ function renderCapabilities(): void {
   const environmentActive = activeScreen === "environment";
   const output = document.querySelector(environmentActive ? "#calibration-capabilities" : "#webgl-capabilities");
   if (!output?.closest("details")?.open) return;
-  const gl = environmentActive ? omgSurfaces.get(calibrationOrientation)?.context : studyContext;
+  const gl = environmentActive ? omgSurfaces.get(contentOrientation)?.context : studyContext;
   try {
     output.textContent = gl && !gl.isContextLost()
       ? JSON.stringify(readWebGLCapabilities(gl), null, 2)
@@ -426,7 +430,7 @@ function initializeCalibrationSurface(surface: CalibrationSurface, orientation: 
 }
 
 function ensureCalibrationSurface(): CalibrationSurface {
-  const orientation = calibrationOrientation;
+  const orientation = contentOrientation;
   let surface = omgSurfaces.get(orientation);
   if (!surface) {
     const canvas = orientation === "landscape" ? omgCanvas : document.createElement("canvas");
@@ -530,12 +534,13 @@ function drawGenericCalibration(css: CanvasSize, backing: CanvasSize, backingCha
 }
 
 function drawOmgCalibration(target: DisplayRenderer): void {
-  const logical = logicalSize(calibrationOrientation);
+  const logical = logicalSize(contentOrientation);
+  const content = virtualSize;
   const backing = { width: omgCanvas.width, height: omgCanvas.height };
-  const mapped = genericMap(backing, logical, mappingMode);
+  const mapped = genericMap(backing, content, mappingMode);
   const fitScale = Math.min(backing.width / logical.width, backing.height / logical.height);
-  const edgeX = logical.width * 0.44;
-  const edgeY = logical.height * 0.44;
+  const edgeX = content.width * 0.44;
+  const edgeY = content.height * 0.44;
   target.beginFrame();
   target.pushTransform();
   target.scale(mapped.scaleX / fitScale, mapped.scaleY / fitScale);
@@ -547,7 +552,7 @@ function drawOmgCalibration(target: DisplayRenderer): void {
   target.setColor([0, 0.9, 1]); target.setIntensity(0.95);
   target.moveTo(-edgeX, 0); target.lineTo(edgeX, 0); target.moveTo(0, -edgeY); target.lineTo(0, edgeY);
   target.setColor([1, 0.72, 0.3]); target.setIntensity(1);
-  const square = Math.min(logical.width, logical.height) * 0.42;
+  const square = Math.min(content.width, content.height) * 0.42;
   target.moveTo(-square / 2, -square / 2); target.lineTo(square / 2, -square / 2);
   target.lineTo(square / 2, square / 2); target.lineTo(-square / 2, square / 2); target.lineTo(-square / 2, -square / 2);
   drawCircle(target, [0, 0], square * 0.34);
@@ -555,8 +560,8 @@ function drawOmgCalibration(target: DisplayRenderer): void {
   target.moveTo(-edgeX * 0.88, -edgeY * 0.88); target.lineTo(edgeX * 0.88, edgeY * 0.88);
   target.moveTo(edgeX * 0.88, -edgeY * 0.88); target.lineTo(-edgeX * 0.88, edgeY * 0.88);
   target.setColor([0.7, 1, 0.45]);
-  const halfWidth = logical.width / 2;
-  const halfHeight = logical.height / 2;
+  const halfWidth = content.width / 2;
+  const halfHeight = content.height / 2;
   target.moveTo(-halfWidth, -halfHeight); target.lineTo(halfWidth, -halfHeight); target.lineTo(halfWidth, halfHeight); target.lineTo(-halfWidth, halfHeight); target.lineTo(-halfWidth, -halfHeight);
   for (const [px, py] of [[-halfWidth, -halfHeight], [halfWidth, -halfHeight], [-halfWidth, halfHeight], [halfWidth, halfHeight]]) target.point(px, py);
   target.popTransform();
@@ -591,12 +596,28 @@ function renderCalibration(trigger = "calibration settings"): void {
   }
   positionResizeHandle(measured, stage);
   if (automaticSize) widthInput.value = String(Math.round(measured.width));
-  calibrationModeLabel.textContent = calibrationMode === "omg1" ? `OMG-1 / ${calibrationOrientation.toUpperCase()}` : "CANVAS 2D";
+  calibrationModeLabel.textContent = calibrationMode === "omg1" ? `OMG-1 / ${contentOrientation.toUpperCase()}` : "CANVAS 2D";
   scheduleMeasurements(trigger);
 }
 
 function logicalSize(orientation: DisplayOrientation): CanvasSize {
   return orientation === "landscape" ? { width: 1024, height: 768 } : { width: 768, height: 1024 };
+}
+
+function contentSizeLabel(): string {
+  return `${Math.round(virtualSize.width * 100) / 100} × ${Math.round(virtualSize.height * 100) / 100}`;
+}
+
+function aspectLabel(preset: AspectPreset, orientation: AspectOrientation, custom: CanvasSize): string {
+  if (preset === "custom") return `${custom.width}:${custom.height}`;
+  const [width, height] = preset.split(":");
+  return orientation === "portrait" && preset !== "1:1" ? `${height}:${width}` : preset;
+}
+
+function refreshAspectSettings(): void {
+  targetRatio = aspectRatio(canvasAspectPreset, canvasOrientation, canvasCustomSize);
+  ratioLabel = aspectLabel(canvasAspectPreset, canvasOrientation, canvasCustomSize);
+  virtualSize = aspectDimensions(contentAspectPreset, contentOrientation, contentCustomSize);
 }
 
 function drawingBufferSize(context: WebGL2RenderingContext | null): CanvasSize | null {
@@ -635,7 +656,7 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
       && canvasRect.right <= bounds.right + tolerance && canvasRect.bottom <= bounds.bottom + tolerance;
   };
   const generic = environmentActive && calibrationMode === "generic";
-  const surface = environmentActive ? omgSurfaces.get(calibrationOrientation) : undefined;
+  const surface = environmentActive ? omgSurfaces.get(contentOrientation) : undefined;
   const gl = environmentActive ? surface?.context ?? null : studyContext;
   const rendererReady = environmentActive ? !!surface?.renderer : contextStatus === "ready";
   const attributes = { width: canvas.width, height: canvas.height };
@@ -656,7 +677,7 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
   if (buffer && (buffer.width !== attributes.width || buffer.height !== attributes.height)) reasons.push("Browser allocated a different buffer");
   if (!allocation.limit && (Math.abs(attributes.width - canvasRect.width * requestedScale) > 0.01
     || Math.abs(attributes.height - canvasRect.height * requestedScale) > 0.01)) reasons.push("Rounded to whole backing pixels");
-  const logical = generic ? virtualSize : logicalSize(environmentActive ? calibrationOrientation : orientation);
+  const logical = environmentActive ? virtualSize : logicalSize(orientation);
   const map = genericMap(canvasRect, logical, mappingMode);
   const mapping = mappingMode === "stretch"
     ? Math.abs(map.scaleX - map.scaleY) < 0.001 ? "Stretch · proportions preserved"
@@ -667,16 +688,16 @@ function collectMeasurement(trigger: string): MeasurementSnapshot | null {
       : map.offsetX > 0.25 ? "Letterbox · empty space at the sides"
         : map.offsetY > 0.25 ? "Letterbox · empty space above and below" : "Letterbox · no empty bars";
   const actualRatio = canvasRect.width / canvasRect.height;
-  const target = environmentActive ? targetRatio : aspectRatio();
+  const target = environmentActive ? targetRatio : studyAspectRatio();
   const root = document.documentElement;
   const screenOrientation = window.screen.orientation;
   return {
     trigger,
     timestamp: new Date().toISOString(),
     screen: activeScreen,
-    test: environmentActive ? generic ? "Canvas 2D calibration" : `OMG-1 calibration · ${calibrationOrientation}` : studyNames[scene],
+    test: environmentActive ? generic ? "Canvas 2D calibration" : `OMG-1 calibration · ${contentOrientation}` : studyNames[scene],
     settings: environmentActive
-      ? { sizeMode: automaticSize ? "auto" : "manual", requestedWidth: automaticSize ? null : manualWidth, canvasAspect: ratioLabel, mapping: mappingMode }
+      ? { sizeMode: automaticSize ? "auto" : "manual", requestedWidth: automaticSize ? null : manualWidth, canvasAspect: `${ratioLabel} ${canvasOrientation}`, contentAspect: `${contentSizeLabel()} ${contentOrientation}`, mapping: mappingMode }
       : { orientation, profile: activeDisplayProfile() },
     stage: rectSnapshot(stageRect),
     canvas: rectSnapshot(canvasRect),
@@ -1176,25 +1197,32 @@ function syncControls(): void {
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-mode]")) {
     button.setAttribute("aria-pressed", String(button.dataset.calMode === calibrationMode));
   }
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-orientation]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.calOrientation === calibrationOrientation));
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-orientation]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.canvasOrientation === canvasOrientation));
+  }
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-content-orientation]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.contentOrientation === contentOrientation));
   }
   for (const button of document.querySelectorAll<HTMLButtonElement>("[data-mapping]")) {
     button.setAttribute("aria-pressed", String(button.dataset.mapping === mappingMode));
   }
-  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-ratio]")) {
-    button.setAttribute("aria-pressed", String(button.dataset.ratio === ratioLabel));
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-ratio]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.canvasRatio === canvasAspectPreset));
   }
-  customRatio.hidden = ratioLabel !== "custom";
-  genericControls.hidden = calibrationMode !== "generic";
-  orientationControl.hidden = calibrationMode !== "omg1";
+  for (const button of document.querySelectorAll<HTMLButtonElement>("[data-content-ratio]")) {
+    button.setAttribute("aria-pressed", String(button.dataset.contentRatio === contentAspectPreset));
+  }
+  canvasCustomAspect.hidden = canvasAspectPreset !== "custom";
+  contentCustomAspect.hidden = contentAspectPreset !== "custom";
   requireElement(document.getElementById("calibration-capability-section"), "#calibration-capability-section").hidden = calibrationMode !== "omg1";
   widthControl.hidden = automaticSize;
   for (const button of sizeModeButtons) {
     button.setAttribute("aria-pressed", String(button.dataset.sizeMode === (automaticSize ? "auto" : "manual")));
   }
-  const robotsSettings = automaticSize && calibrationMode === "omg1" && calibrationOrientation === "landscape"
-    && targetRatio === 4 / 3 && mappingMode === "letterbox" && backingScaleSelect.value === "robots";
+  const robotsSettings = automaticSize && calibrationMode === "omg1"
+    && canvasOrientation === "landscape" && contentOrientation === "landscape"
+    && canvasAspectPreset === "4:3" && contentAspectPreset === "4:3"
+    && mappingMode === "letterbox" && backingScaleSelect.value === "robots";
   referenceStatus.textContent = robotsSettings ? "Robots settings active" : "Modified";
   const segmentStudy = scene === "segments" || scene === "spacing";
   requireElement(document.getElementById("segment-study-views"), "#segment-study-views").hidden = !segmentStudy;
@@ -1379,37 +1407,87 @@ for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-mod
   });
 }
 
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-cal-orientation]")) {
+function customCanvasDimensions(): CanvasSize | null {
+  const width = boundedValue(canvasRatioWidthInput, "Canvas aspect width");
+  if (width === null) return null;
+  const height = boundedValue(canvasRatioHeightInput, "Canvas aspect height");
+  if (height === null) return null;
+  return { width, height };
+}
+
+function customContentDimensions(): CanvasSize | null {
+  const width = boundedValue(virtualWidthInput, "Content width");
+  if (width === null) return null;
+  const height = boundedValue(virtualHeightInput, "Content height");
+  if (height === null) return null;
+  return { width, height };
+}
+
+function isAspectPreset(value: string | undefined): value is AspectPreset {
+  return value === "custom" || ASPECT_PRESETS.some((preset) => preset === value);
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-orientation]")) {
   button.addEventListener("click", () => {
-    if (button.dataset.calOrientation !== "landscape" && button.dataset.calOrientation !== "portrait") return;
-    calibrationOrientation = button.dataset.calOrientation;
+    const selected = button.dataset.canvasOrientation;
+    if (selected !== "landscape" && selected !== "portrait") return;
+    if (canvasOrientation === selected) return;
+    canvasOrientation = selected;
+    canvasCustomSize = swapDimensions(canvasCustomSize);
+    canvasRatioWidthInput.value = String(canvasCustomSize.width);
+    canvasRatioHeightInput.value = String(canvasCustomSize.height);
+    refreshAspectSettings();
+    setCalibrationError();
     syncControls();
     renderCalibration();
   });
 }
 
-function updateCustomRatio(): boolean {
-  const width = boundedValue(ratioWidthInput, "Canvas aspect width");
-  if (width === null) return false;
-  const height = boundedValue(ratioHeightInput, "Canvas aspect height");
-  if (height === null) return false;
-  targetRatio = width / height;
-  return true;
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-content-orientation]")) {
+  button.addEventListener("click", () => {
+    const selected = button.dataset.contentOrientation;
+    if (selected !== "landscape" && selected !== "portrait") return;
+    if (contentOrientation === selected) return;
+    contentOrientation = selected;
+    contentCustomSize = swapDimensions(contentCustomSize);
+    virtualWidthInput.value = String(contentCustomSize.width);
+    virtualHeightInput.value = String(contentCustomSize.height);
+    refreshAspectSettings();
+    setCalibrationError();
+    syncControls();
+    renderCalibration();
+  });
 }
 
-for (const button of document.querySelectorAll<HTMLButtonElement>("[data-ratio]")) {
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-canvas-ratio]")) {
   button.addEventListener("click", () => {
-    const value = button.dataset.ratio;
-    if (!value) return;
+    const value = button.dataset.canvasRatio;
+    if (!isAspectPreset(value)) return;
     if (value === "custom") {
-      // Expose the fields even when an incomplete edit needs correction.
-      updateCustomRatio();
-    } else {
-      const [width, height] = value.split(":").map(Number);
-      targetRatio = width / height;
-      setCalibrationError();
+      const custom = customCanvasDimensions();
+      if (!custom) return;
+      canvasCustomSize = custom;
     }
-    ratioLabel = value;
+    canvasAspectPreset = value;
+    refreshAspectSettings();
+    setCalibrationError();
+    syncControls();
+    renderCalibration();
+  });
+}
+
+for (const button of document.querySelectorAll<HTMLButtonElement>("[data-content-ratio]")) {
+  button.addEventListener("click", () => {
+    const value = button.dataset.contentRatio;
+    if (!isAspectPreset(value)) return;
+    if (value === "custom") {
+      const custom = customContentDimensions();
+      if (!custom) return;
+      contentCustomSize = custom;
+    }
+    contentAspectPreset = value;
+    refreshAspectSettings();
+    setCalibrationError();
     syncControls();
     renderCalibration();
   });
@@ -1451,14 +1529,17 @@ widthInput.addEventListener("input", () => {
 
 robotsReset.addEventListener("click", () => {
   calibrationMode = "omg1";
-  calibrationOrientation = "landscape";
-  targetRatio = 4 / 3;
-  ratioLabel = "4:3";
-  ratioWidthInput.value = "4";
-  ratioHeightInput.value = "3";
-  virtualSize = { width: 1024, height: 768 };
+  canvasOrientation = "landscape";
+  contentOrientation = "landscape";
+  canvasAspectPreset = "4:3";
+  contentAspectPreset = "4:3";
+  canvasCustomSize = { width: 4, height: 3 };
+  contentCustomSize = { width: 1024, height: 768 };
+  canvasRatioWidthInput.value = "4";
+  canvasRatioHeightInput.value = "3";
   virtualWidthInput.value = "1024";
   virtualHeightInput.value = "768";
+  refreshAspectSettings();
   mappingMode = "letterbox";
   backingScaleSelect.value = "robots";
   automaticSize = true;
@@ -1471,22 +1552,28 @@ backingScaleSelect.addEventListener("change", () => {
   syncControls();
   renderCalibration();
 });
-for (const input of [ratioWidthInput, ratioHeightInput]) {
+for (const input of [canvasRatioWidthInput, canvasRatioHeightInput]) {
   input.addEventListener("input", () => {
-    if (ratioLabel !== "custom" || !updateCustomRatio()) return;
-    syncControls();
-    renderCalibration();
+    const custom = customCanvasDimensions();
+    if (!custom) return;
+    canvasCustomSize = custom;
+    if (canvasAspectPreset === "custom") {
+      refreshAspectSettings();
+      syncControls();
+      renderCalibration();
+    }
   });
 }
 
 for (const input of [virtualWidthInput, virtualHeightInput]) {
   input.addEventListener("input", () => {
-    const width = boundedValue(virtualWidthInput, "Content width");
-    if (width === null) return;
-    const height = boundedValue(virtualHeightInput, "Content height");
-    if (height === null) return;
-    virtualSize = { width, height };
-    renderCalibration();
+    const custom = customContentDimensions();
+    if (!custom) return;
+    contentCustomSize = custom;
+    if (contentAspectPreset === "custom") {
+      refreshAspectSettings();
+      renderCalibration();
+    }
   });
 }
 
