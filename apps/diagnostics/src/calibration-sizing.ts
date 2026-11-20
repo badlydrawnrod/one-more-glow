@@ -3,6 +3,41 @@ export interface CanvasSize {
   height: number;
 }
 
+export const ASPECT_PRESETS = ["16:9", "16:10", "3:2", "4:3", "1:1"] as const;
+export type AspectPreset = typeof ASPECT_PRESETS[number] | "custom";
+export type AspectOrientation = "landscape" | "portrait";
+
+export function aspectRatio(
+  preset: AspectPreset,
+  orientation: AspectOrientation,
+  custom: CanvasSize,
+): number {
+  const base = preset === "custom"
+    ? custom.width / custom.height
+    : (() => {
+      const [width, height] = preset.split(":").map(Number);
+      return width / height;
+    })();
+  return preset !== "custom" && orientation === "portrait" && base !== 1 ? 1 / base : base;
+}
+
+export function aspectDimensions(
+  preset: AspectPreset,
+  orientation: AspectOrientation,
+  custom: CanvasSize,
+  longSide = 1024,
+): CanvasSize {
+  if (preset === "custom") return { ...custom };
+  const ratio = aspectRatio(preset, orientation, custom);
+  return ratio >= 1
+    ? { width: longSide, height: longSide / ratio }
+    : { width: longSide * ratio, height: longSide };
+}
+
+export function swapDimensions(size: CanvasSize): CanvasSize {
+  return { width: size.height, height: size.width };
+}
+
 export function fitCanvasSize(
   stage: CanvasSize,
   ratio: number,
@@ -40,12 +75,12 @@ export function backingSize(css: CanvasSize, scale: number): CanvasSize {
 export function genericMap(
   output: CanvasSize,
   virtual: CanvasSize,
-  mapping: "fit" | "stretch",
+  mapping: "letterbox" | "stretch" | "crop",
 ): { scaleX: number; scaleY: number; offsetX: number; offsetY: number } {
   const x = output.width / virtual.width;
   const y = output.height / virtual.height;
   if (mapping === "stretch") return { scaleX: x, scaleY: y, offsetX: 0, offsetY: 0 };
-  const scale = Math.min(x, y);
+  const scale = mapping === "crop" ? Math.max(x, y) : Math.min(x, y);
   return {
     scaleX: scale,
     scaleY: scale,

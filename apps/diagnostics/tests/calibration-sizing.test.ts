@@ -1,6 +1,21 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { backingSize, fitCanvasSize, genericMap, planBackingAllocation } from "../src/calibration-sizing.ts";
+import { ASPECT_PRESETS, aspectDimensions, aspectRatio, backingSize, fitCanvasSize, genericMap, planBackingAllocation, swapDimensions } from "../src/calibration-sizing.ts";
+
+test("aspect presets cover landscape, portrait, square, and custom dimensions", () => {
+  const custom = { width: 1920, height: 1080 };
+  assert.deepEqual(ASPECT_PRESETS, ["16:9", "16:10", "3:2", "4:3", "1:1"]);
+  assert.equal(aspectRatio("16:9", "landscape", custom), 16 / 9);
+  assert.equal(aspectRatio("16:9", "portrait", custom), 9 / 16);
+  assert.equal(aspectRatio("16:10", "landscape", custom), 16 / 10);
+  assert.equal(aspectRatio("3:2", "portrait", custom), 2 / 3);
+  assert.equal(aspectRatio("1:1", "portrait", custom), 1);
+  assert.deepEqual(aspectDimensions("16:9", "landscape", custom), { width: 1024, height: 576 });
+  assert.deepEqual(aspectDimensions("16:9", "portrait", custom), { width: 576, height: 1024 });
+  assert.deepEqual(aspectDimensions("1:1", "portrait", custom), { width: 1024, height: 1024 });
+  assert.deepEqual(aspectDimensions("custom", "portrait", custom), custom);
+  assert.deepEqual(swapDimensions(custom), { width: 1080, height: 1920 });
+});
 
 test("Robots fit respects the 1024 CSS pixel cap and 4:3 ratio", () => {
   assert.deepEqual(fitCanvasSize({ width: 1200, height: 900 }, 4 / 3, 1024), { width: 1024, height: 768 });
@@ -24,8 +39,8 @@ test("a very tall canvas can hit the side limit without hitting the area limit",
   assert.equal(allocation.limit, "8192 px side limit");
 });
 
-test("Generic Fit preserves proportions and centers while Stretch uses both axes", () => {
-  assert.deepEqual(genericMap({ width: 1600, height: 900 }, { width: 1024, height: 768 }, "fit"), {
+test("Letterbox preserves proportions and centers while Stretch uses both axes", () => {
+  assert.deepEqual(genericMap({ width: 1600, height: 900 }, { width: 1024, height: 768 }, "letterbox"), {
     scaleX: 1.171875,
     scaleY: 1.171875,
     offsetX: 200,
