@@ -11,6 +11,13 @@ Create a plan when the work has meaningful steps to sequence, a design decision
 to investigate, or a likely handoff across people, agents, or sessions. A small,
 self-contained change can start from the objective and a suitable check.
 
+Before drafting a substantial plan, use the
+[Skeptic review](../.agents/skills/skeptic-review/SKILL.md#before-substantial-planning)
+on the work item. Start planning when questions that could materially change
+the plan have answers or the requester has agreed to both the deferral and
+its consequence. Keep the agreed scope with the work item and preserve
+lasting behavior in the owning spec.
+
 Start with the [template](template.md). Keep app-specific plans in
 `apps/<app>/plans/active/` and library or shared work in `plans/active/`.
 
@@ -50,15 +57,16 @@ keeps the resulting behavioral commitment.
 
 ## Maintain and close the plan
 
-Check the plan against the repository before resuming. As work progresses,
-check off steps after their checkpoints pass, record significant decisions
-and their rationale, and keep the next action current. Record actual evidence,
-including failures and pending checks with the browser, device, or fixture
-needed to run them.
+Check the plan against the repository before resuming. Use the
+[verification evidence rule](../docs/engineering.md#verification-evidence)
+when marking a checkpoint passed or claiming the objective is verified. Work
+on independent steps and draft handoffs can proceed with gaps identified.
+Record significant decisions and their rationale, and keep the next action current.
 
 Before closing, check the objective against the observed results and call out
-any unmet criteria or remaining verification gaps. Keep actionable follow-up
-visible when work is deferred. Transfer lasting decisions to the appropriate
-spec or architecture document. Keep a useful summary of the verification in
-the change description, then delete the completed plan. Retain a completed
-plan only for a specific historical reason.
+any unmet criteria or remaining verification gaps. Closing with a gap requires
+the requester's explicit agreement to defer it. Keep the outstanding check,
+its consequence and the follow-up visible in the change description. Transfer
+lasting decisions to the appropriate spec or architecture document. Summarise
+the verification in the change description, then delete the completed plan.
+Retain a completed plan only for a specific historical reason.

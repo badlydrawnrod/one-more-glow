@@ -26,7 +26,8 @@
     "build:robots": "npm run build --workspace=one-more-glow && npm run build --workspace=very-angry-robots",
     "preview:robots": "npm run preview --workspace=very-angry-robots",
     "check:boundaries": "node tools/check-app-imports.mjs",
-    "check:repo-conventions": "node tools/check-repo-conventions.mjs"
+    "check:repo-conventions": "node tools/check-repo-conventions.mjs",
+    "verification:tree": "node tools/verification-tree.mjs"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
