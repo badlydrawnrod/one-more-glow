@@ -86,6 +86,39 @@ An edit that only records a result leaves that result applicable unless the
 record itself was under review. Changes to criteria or code in the same
 document still need assessment.
 
+### PR descriptions
+
+Write the description for a developer reviewing the actual change against its
+base. Lead with the problem or objective, then explain the resulting behavior.
+Include implementation details only when they help assess the change, and scale
+the description to the diff.
+
+Keep intended behavior distinct from observed results. Record concise
+verification evidence: what ran, its checked state or CI link, what passed, and
+any material gaps. Mention limitations when they matter; omit an empty gaps
+section. Before submitting, compare the PR title and description with the
+base-to-head diff, remove claims inherited from earlier PRs, and check that an
+automatically filled title clearly describes this change.
+
+The PR helper requires non-empty Summary and Verification sections. Keep those
+sections concise, and include a gaps note only when a gap is material:
+
+```md
+## Summary
+
+Problem or objective, followed by the resulting behavior.
+
+## Verification
+
+Checks run and outcomes, with a CI link when available. Mention material gaps
+only when there are any.
+```
+
+The PR helper checks that the description is non-empty and contains non-empty
+Summary and Verification sections. These structural checks cannot establish
+whether the description accurately explains the diff; authors and reviewers
+must make that assessment.
+
 ### Specifications
 
 Keep a spec for behavior worth preserving across changes. Describe the intent,

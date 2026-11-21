@@ -4,8 +4,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const descriptionFile = readDescriptionFile(process.argv.slice(2));
-const description = readFileSync(descriptionFile, "utf8");
+const description = readDescription(process.argv.slice(2));
 validateDescription(description);
 
 const branch = git(["branch", "--show-current"]).trim();
@@ -25,26 +24,28 @@ run("gh", [
   "--base", base,
   "--head", branch,
   "--fill",
-  "--body-file", descriptionFile,
+  "--body", description,
 ]);
 run("gh", ["pr", "checks", "--watch"]);
 run("gh", ["pr", "merge", "--squash", "--delete-branch"]);
 
-function readDescriptionFile(args) {
+function readDescription(args) {
   if (args.length === 1 && (args[0] === "--help" || args[0] === "-h")) {
-    console.log("Usage: npm run pr:merge -- --body-file <markdown-file>");
-    console.log("The description must include Review scope, Results, and Remaining gaps sections.");
+    console.log("Usage: npm run pr:merge [-- --body-file <markdown-file>]");
+    console.log("Without --body-file, the PR description is read from stdin.");
+    console.log("The description must include non-empty Summary and Verification sections.");
     process.exit(0);
   }
 
+  if (args.length === 0) return readFileSync(0, "utf8");
+
   if (args.length !== 2 || !["--body-file", "-f"].includes(args[0]) || !args[1]) {
-    fail("Usage: npm run pr:merge -- --body-file <markdown-file>");
+    fail("Usage: npm run pr:merge [-- --body-file <markdown-file>] (otherwise provide the description on stdin)");
   }
 
   const file = path.resolve(process.cwd(), args[1]);
   try {
-    readFileSync(file, "utf8");
-    return file;
+    return readFileSync(file, "utf8");
   } catch {
     fail(`Could not read PR description file: ${file}`);
   }
@@ -54,7 +55,7 @@ function validateDescription(body) {
   if (!body.trim()) fail("PR description must not be empty.");
 
   const lines = body.split(/\r?\n/);
-  for (const heading of ["Review scope", "Results", "Remaining gaps"]) {
+  for (const heading of ["Summary", "Verification"]) {
     const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const pattern = new RegExp(`^#{1,6}\\s+${escaped}\\s*$`, "i");
     const start = lines.findIndex((line) => pattern.test(line));
