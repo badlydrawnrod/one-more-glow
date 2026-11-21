@@ -3,8 +3,9 @@
 ## Scope and status
 
 **Status: Accepted. Implementation: Partial.** On touch devices, provide twin
-virtual sticks in landscape, and place them below the play area in portrait.
-Every game screen must be usable without a keyboard or gamepad.
+virtual sticks beside the play area in landscape, and place them below the play
+area in portrait. Every game screen must be usable without a keyboard or
+gamepad.
 
 Make Very Angry Robots playable on touch devices without requiring a keyboard
 or gamepad. Retain the existing keyboard and standard-mapped gamepad controls.
@@ -14,8 +15,11 @@ actions as the existing input methods; it does not change game simulation rules.
 ## Touch behavior
 
 - On touch-capable devices, show two directional controls during gameplay. In
-  landscape, place them over opposite lower sides of the play area. In portrait,
-  place them underneath the play area so they do not cover the game.
+  landscape, center the 4:3 play area and place the sticks in separate side
+  rails so they do not cover it. Size the play area and rails to fit the
+  available viewport; when landscape is too narrow for usable side targets,
+  place the sticks below the play area. In portrait, place them underneath the
+  play area so they do not cover the game.
   Derive each control's direction from the touch displacement relative to its
   neutral center, with a neutral zone around that center. The left control moves
   the player; the right control aims and fires in the same eight directions as
@@ -43,9 +47,9 @@ actions as the existing input methods; it does not change game simulation rules.
   capture, browser focus loss, and screen transitions. A stale touch must not
   move or fire after returning to the game or resuming play.
 - Keep touch targets and gameplay legible at narrow and wide viewport sizes.
-  In landscape, controls must not obscure important game information. In
-  portrait, place the 4:3 play area above the controls and allow the page to
-  scroll when the full layout cannot fit vertically.
+  In landscape, controls must not obscure the play area. In portrait, place the
+  4:3 play area above the controls and allow the page to scroll when the full
+  layout cannot fit vertically.
 - Prevent browser gestures from interrupting an active gameplay touch gesture
   while preserving normal page scrolling outside the game interaction.
 
@@ -62,6 +66,7 @@ actions as the existing input methods; it does not change game simulation rules.
 - Start from Main Menu and Top Scores, switch attract screens, pause and resume,
   enter and submit initials (including correction), and open, operate and close
   Settings using touch alone.
-- Check controls in landscape over the play area and in portrait below it.
-  Confirm browser scrolling and zoom gestures remain available outside active
-  control interactions.
+- Check controls in landscape in the side rails and in portrait below the play
+  area; also check that narrow landscape falls back below the play area. Confirm
+  browser scrolling and zoom gestures remain available outside active control
+  interactions.

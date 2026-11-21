@@ -28,14 +28,54 @@ footer { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 2px; color
 footer p { margin: 0; } strong { color: #eac886; margin-right: 5px; } .hint { flex-basis: 100%; color: #ed9093; }
 @media (max-width: 600px) { main { width: calc(100% - 16px); padding-top: 10px; } header p { display: none; } footer { font-size: 9px; } }
 @media (hover: none) and (pointer: coarse) {
-  .touch-controls { display: block; position: absolute; top: 50%; left: 50%; width: min(100%, 1024px, 133.333cqh); aspect-ratio: 4 / 3; transform: translate(-50%, -50%); pointer-events: none; }
-  .touch-stick { pointer-events: auto; }
+  main { width: min(calc(100% - 32px), 1400px); }
+  .game {
+    --playfield-width: min(1024px, 133.333cqh, calc(100% - 384px));
+    grid-template-columns: minmax(192px, 1fr) minmax(0, var(--playfield-width)) minmax(192px, 1fr);
+  }
+  .game-frame { grid-column: 2; grid-row: 1; width: 100%; }
+  .touch-controls { display: contents; }
+  .touch-stick {
+    position: static;
+    bottom: auto;
+    width: min(clamp(112px, 19vw, 176px), calc(100% - 16px));
+    margin-top: clamp(12px, 4vh, 40px);
+    justify-self: center;
+    align-self: center;
+    grid-row: 1;
+    pointer-events: auto;
+  }
+  .touch-stick[data-touch-stick="move"] { grid-column: 1; left: auto; right: auto; }
+  .touch-stick[data-touch-stick="aim"] { grid-column: 3; left: auto; right: auto; }
+  .stick-ring { width: min(clamp(92px, 16vw, 142px), 100%); }
+}
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .game-frame { box-shadow: inset 0 0 35px #1c617132; }
+}
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 560px) {
+  main { width: min(calc(100% - 32px), 1024px); height: auto; min-height: 100dvh; grid-template-rows: auto auto auto; }
+  .game { display: flex; flex-direction: column; gap: 10px; container-type: normal; }
+  .game-frame { width: min(100%, calc((100dvh - 190px) * 4 / 3), 1024px); flex: none; }
+  .touch-controls {
+    display: flex;
+    position: static;
+    justify-content: space-around;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: auto;
+    min-height: 136px;
+    grid-template-columns: none;
+    transform: none;
+  }
+  .touch-stick { width: min(42vw, 176px); margin: 0; }
+  .stick-ring { width: clamp(92px, 22vw, 132px); }
 }
 @media (orientation: portrait) and (hover: none) and (pointer: coarse) {
-  main { height: auto; min-height: 100dvh; grid-template-rows: auto auto auto; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  main { width: min(calc(100% - 16px), 1024px); height: auto; min-height: 100dvh; grid-template-rows: auto auto auto; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
   .game { display: flex; flex-direction: column; gap: 10px; min-height: 0; container-type: normal; }
   .game-frame { width: min(100%, calc((100dvh - 160px) * 4 / 3), 1024px); flex: none; }
-  .touch-controls { display: flex; position: static; justify-content: space-around; align-items: center; gap: 8px; width: 100%; min-height: 154px; aspect-ratio: auto; transform: none; pointer-events: none; }
-  .touch-stick { position: static; width: min(42vw, 176px); }
+  .touch-controls { display: flex; position: static; justify-content: space-around; align-items: center; gap: 8px; width: 100%; height: auto; min-height: 154px; grid-template-columns: none; aspect-ratio: auto; transform: none; pointer-events: none; }
+  .touch-stick { position: static; width: min(42vw, 176px); margin: 0; }
   .stick-ring { width: clamp(92px, 27vw, 142px); }
 }

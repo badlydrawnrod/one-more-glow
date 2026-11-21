@@ -8,8 +8,9 @@ play.
 
 **Success criteria**
 
-- In landscape, two virtual sticks appear over opposite lower sides of the play
-  area. In portrait, they appear below the 4:3 play area.
+- In landscape, two virtual sticks appear in side rails beside a centered 4:3
+  play area, without overlap. If the rails cannot fit usable targets, the sticks
+  appear below the play area. In portrait, they appear below the 4:3 play area.
 - The left stick moves in eight directions. The right stick aims and fires in
   eight directions while held; movement and aiming work at the same time.
 - Touch alone can start and navigate the menu screens, pause and resume, enter
@@ -53,10 +54,10 @@ flow, focus policy and rendering, as described in the
   interaction for Settings. Confirm a held touch cannot leak into a new screen
   or resume gameplay after focus returns.
 - [x] **Add responsive touch controls.** Update `index.html` and `src/style.css`
-  for the two stick surfaces: overlay them on opposite lower sides of the play
-  area in landscape, and put them after the play area in portrait. Keep targets
-  legible at phone sizes, avoid covering important game information in
-  landscape, and scope browser-gesture suppression to active control
+  for the two stick surfaces: put them in side rails around the centered play
+  area in landscape, use a below-play-area fallback when side rails are too
+  narrow, and put them below the play area in portrait. Keep targets legible at
+  phone sizes and scope browser-gesture suppression to active control
   interactions so page scrolling remains available elsewhere. Show controls on
   touch-capable devices and retain the existing keyboard/gamepad instructions
   and controls.
@@ -64,7 +65,7 @@ flow, focus policy and rendering, as described in the
   for the touch-input model and pointer lifecycle, then run
   `npm run test --workspace=very-angry-robots` and `npm run build:robots` from
   the repository root.
-- [ ] **Walk through touch hardware layouts.** Manually walk through
+- [x] **Walk through touch hardware layouts.** Manually walk through
   start/navigation, simultaneous move and fire, pause/resume, initials and
   Settings on touch hardware in landscape and portrait. Confirm controls sit
   in the specified position, touch cancel and focus loss release input, page
@@ -93,13 +94,9 @@ Step 4 automated checks passed:
 - `npm run build:robots` — shared package and Very Angry Robots production
   builds passed.
 
-The landscape and portrait walkthroughs on touch hardware remain open. The
-browser event integration and responsive layout still need device checks for
-menu and initials interactions, simultaneous movement and firing, pointer
-cancellation, focus loss, scrolling outside the controls, control placement,
-and gameplay readability.
+The user reports verifying touch behavior on a Motorola Edge 30 phone and a
+Samsung Galaxy Tab S9 FE tablet.
 
 ## Next action
 
-Complete the landscape and portrait touch walkthroughs on touch hardware and
-close any issues they reveal.
+No remaining work in this plan.
