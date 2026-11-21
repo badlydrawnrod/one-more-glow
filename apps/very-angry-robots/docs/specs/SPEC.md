@@ -20,6 +20,8 @@ organized by capability:
 - [High scores and attract screens](high-scores.md) — accepted and implemented.
 - [Pause and display settings](pause-and-display-settings.md) — pause controls and
   player-adjustable vector display settings.
+- [Touch controls](touch-controls.md) — accepted and implemented touch gameplay
+  and screen-flow controls.
 - [The Captain](captain.md) — the persistent pursuer and its presentation.
 - [Audio](audio.md) — sound effects, Captain speech and robot taunts.
 

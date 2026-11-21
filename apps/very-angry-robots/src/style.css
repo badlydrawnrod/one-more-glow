@@ -14,9 +14,68 @@ header { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; margi
 header span { color: #64c7d8; font-size: 10px; letter-spacing: .15em; }
 h1 { margin: 0; font-size: clamp(15px, 2.5vw, 23px); letter-spacing: .09em; color: #fff2cf; }
 header p { margin: 0 0 0 auto; color: #a56b69; font-size: 10px; }
-.game { display: grid; min-height: 0; place-items: center; container-type: size; }
+.game { display: grid; position: relative; min-height: 0; place-items: center; container-type: size; }
 .game-frame { width: min(100%, 1024px, 133.333cqh); aspect-ratio: 4 / 3; overflow: hidden; outline: 1px solid #345263; background: #05080d; box-shadow: 0 0 35px #1c617132; }
 canvas { display: block; width: 100%; height: 100%; }
+.touch-controls { display: none; }
+.touch-stick { --thumb-x: 0px; --thumb-y: 0px; position: absolute; bottom: 3%; display: grid; justify-items: center; gap: 5px; width: clamp(112px, 19vw, 176px); color: #bdeef5; font-size: 9px; font-weight: 700; letter-spacing: .12em; user-select: none; -webkit-user-select: none; touch-action: none; }
+.touch-stick[data-touch-stick="move"] { left: 5%; }
+.touch-stick[data-touch-stick="aim"] { right: 5%; }
+.stick-ring { display: grid; place-items: center; width: clamp(92px, 16vw, 142px); aspect-ratio: 1; border: 1px solid #72dcea99; border-radius: 50%; background: #0a1b29aa; box-shadow: inset 0 0 0 9px #52b7c522, 0 0 20px #32b9d033; }
+.stick-knob { display: block; width: 38%; aspect-ratio: 1; transform: translate(var(--thumb-x), var(--thumb-y)); border: 1px solid #c4faff; border-radius: 50%; background: #79dce9aa; box-shadow: 0 0 12px #61dcec88; pointer-events: none; }
+.stick-label { text-shadow: 0 1px 4px #000; }
 footer { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 12px 2px; color: #89a5af; font-size: 10px; letter-spacing: .04em; }
 footer p { margin: 0; } strong { color: #eac886; margin-right: 5px; } .hint { flex-basis: 100%; color: #ed9093; }
 @media (max-width: 600px) { main { width: calc(100% - 16px); padding-top: 10px; } header p { display: none; } footer { font-size: 9px; } }
+@media (hover: none) and (pointer: coarse) {
+  main { width: min(calc(100% - 32px), 1400px); }
+  .game {
+    --playfield-width: min(1024px, 133.333cqh, calc(100% - 384px));
+    grid-template-columns: minmax(192px, 1fr) minmax(0, var(--playfield-width)) minmax(192px, 1fr);
+  }
+  .game-frame { grid-column: 2; grid-row: 1; width: 100%; }
+  .touch-controls { display: contents; }
+  .touch-stick {
+    position: static;
+    bottom: auto;
+    width: min(clamp(112px, 19vw, 176px), calc(100% - 16px));
+    margin-top: clamp(12px, 4vh, 40px);
+    justify-self: center;
+    align-self: center;
+    grid-row: 1;
+    pointer-events: auto;
+  }
+  .touch-stick[data-touch-stick="move"] { grid-column: 1; left: auto; right: auto; }
+  .touch-stick[data-touch-stick="aim"] { grid-column: 3; left: auto; right: auto; }
+  .stick-ring { width: min(clamp(92px, 16vw, 142px), 100%); }
+}
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) {
+  .game-frame { box-shadow: inset 0 0 35px #1c617132; }
+}
+@media (hover: none) and (pointer: coarse) and (orientation: landscape) and (max-width: 560px) {
+  main { width: min(calc(100% - 32px), 1024px); height: auto; min-height: 100dvh; grid-template-rows: auto auto auto; }
+  .game { display: flex; flex-direction: column; gap: 10px; container-type: normal; }
+  .game-frame { width: min(100%, calc((100dvh - 190px) * 4 / 3), 1024px); flex: none; }
+  .touch-controls {
+    display: flex;
+    position: static;
+    justify-content: space-around;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    height: auto;
+    min-height: 136px;
+    grid-template-columns: none;
+    transform: none;
+  }
+  .touch-stick { width: min(42vw, 176px); margin: 0; }
+  .stick-ring { width: clamp(92px, 22vw, 132px); }
+}
+@media (orientation: portrait) and (hover: none) and (pointer: coarse) {
+  main { width: min(calc(100% - 16px), 1024px); height: auto; min-height: 100dvh; grid-template-rows: auto auto auto; padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+  .game { display: flex; flex-direction: column; gap: 10px; min-height: 0; container-type: normal; }
+  .game-frame { width: min(100%, calc((100dvh - 160px) * 4 / 3), 1024px); flex: none; }
+  .touch-controls { display: flex; position: static; justify-content: space-around; align-items: center; gap: 8px; width: 100%; height: auto; min-height: 154px; grid-template-columns: none; aspect-ratio: auto; transform: none; pointer-events: none; }
+  .touch-stick { position: static; width: min(42vw, 176px); margin: 0; }
+  .stick-ring { width: clamp(92px, 27vw, 142px); }
+}

@@ -13,6 +13,17 @@ export interface Direction {
   y: number;
 }
 
+export type TouchStick = "move" | "aim";
+
+/** Browser-independent state produced by the two virtual sticks. */
+export interface TouchInputState {
+  move: Direction;
+  /** Last non-neutral direction from the aim stick, retained for player facing. */
+  aim: Direction;
+  /** True only while the aim stick is outside its neutral zone. */
+  fire: boolean;
+}
+
 export interface InputState {
   move: Direction;
   aim: Direction;
@@ -36,6 +47,76 @@ const MOVEMENT_KEYS = new Set(["w", "a", "s", "d"]);
 const AIM_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
 const INPUT_KEYS = new Set([...MOVEMENT_KEYS, ...AIM_KEYS, "Enter", "Backspace"]);
 const GAMEPAD_DEAD_ZONE = 0.2;
+const TOUCH_NEUTRAL_ZONE = 0.18;
+
+/**
+ * Tracks virtual-stick input without depending on DOM or browser pointer APIs.
+ * Coordinates passed to the methods are offsets from the stick's neutral center,
+ * normalized so a full stick radius is 1.
+ */
+export class TouchInputModel {
+  private readonly pointerByStick = new Map<TouchStick, number>();
+  private readonly directionByStick = new Map<TouchStick, Direction>();
+  private readonly stickByPointer = new Map<number, TouchStick>();
+  private lastAim: Direction = ZERO;
+
+  /** Assign a pointer to a neutral stick; an already-owned stick is unchanged. */
+  pointerDown(stick: TouchStick, pointerId: number, dx: number, dy: number): boolean {
+    if (this.pointerByStick.has(stick) || this.stickByPointer.has(pointerId)) return false;
+    this.pointerByStick.set(stick, pointerId);
+    this.stickByPointer.set(pointerId, stick);
+    this.setDirection(stick, dx, dy);
+    return true;
+  }
+
+  /** Update only the stick owned by this pointer. */
+  pointerMove(pointerId: number, dx: number, dy: number): boolean {
+    const stick = this.stickByPointer.get(pointerId);
+    if (!stick) return false;
+    this.setDirection(stick, dx, dy);
+    return true;
+  }
+
+  /** Release only the stick owned by this pointer. */
+  pointerUp(pointerId: number): boolean {
+    const stick = this.stickByPointer.get(pointerId);
+    if (!stick) return false;
+    this.stickByPointer.delete(pointerId);
+    this.pointerByStick.delete(stick);
+    this.directionByStick.delete(stick);
+    return true;
+  }
+
+  /** Cancellation releases the pointer just like pointerup, without affecting its peer. */
+  pointerCancel(pointerId: number): boolean {
+    return this.pointerUp(pointerId);
+  }
+
+  /** Release every active pointer, such as when focus is lost or a screen changes. */
+  clear(): void {
+    this.pointerByStick.clear();
+    this.directionByStick.clear();
+    this.stickByPointer.clear();
+  }
+
+  read(): TouchInputState {
+    return {
+      move: this.directionByStick.get("move") ?? ZERO,
+      aim: this.lastAim,
+      fire: Boolean(this.directionByStick.get("aim")),
+    };
+  }
+
+  private setDirection(stick: TouchStick, dx: number, dy: number): void {
+    const direction = quantizeTouchDirection(dx, dy);
+    if (direction.x === 0 && direction.y === 0) {
+      this.directionByStick.delete(stick);
+      return;
+    }
+    this.directionByStick.set(stick, direction);
+    if (stick === "aim") this.lastAim = direction;
+  }
+}
 
 /** Tracks controls without touching DOM or navigator APIs. */
 export class InputController {
@@ -194,6 +275,20 @@ function applyDeadZone(x: number, y: number): Direction {
   if (!Number.isFinite(magnitude) || magnitude <= GAMEPAD_DEAD_ZONE) return ZERO;
   const outputMagnitude = Math.min(1, (magnitude - GAMEPAD_DEAD_ZONE) / (1 - GAMEPAD_DEAD_ZONE));
   return { x: x / magnitude * outputMagnitude, y: y / magnitude * outputMagnitude };
+}
+
+function quantizeTouchDirection(dx: number, dy: number): Direction {
+  const magnitude = Math.hypot(dx, dy);
+  if (!Number.isFinite(magnitude) || magnitude <= TOUCH_NEUTRAL_ZONE) return ZERO;
+
+  const sector = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
+  const angle = sector * Math.PI / 4;
+  const diagonal = Math.abs(sector % 2) === 1;
+  const component = diagonal ? Math.SQRT1_2 : 1;
+  return {
+    x: Math.round(Math.cos(angle)) * (diagonal ? component : 1),
+    y: Math.round(Math.sin(angle)) * (diagonal ? component : 1),
+  };
 }
 
 function combineDirections(a: Direction, b: Direction): Direction {

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { InputController } from "./input.ts";
+import { InputController, TouchInputModel } from "./input.ts";
 
 test("keyboard movement and aiming are independent and support diagonals", () => {
   const input = new InputController();
@@ -207,4 +207,84 @@ test("gamepad controls held across a screen transition stay suppressed until rel
   assert.ok(fresh.move.x > 0);
   assert.equal(fresh.startPressed, true);
   assert.equal(fresh.settingsPressed, true);
+});
+
+test("touch sticks quantize displacement to the eight normalized directions", () => {
+  const input = new TouchInputModel();
+  const directions = [
+    [1, 0, { x: 1, y: 0 }],
+    [1, 1, { x: Math.SQRT1_2, y: Math.SQRT1_2 }],
+    [0, 1, { x: 0, y: 1 }],
+    [-1, 1, { x: -Math.SQRT1_2, y: Math.SQRT1_2 }],
+    [-1, 0, { x: -1, y: 0 }],
+    [-1, -1, { x: -Math.SQRT1_2, y: -Math.SQRT1_2 }],
+    [0, -1, { x: 0, y: -1 }],
+    [1, -1, { x: Math.SQRT1_2, y: -Math.SQRT1_2 }],
+  ];
+
+  for (const [dx, dy, expected] of directions) {
+    input.pointerDown("move", 1, dx, dy);
+    assert.deepEqual(input.read().move, expected);
+    input.pointerUp(1);
+  }
+});
+
+test("touch sticks have a neutral zone and aim remains after fire is released", () => {
+  const input = new TouchInputModel();
+  input.pointerDown("aim", 5, 0.1, 0);
+  assert.deepEqual(input.read(), { move: { x: 0, y: 0 }, aim: { x: 0, y: 0 }, fire: false });
+
+  input.pointerMove(5, 0.8, 0.1);
+  assert.deepEqual(input.read(), { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: true });
+  input.pointerMove(5, 0.12, 0.02);
+  assert.deepEqual(input.read(), { move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: false });
+});
+
+test("touch pointers control independent sticks and release only their own stick", () => {
+  const input = new TouchInputModel();
+  assert.equal(input.pointerDown("move", 10, 0, -1), true);
+  assert.equal(input.pointerDown("aim", 20, 1, 0), true);
+  assert.equal(input.pointerDown("move", 30, -1, 0), false);
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: -1 }, aim: { x: 1, y: 0 }, fire: true,
+  });
+
+  assert.equal(input.pointerUp(10), true);
+  assert.equal(input.pointerUp(10), false);
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: true,
+  });
+
+  input.clear();
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: false,
+  });
+});
+
+test("touch cancellation releases only the canceled pointer and permits reuse", () => {
+  const input = new TouchInputModel();
+  input.pointerDown("move", 31, 1, 0);
+  input.pointerDown("aim", 32, 0, -1);
+
+  assert.equal(input.pointerCancel(31), true);
+  assert.equal(input.pointerCancel(31), false);
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: 0 }, aim: { x: 0, y: -1 }, fire: true,
+  });
+
+  assert.equal(input.pointerDown("move", 31, -1, 0), true);
+  assert.deepEqual(input.read().move, { x: -1, y: 0 });
+});
+
+test("clearing touch input on focus loss or screen changes releases every active pointer", () => {
+  const input = new TouchInputModel();
+  input.pointerDown("move", 41, 0, 1);
+  input.pointerDown("aim", 42, 1, 0);
+  input.clear();
+
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: false,
+  });
+  assert.equal(input.pointerMove(41, -1, 0), false);
+  assert.equal(input.pointerUp(42), false);
 });
