@@ -12,10 +12,20 @@
       <header><span>ONE MORE GLOW</span><h1>VERY ANGRY ROBOTS</h1><p>MANY ROOMS. MANY ANGRY ROBOTS.</p></header>
       <section class="game" aria-label="Very Angry Robots game">
         <div class="game-frame">
-          <canvas id="screen" width="1024" height="768" aria-label="Very Angry Robots. WASD moves, arrow keys fire. Gamepad left stick moves and right stick fires. Enter or gamepad Start begins; P or gamepad Start pauses and resumes. S or gamepad Back opens display settings from the menu or pause screen."></canvas>
+          <canvas id="screen" width="1024" height="768" aria-label="Very Angry Robots. Touch left stick moves and right stick aims and fires. WASD moves, arrow keys fire. Gamepad left stick moves and right stick fires. Enter or gamepad Start begins; P or gamepad Start pauses and resumes. S or gamepad Back opens display settings from the menu or pause screen."></canvas>
+        </div>
+        <div class="touch-controls" aria-label="Touch controls">
+          <div class="touch-stick" data-touch-stick="move" role="group" aria-label="Move">
+            <span class="stick-ring" aria-hidden="true"><span class="stick-knob"></span></span>
+            <span class="stick-label">MOVE</span>
+          </div>
+          <div class="touch-stick" data-touch-stick="aim" role="group" aria-label="Aim and fire">
+            <span class="stick-ring" aria-hidden="true"><span class="stick-knob"></span></span>
+            <span class="stick-label">AIM / FIRE</span>
+          </div>
         </div>
       </section>
-      <footer><p><strong>MOVE</strong> WASD / LEFT STICK</p><p><strong>FIRE</strong> ARROWS / RIGHT STICK</p><p><strong>START</strong> ENTER / GAMEPAD START</p><p><strong>PAUSE</strong> P / GAMEPAD START</p><p><strong>SETTINGS</strong> S / GAMEPAD BACK</p><p class="hint">Walls and closed doors are electrified. Leave through an open doorway.</p></footer>
+      <footer><p><strong>MOVE</strong> WASD / LEFT STICK / TOUCH LEFT</p><p><strong>FIRE</strong> ARROWS / RIGHT STICK / TOUCH RIGHT</p><p><strong>START</strong> ENTER / GAMEPAD START / TAP</p><p><strong>PAUSE</strong> P / GAMEPAD START / TAP</p><p><strong>SETTINGS</strong> S / GAMEPAD BACK / TAP</p><p class="hint">Walls and closed doors are electrified. Leave through an open doorway.</p></footer>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>

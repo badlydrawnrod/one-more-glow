@@ -28,6 +28,8 @@ registerAppServiceWorker();
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
 if (!canvas) throw new Error("Missing game canvas");
 const screen = canvas;
+const gameElement = document.querySelector<HTMLElement>(".game");
+if (!gameElement) throw new Error("Missing game controls container");
 const gl = screen.getContext("webgl2");
 if (!gl) throw new Error("WebGL2 is unavailable");
 const drawing = createWebGL2Renderer(gl);
@@ -49,7 +51,7 @@ const game = createGame();
 const gameView: GameView = game;
 const input = new InputController();
 const touchInput = new TouchInputModel();
-const touchPointerOrigins = new Map<number, { x: number; y: number }>();
+const touchPointerOrigins = new Map<number, { x: number; y: number; radius: number; target: HTMLElement }>();
 let latestGamepadState: GamepadState | undefined;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
@@ -128,11 +130,14 @@ function canvasGamePosition(event: PointerEvent): Point {
 }
 
 function clearTouchInput(): void {
-  const pointerIds = [...touchPointerOrigins.keys()];
+  const captures = [...touchPointerOrigins.entries()];
   touchPointerOrigins.clear();
   touchInput.clear();
-  for (const pointerId of pointerIds) {
-    if (screen.hasPointerCapture(pointerId)) screen.releasePointerCapture(pointerId);
+  for (const [pointerId, origin] of captures) {
+    origin.target.style.setProperty("--thumb-x", "0px");
+    origin.target.style.setProperty("--thumb-y", "0px");
+    const target = origin.target;
+    if (target?.hasPointerCapture(pointerId)) target.releasePointerCapture(pointerId);
   }
 }
 
@@ -661,15 +666,29 @@ screen.addEventListener("pointerdown", (event) => {
     touchActionAt(position);
     return;
   }
-  if (paused) return;
-
-  const stick = position[0] < 0 ? "move" : "aim";
-  if (touchInput.pointerDown(stick, event.pointerId, 0, 0)) {
-    touchPointerOrigins.set(event.pointerId, { x: event.clientX, y: event.clientY });
-    screen.setPointerCapture(event.pointerId);
-  }
+  // Gameplay movement and aiming are accepted only on the visible stick surfaces.
 });
-screen.addEventListener("pointermove", (event) => {
+gameElement.addEventListener("pointerdown", (event) => {
+  const target = (event.target as Element | null)?.closest<HTMLElement>("[data-touch-stick]");
+  if (!target || screenFlow.screen !== "playing" || paused || settingsOpen) return;
+  event.preventDefault();
+  audio.unlock();
+  const stick = target.dataset.touchStick;
+  if (stick !== "move" && stick !== "aim") return;
+  const ring = target.querySelector<HTMLElement>(".stick-ring");
+  if (!ring) return;
+  const rect = ring.getBoundingClientRect();
+  const radius = Math.max(1, Math.min(rect.width, rect.height) * 0.38);
+  if (!touchInput.pointerDown(stick, event.pointerId, 0, 0)) return;
+  touchPointerOrigins.set(event.pointerId, {
+    x: rect.left + rect.width / 2,
+    y: rect.top + rect.height / 2,
+    radius,
+    target,
+  });
+  target.setPointerCapture(event.pointerId);
+});
+gameElement.addEventListener("pointermove", (event) => {
   if (settingsOpen && event.buttons) {
     if (settings.pointer(settingsPointerPosition(event), false) === "close") closeSettings();
     return;
@@ -677,20 +696,33 @@ screen.addEventListener("pointermove", (event) => {
   const origin = touchPointerOrigins.get(event.pointerId);
   if (!origin) return;
   event.preventDefault();
-  const rect = screen.getBoundingClientRect();
-  touchInput.pointerMove(event.pointerId,
-    (event.clientX - origin.x) / Math.max(1, rect.width * 0.18),
-    (event.clientY - origin.y) / Math.max(1, rect.height * 0.18));
+  const dx = (event.clientX - origin.x) / origin.radius;
+  const dy = (event.clientY - origin.y) / origin.radius;
+  touchInput.pointerMove(event.pointerId, dx, dy);
+  const length = Math.hypot(dx, dy);
+  const scale = length > 1 ? 1 / length : 1;
+  origin.target.style.setProperty("--thumb-x", `${dx * scale * origin.radius * 0.55}px`);
+  origin.target.style.setProperty("--thumb-y", `${dy * scale * origin.radius * 0.55}px`);
 });
 function releasePointer(event: PointerEvent): void {
-  if (touchPointerOrigins.delete(event.pointerId)) touchInput.pointerUp(event.pointerId);
+  const origin = touchPointerOrigins.get(event.pointerId);
+  if (origin) {
+    touchPointerOrigins.delete(event.pointerId);
+    touchInput.pointerUp(event.pointerId);
+    origin.target.style.setProperty("--thumb-x", "0px");
+    origin.target.style.setProperty("--thumb-y", "0px");
+    if (origin.target.hasPointerCapture(event.pointerId)) origin.target.releasePointerCapture(event.pointerId);
+  }
   if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId);
 }
-screen.addEventListener("pointerup", releasePointer);
-screen.addEventListener("pointercancel", releasePointer);
-screen.addEventListener("lostpointercapture", (event) => {
+gameElement.addEventListener("pointerup", releasePointer);
+gameElement.addEventListener("pointercancel", releasePointer);
+gameElement.addEventListener("lostpointercapture", (event) => {
+  const origin = touchPointerOrigins.get(event.pointerId);
   touchPointerOrigins.delete(event.pointerId);
   touchInput.pointerUp(event.pointerId);
+  origin?.target.style.setProperty("--thumb-x", "0px");
+  origin?.target.style.setProperty("--thumb-y", "0px");
 });
 function pauseForFocusLoss(): void {
   clearTouchInput();

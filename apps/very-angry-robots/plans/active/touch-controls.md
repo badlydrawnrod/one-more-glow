@@ -52,7 +52,7 @@ flow, focus policy and rendering, as described in the
   correction and submission operable by touch; retain the existing pointer
   interaction for Settings. Confirm a held touch cannot leak into a new screen
   or resume gameplay after focus returns.
-- [ ] **Add responsive touch controls.** Update `index.html` and `src/style.css`
+- [x] **Add responsive touch controls.** Update `index.html` and `src/style.css`
   for the two stick surfaces: overlay them on opposite lower sides of the play
   area in landscape, and put them after the play area in portrait. Keep targets
   legible at phone sizes, avoid covering important game information in
@@ -84,9 +84,10 @@ Step 2 checks passed:
 - `npm run check --workspace=very-angry-robots` — TypeScript check passed.
 
 The production build and landscape/portrait device walkthroughs have not been
-run. The browser event integration has not yet been exercised on touch hardware.
+run. The browser event integration and responsive control layout have not yet
+been exercised on touch hardware.
 
 ## Next action
 
-Add responsive touch controls in `index.html` and `src/style.css`, placing them
-over the play area in landscape and below it in portrait.
+Add focused tests for pointer lifecycle, run the app test suite and production
+build, then complete the landscape and portrait touch walkthroughs.
