@@ -1,28 +1,32 @@
 # Agent instructions
 
-One More Glow is a TypeScript workspace for retro-inspired vector graphics,
-with reusable packages under `packages/` and demo apps under `apps/`. The
-current drawing package's WebGL2 renderer implements the renderer-independent
-`DrawingContext`; preserve that boundary so future renderers can serve the
-same consumers.
+Start with the requested outcome and what would show it has been achieved.
+Use the guidance relevant to the task:
 
-## Start with the objective
+- **Implement a change:** Consult the owning app or package's `docs/specs/SPEC.md`
+  and relevant capabilities. For shared behavior, also consult the
+  [root spec index](docs/specs/SPEC.md). Follow the applicable
+  [engineering conventions](docs/engineering.md) and use the
+  [workspace commands](README.md#workspace-commands).
+- **Discuss or change a spec:** Read the relevant spec and the
+  [specification rules](docs/engineering.md#specifications). Only the developer
+  can accept requirements. Do not treat proposed or deferred capabilities as
+  accepted requirements, or treat an implementation request alone as acceptance.
+- **Create or continue a plan:** Read the [plan guide](plans/README.md) and
+  inspect relevant root and app-local active plans. Before reporting planned
+  work complete or preparing its final PR, follow the
+  [plan closure rule](plans/README.md#maintain-and-close-the-plan).
+- **Review or advise:** Inspect the requested scope and applicable contracts;
+  report findings or options as requested. See the [skills catalog](docs/skills.md)
+  for focused workflows.
 
-Identify the agreed outcome and what would show it has been achieved. Read the
-guidance that applies to the work.
+For substantial work or work that may overlap an active plan, inspect relevant
+root and app-local active plans. Read [architecture](docs/architecture.md) when
+work touches module boundaries, dependencies, or repository layout. Preserve
+the renderer-independent `DrawingContext` boundary when changing drawing code.
+Use the [verification evidence rule](docs/engineering.md#verification-evidence)
+when claiming a change or checkpoint has been verified.
 
-- Read `docs/engineering.md` for engineering conventions and how objectives, verification, specs, architecture, and plans fit together.
-- Read `docs/architecture.md` when a change touches module boundaries, dependencies or repository layout.
-- When working on a package, read its `docs/specs/SPEC.md` index if present, then the relevant capability specs it links.
-- When working on an app, read its `docs/specs/SPEC.md` index if present, then the relevant app capability specs it links.
-- For substantial work, read `plans/README.md` and inspect relevant root and app-local active plans.
-- Use `README.md` for workspace commands.
-
-Only the developer can accept specification requirements; follow the
-[specification acceptance rule](docs/engineering.md#specifications). Do not
-implement proposed or deferred capabilities as if they were accepted requirements.
-
-Before reporting planned work complete or preparing its final PR, follow the
-[plan closure rule](plans/README.md#maintain-and-close-the-plan).
-
-Before adding persistent guidance, check whether an existing authoritative document can be clarified or consolidated. Add a rule only when it captures a repository-specific decision that existing guidance and checks do not already cover.
+Before adding persistent guidance, check whether an existing authoritative
+document can be clarified or consolidated. Add a rule only when it captures a
+repository-specific decision that existing guidance and checks do not cover.

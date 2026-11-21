@@ -41,8 +41,10 @@ An abstraction or dependency must justify its maintenance cost. Do not add frame
 Start with the agreed objective and identify what would show that it has been
 achieved. Use observable success criteria where people could reasonably
 interpret the objective in different ways. Account for any relevant behavior
-that users or callers already rely on. An objective is enough to start work
-when no spec covers it.
+that users or callers already rely on. An agreed objective is enough to start
+implementation when no spec covers it. If the resulting behavior merits a
+spec, record it as proposed unless the developer has explicitly accepted it;
+follow the [specification rules](#specifications).
 
 Choose checks that exercise the intended outcome. Use automated checks for
 repeatable contracts and regressions. Use a manual walkthrough when judging

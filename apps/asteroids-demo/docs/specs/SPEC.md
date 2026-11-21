@@ -211,7 +211,7 @@ configurable bindings and online leaderboards are deferred.
 ## Accepted: live display settings
 
 **Status: Accepted.** Shared profile semantics and valid values are defined by
-the [vector display specification](../../../../packages/one-more-glow/docs/specs/SPEC.md#global-display-profile-options).
+the [vector display specification](../../../../packages/one-more-glow/docs/specs/vector-display.md#global-display-profile-options).
 
 **Implementation: Implemented.**
 

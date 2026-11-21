@@ -5,6 +5,12 @@ It gives the next person enough context to resume the work. See
 [work and documentation](../docs/engineering.md#work-and-documentation) for
 the roles of objectives, specifications, and architecture.
 
+## Find an active plan
+
+When asked to continue a plan, or when work may overlap ongoing work, inspect
+the relevant root and app-local `plans/active/` directories first. Follow an
+applicable plan and check it against the repository before resuming.
+
 ## When to create a plan
 
 Create a plan when the work has meaningful steps to sequence, a design decision
