@@ -20,8 +20,7 @@ matter to this work. Link applicable specs or architecture decisions.
 
 ## Verification
 
-Record what was actually checked and the results. For a pending check, record
-what is needed to run it.
+Give the checked state, command or review scope, observed result and gaps.
 
 ## Next action
 

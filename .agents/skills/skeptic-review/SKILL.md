@@ -1,6 +1,6 @@
 ---
 name: skeptic-review
-description: Review code, designs, specifications, or changes for questionable assumptions, correctness gaps, unverified claims, and credible failure scenarios. Use when asked for a Skeptic review or an evidence-based challenge to proposed or existing work.
+description: Review code, designs, specifications, or changes for questionable assumptions, correctness gaps, unverified claims, and credible failure scenarios. Use for a Skeptic review, including ambiguity review of a work item before substantial planning.
 ---
 # Skeptic Review
 
@@ -41,6 +41,22 @@ Consider:
 Distinguish demonstrated defects from plausible risks and unanswered questions.
 
 Do not speculate about hypothetical problems without explaining a credible failure scenario.
+
+## Before substantial planning
+
+Start from the work item, whether it is a request, issue or spec. Test its
+terms, scope and success criteria against a concrete case. What should the
+user observe if it fails? Look for conflicting commitments, missing
+constraints and proposals being treated as settled.
+
+Inspect the repository or run a small experiment to answer factual questions.
+Make routine implementation choices and explain consequential assumptions.
+Ask the requester only about decisions that affect intent, behavior, scope,
+compatibility or an important tradeoff. Group a few related questions, show
+how the answers would change the outcome, and recommend a choice when useful.
+Apply each answer to the work item and revisit any uncertainty it exposes.
+Use the [planning readiness rule](../../../plans/README.md#when-to-create-a-plan)
+to decide when to proceed. Focused questions suffice for this review.
 
 ## Findings
 
