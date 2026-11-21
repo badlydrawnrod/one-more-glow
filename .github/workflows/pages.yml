@@ -25,6 +25,8 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
       - run: npm ci
+      - name: Check conventions, boundaries, types, and behavior
+        run: npm run check
       - name: Build selected Pages apps
         run: npm run build:pages
         env:
