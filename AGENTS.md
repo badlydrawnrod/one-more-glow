@@ -18,6 +18,11 @@ guidance that applies to the work.
 - For substantial work, read `plans/README.md` and inspect relevant root and app-local active plans.
 - Use `README.md` for workspace commands.
 
-Do not implement proposed or deferred capabilities as if they were accepted requirements.
+Only the developer can accept specification requirements; follow the
+[specification acceptance rule](docs/engineering.md#specifications). Do not
+implement proposed or deferred capabilities as if they were accepted requirements.
+
+Before reporting planned work complete or preparing its final PR, follow the
+[plan closure rule](plans/README.md#maintain-and-close-the-plan).
 
 Before adding persistent guidance, check whether an existing authoritative document can be clarified or consolidated. Add a rule only when it captures a repository-specific decision that existing guidance and checks do not already cover.

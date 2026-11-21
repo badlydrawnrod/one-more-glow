@@ -92,16 +92,24 @@ Keep a spec for behavior worth preserving across changes. Describe the intent,
 observable rules, and rationale a future maintainer needs. Specify particular
 controls, values, or mechanisms when they are part of an agreed contract.
 
-Consult any relevant spec when changing behavior. If the objective changes an
-accepted requirement, make that decision explicit and update the spec as part
-of the change. Capture newly agreed, lasting behavior in the relevant spec,
-whether it was settled before implementation or learned through the work.
-Preserve unrelated open questions.
+Consult any relevant spec when changing behavior. Only the developer can accept
+a specification or a change to accepted requirements. An agent may record
+**Accepted** only when the developer has explicitly approved the relevant
+behavior; identify that decision and its scope in the spec or work item. Use
+approval already given without asking again. Discussion, an agent's review,
+implementation instructions, passing checks or a merge do not by themselves
+establish acceptance. If acceptance is unclear, keep the affected behavior
+**Proposed** and ask the developer when the decision is needed.
+
+Capture newly agreed, lasting behavior in the relevant spec, including decisions
+learned through implementation and subsequently approved by the developer.
+Keep proposed changes distinct from existing accepted requirements and preserve
+unrelated open questions.
 
 Mark maturity at the capability or section level where it matters.
 
 - **Proposed** is a candidate for discussion.
-- **Accepted** is agreed behavior that guides implementation.
+- **Accepted** is behavior explicitly approved by the developer that guides implementation.
 - **Deferred** is intentionally postponed.
 - **Superseded** has been replaced by another decision. Link to its replacement.
 

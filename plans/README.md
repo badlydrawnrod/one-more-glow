@@ -63,10 +63,18 @@ when marking a checkpoint passed or claiming the objective is verified. Work
 on independent steps and draft handoffs can proceed with gaps identified.
 Record significant decisions and their rationale, and keep the next action current.
 
-Before closing, check the objective against the observed results and call out
-any unmet criteria or remaining verification gaps. Closing with a gap requires
-the requester's explicit agreement to defer it. Keep the outstanding check,
-its consequence and the follow-up visible in the change description. Transfer
-lasting decisions to the appropriate spec or architecture document. Summarise
-the verification in the change description, then delete the completed plan.
-Retain a completed plan only for a specific historical reason.
+Closing the plan is part of completing the work. Before reporting completion or
+preparing the final PR:
+
+- Check the objective against observed results. An unmet criterion, pending
+  decision or verification gap keeps the plan active unless the developer has
+  explicitly agreed to defer it. Keep the plan's next action current while work
+  remains. Record any agreed deferral, its consequence and follow-up in the
+  change description.
+- Transfer lasting decisions to the appropriate spec or architecture document,
+  respecting the [specification acceptance rule](../docs/engineering.md#specifications).
+  Summarise actual verification evidence in the change description.
+- Delete the completed plan in the same change, including app-local plans.
+  Routine plan cleanup is part of the authorized work. Retain a completed plan
+  only at the developer's explicit request, with a recorded historical reason;
+  remove it from the active directory.

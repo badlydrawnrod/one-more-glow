@@ -17,6 +17,8 @@ matter to this work. Link applicable specs or architecture decisions.
 
 - [ ] **Step and observable outcome.** Name the starting point or prerequisite
   if useful. Give the checkpoint action or command, setup, and expected result.
+- [ ] **Close the plan.** Apply the closure rule in the repository's
+  `plans/README.md` before reporting completion or preparing the final PR.
 
 ## Verification
 
