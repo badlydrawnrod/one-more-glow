@@ -33,8 +33,12 @@ actions as the existing input methods; it does not change game simulation rules.
   for these on-screen prompts; in particular, provide a pause action during
   play and a resume action while paused.
 - Make initials entry possible by touch, including character selection,
-  correction, and submission. Existing pointer-operated Settings controls
-  remain available to touch.
+  correction, and submission. On the initials screen, use the left stick's
+  horizontal flick to move the selected slot and the right stick's vertical
+  flick to cycle its character. Each stick produces one step per flick and
+  rearms after returning to neutral. Taps may also select and cycle initials;
+  lower-screen tap areas correct and submit. Existing pointer-operated
+  Settings controls remain available to touch.
 - Release held touch input on pointer release or cancellation, loss of pointer
   capture, browser focus loss, and screen transitions. A stale touch must not
   move or fire after returning to the game or resuming play.

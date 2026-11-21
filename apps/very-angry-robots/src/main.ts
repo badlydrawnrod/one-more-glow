@@ -52,6 +52,8 @@ const gameView: GameView = game;
 const input = new InputController();
 const touchInput = new TouchInputModel();
 const touchPointerOrigins = new Map<number, { x: number; y: number; radius: number; target: HTMLElement }>();
+let touchInitialsSlotArmed = true;
+let touchInitialsCharArmed = true;
 let latestGamepadState: GamepadState | undefined;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
@@ -133,6 +135,8 @@ function clearTouchInput(): void {
   const captures = [...touchPointerOrigins.entries()];
   touchPointerOrigins.clear();
   touchInput.clear();
+  touchInitialsSlotArmed = true;
+  touchInitialsCharArmed = true;
   for (const [pointerId, origin] of captures) {
     origin.target.style.setProperty("--thumb-x", "0px");
     origin.target.style.setProperty("--thumb-y", "0px");
@@ -158,12 +162,12 @@ function touchActionAt(position: Point): void {
   }
 
   if (screenFlow.screen === "main-menu" || screenFlow.screen === "top-scores") {
-    if (y >= -270 && y <= -220) startRun();
+    if (y >= -355 && y < -310 && canOpenSettings()) openSettings();
     else if (y >= -310 && y < -270) {
       screenFlow = updateScreenFlow(screenFlow, { type: "advance" });
       audio.playEffects(["interface"]);
       clearTouchInput();
-    } else if (y >= -355 && y < -310 && canOpenSettings()) openSettings();
+    } else startRun();
     return;
   }
 
@@ -537,8 +541,8 @@ function drawAttractScreen(time: number): void {
         drawing.lineTo(x + 8, -12);
       }
     });
-    label("TAP AN INITIAL TO SELECT AND CHANGE IT", -55, white);
-    label("BACKSPACE CORRECTS - TAP LOWER LEFT TO CLEAR", -80, white);
+    label("LEFT STICK SELECTS - RIGHT STICK CHANGES", -55, white);
+    label("TAP AN INITIAL TO CHANGE - TAP LOWER LEFT TO CLEAR", -80, white);
     label("ENTER / START OR TAP LOWER RIGHT TO SUBMIT", -125, white);
   } else {
     drawBrand(time, 326);
@@ -670,7 +674,8 @@ screen.addEventListener("pointerdown", (event) => {
 });
 gameElement.addEventListener("pointerdown", (event) => {
   const target = (event.target as Element | null)?.closest<HTMLElement>("[data-touch-stick]");
-  if (!target || screenFlow.screen !== "playing" || paused || settingsOpen) return;
+  if (!target || (screenFlow.screen !== "playing" && screenFlow.screen !== "initials")
+    || paused || settingsOpen) return;
   event.preventDefault();
   audio.unlock();
   const stick = target.dataset.touchStick;
@@ -783,6 +788,26 @@ function readFrameInput(): FrameInput {
   latestGamepadState = readGamepadState(gamepad);
   const controls = input.read(latestGamepadState);
   const touch = touchInput.read();
+  let initialsSlotDelta = controls.initialsSlotDelta;
+  let initialsCharDelta = controls.initialsCharDelta;
+  if (screenFlow.screen === "initials") {
+    if (touch.move.x === 0) touchInitialsSlotArmed = true;
+    else if (touchInitialsSlotArmed) {
+      initialsSlotDelta = Math.max(-1, Math.min(1,
+        initialsSlotDelta + Math.sign(touch.move.x))) as -1 | 0 | 1;
+      touchInitialsSlotArmed = false;
+    }
+    const touchCharAxis = touch.fire ? touch.aim.y : 0;
+    if (touchCharAxis === 0) touchInitialsCharArmed = true;
+    else if (touchInitialsCharArmed) {
+      initialsCharDelta = Math.max(-1, Math.min(1,
+        initialsCharDelta + Math.sign(touchCharAxis))) as -1 | 0 | 1;
+      touchInitialsCharArmed = false;
+    }
+  } else {
+    touchInitialsSlotArmed = true;
+    touchInitialsCharArmed = true;
+  }
   const keyboardOrGamepadAim = controls.aim.x !== 0 || controls.aim.y !== 0;
   return {
     gamepad,
@@ -790,6 +815,8 @@ function readFrameInput(): FrameInput {
       ...controls,
       move: touch.move.x || touch.move.y ? touch.move : controls.move,
       aim: touch.fire || !keyboardOrGamepadAim ? touch.aim : controls.aim,
+      initialsSlotDelta,
+      initialsCharDelta,
     },
     fire: touch.fire || keyboardOrGamepadAim,
   };
