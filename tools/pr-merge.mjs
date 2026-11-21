@@ -53,10 +53,14 @@ function readDescriptionFile(args) {
 function validateDescription(body) {
   if (!body.trim()) fail("PR description must not be empty.");
 
+  const lines = body.split(/\r?\n/);
   for (const heading of ["Review scope", "Results", "Remaining gaps"]) {
     const escaped = heading.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const pattern = new RegExp(`^#{1,6}\\s+${escaped}\\s*$([\\s\\S]*?)(?=^#{1,6}\\s|$)`, "im");
-    const section = body.match(pattern)?.[1].trim();
+    const pattern = new RegExp(`^#{1,6}\\s+${escaped}\\s*$`, "i");
+    const start = lines.findIndex((line) => pattern.test(line));
+    let end = start + 1;
+    while (end < lines.length && !/^#{1,6}\s+/.test(lines[end])) end += 1;
+    const section = start < 0 ? "" : lines.slice(start + 1, end).join("\n").trim();
     if (!section) {
       fail(`PR description must include a non-empty "${heading}" section.`);
     }
