@@ -172,7 +172,7 @@ Run these commands from the repository root.
 | `npm run test --workspace=diagnostics` | Run the diagnostics sizing and frame-timing tests. |
 | `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
 | `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
-| `npm run pr:merge [-- --body-file <file>]` | Push the current branch, open a PR with the supplied description, watch its checks, then squash-merge it. The description must include non-empty **Summary** and **Verification** sections; see [PR description guidance](docs/engineering.md#pr-descriptions). |
+| `npm run pr:merge [-- --title <title>] [--body-file <file>]` | Push the current branch, open a PR with the supplied title and description, watch its checks, then squash-merge it. Without `--title`, the title is filled from commits. The description must include non-empty **Summary** and **Verification** sections; see the [prepare-pr skill](.agents/skills/prepare-pr/SKILL.md). |
 
 The PR description can come from stdin when `--body-file` is omitted, for
 example `cat pr-description.md | npm run pr:merge` or
