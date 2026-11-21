@@ -161,13 +161,14 @@ Run these commands from the repository root.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run check` | Check repository conventions and app dependencies, build the library, and type-check all apps. |
+| `npm run check` | Check repository conventions and app dependencies, build the library, type-check all apps, and run all behavioral tests. |
 | `npm run check:repo-conventions` | Check the README command list, skills catalog, and placement of check scripts in `tools/`. |
 | `npm run check:boundaries` | Check that apps import the library through its public entry point and avoid dependencies on other apps. |
 | `npm run check:asteroids` | Build the library and type-check Asteroids. |
 | `npm run check:gyruss` | Build the library and type-check Gyruss. |
 | `npm run check:robots` | Build the library and type-check Very Angry Robots. |
-| `npm test` | Run the library tests. |
+| `npm test` | Run behavioral tests for the library and apps that have test suites. |
+| `npm run test --workspace=diagnostics` | Run the diagnostics sizing and frame-timing tests. |
 | `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
 | `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
 

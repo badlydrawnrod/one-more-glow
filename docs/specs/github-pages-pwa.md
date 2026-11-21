@@ -89,9 +89,11 @@ scores.
 GitHub Actions builds the library and only the explicitly selected public app
 targets, assembles the complete site artifact, and deploys it through GitHub
 Pages. A deployment runs from the repository's default branch and can also be
-triggered manually. Pull-request validation may build and inspect the artifact
-but must not publish it. Generated deployment output is not committed as
-source.
+triggered manually. The workflow runs the root checks, including repository
+conventions, dependency boundaries, app type checks, and available behavioral
+test suites, before it builds the artifact. Pull-request runs inspect the
+artifact but must not publish it. Generated deployment output is not committed
+as source.
 
 The site build must not invoke the root all-app production build if that would
 build unpublished workspaces unnecessarily. It may reuse the library build
