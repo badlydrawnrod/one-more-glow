@@ -27,7 +27,8 @@
     "preview:robots": "npm run preview --workspace=very-angry-robots",
     "check:boundaries": "node tools/check-app-imports.mjs",
     "check:repo-conventions": "node tools/check-repo-conventions.mjs",
-    "verification:tree": "node tools/verification-tree.mjs"
+    "verification:tree": "node tools/verification-tree.mjs",
+    "pr:merge": "node tools/pr-merge.mjs"
   },
   "devDependencies": {
     "typescript": "~7.0.2",
