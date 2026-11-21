@@ -2,7 +2,7 @@
 
 ## Scope and status
 
-**Status: Accepted. Implementation: Partial.** On touch devices, provide twin
+**Status: Accepted. Implementation: Complete.** On touch devices, provide twin
 virtual sticks beside the play area in landscape, and place them below the play
 area in portrait. Every game screen must be usable without a keyboard or
 gamepad.
@@ -70,3 +70,12 @@ actions as the existing input methods; it does not change game simulation rules.
   area; also check that narrow landscape falls back below the play area. Confirm
   browser scrolling and zoom gestures remain available outside active control
   interactions.
+
+## Verification status
+
+- `npm run test --workspace=very-angry-robots` passed with 119 tests, including
+  touch cancellation, independent pointer release and clearing active touch
+  input.
+- `npm run build:robots` passed for the shared package and Very Angry Robots.
+- The user reports verifying touch behavior on a Motorola Edge 30 phone and a
+  Samsung Galaxy Tab S9 FE tablet.
