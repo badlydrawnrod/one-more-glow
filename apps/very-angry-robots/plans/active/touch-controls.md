@@ -44,7 +44,7 @@ flow, focus policy and rendering, as described in the
   release only the pointer whose interaction ended. Confirm it handles
   simultaneous pointers, neutral-zone transitions, release and cancellation
   without DOM dependencies.
-- [ ] **Connect browser pointer and screen actions.** In `src/main.ts`, capture
+- [x] **Connect browser pointer and screen actions.** In `src/main.ts`, capture
   the pointers used by gameplay controls and feed the touch model into the
   existing per-frame input and screen-flow paths. Clear touch state on
   `pointercancel`, lost capture, blur, visibility loss, and screen or pause
@@ -78,10 +78,15 @@ Step 1 checks passed:
   model scenarios.
 - `npm run check --workspace=very-angry-robots` — TypeScript check passed.
 
-The remaining implementation checks and landscape/portrait device walkthroughs
-have not been run.
+Step 2 checks passed:
+
+- `npm run test --workspace=very-angry-robots` — 117 tests passed.
+- `npm run check --workspace=very-angry-robots` — TypeScript check passed.
+
+The production build and landscape/portrait device walkthroughs have not been
+run. The browser event integration has not yet been exercised on touch hardware.
 
 ## Next action
 
-Connect browser pointer and screen actions in `src/main.ts`, feeding this model
-into the existing per-frame input and screen-flow paths.
+Add responsive touch controls in `index.html` and `src/style.css`, placing them
+over the play area in landscape and below it in portrait.

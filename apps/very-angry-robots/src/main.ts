@@ -5,7 +5,7 @@ import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_C
 import { createMaze } from "./maze.ts";
 import { createRoomGeometry } from "./room-geometry.ts";
 import { wallOutline } from "./wall-outline.ts";
-import { InputController, type GamepadState, type InputState } from "./input.ts";
+import { InputController, TouchInputModel, type GamepadState, type InputState } from "./input.ts";
 import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 import { transitionOffsets } from "./transition-presentation.ts";
 import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores } from "./high-scores.ts";
@@ -48,6 +48,8 @@ const settings = createSettings({
 const game = createGame();
 const gameView: GameView = game;
 const input = new InputController();
+const touchInput = new TouchInputModel();
+const touchPointerOrigins = new Map<number, { x: number; y: number }>();
 let latestGamepadState: GamepadState | undefined;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
@@ -100,6 +102,7 @@ function openSettings(): void {
   settingsNeedsGamepadNeutral = true;
   input.clearKeyboard();
   input.suppressGamepadWhileHeld(latestGamepadState);
+  clearTouchInput();
 }
 
 function closeSettings(): void {
@@ -109,12 +112,66 @@ function closeSettings(): void {
   settingsNeedsGamepadNeutral = true;
   input.clearKeyboard();
   input.suppressGamepadWhileHeld(latestGamepadState);
+  clearTouchInput();
 }
 
 function settingsPointerPosition(event: PointerEvent): Point {
   const rect = screen.getBoundingClientRect();
   return [(event.clientX - rect.left) / rect.width * 1024 - 512,
     384 - (event.clientY - rect.top) / rect.height * 768];
+}
+
+function canvasGamePosition(event: PointerEvent): Point {
+  const rect = screen.getBoundingClientRect();
+  return [(event.clientX - rect.left) / rect.width * 1024 - 512,
+    384 - (event.clientY - rect.top) / rect.height * 768];
+}
+
+function clearTouchInput(): void {
+  const pointerIds = [...touchPointerOrigins.keys()];
+  touchPointerOrigins.clear();
+  touchInput.clear();
+  for (const pointerId of pointerIds) {
+    if (screen.hasPointerCapture(pointerId)) screen.releasePointerCapture(pointerId);
+  }
+}
+
+function touchActionAt(position: Point): void {
+  const [x, y] = position;
+  if (screenFlow.screen === "playing") {
+    if (paused && y >= -58 && y <= -15 && canOpenSettings()) {
+      openSettings();
+      return;
+    }
+    if ((!paused && x >= 350 && y >= 285) || (paused && Math.abs(x) <= 300 && y >= -10 && y <= 90)) {
+      paused = !paused;
+      input.clearKeyboard();
+      input.suppressGamepadWhileHeld(latestGamepadState);
+      clearTouchInput();
+    }
+    return;
+  }
+
+  if (screenFlow.screen === "main-menu" || screenFlow.screen === "top-scores") {
+    if (y >= -270 && y <= -220) startRun();
+    else if (y >= -310 && y < -270) {
+      screenFlow = updateScreenFlow(screenFlow, { type: "advance" });
+      audio.playEffects(["interface"]);
+      clearTouchInput();
+    } else if (y >= -355 && y < -310 && canOpenSettings()) openSettings();
+    return;
+  }
+
+  if (screenFlow.screen === "initials") {
+    if (y >= -32 && y <= 32) {
+      const slot = Math.max(0, Math.min(2, Math.round((x + 28) / 28)));
+      initialsEntry = { ...initialsEntry, selectedSlot: slot };
+      initialsEntry = updateInitialsEntry(initialsEntry, { keyPresses: [], slotDelta: 0, charDelta: 1 });
+    } else if (y < -105 && x < 0) {
+      initialsEntry = updateInitialsEntry(initialsEntry,
+        { keyPresses: ["Backspace"], slotDelta: 0, charDelta: 0 });
+    } else if (y < -105 && x >= 0) submitInitials();
+  }
 }
 
 function handleSettingsGamepad(time: number, gamepad: Gamepad | undefined): void {
@@ -458,9 +515,9 @@ function drawAttractScreen(time: number): void {
     menuText("GAMEPAD", 55, -139, cyan, 15);
     menuText("LEFT STICK MOVE   RIGHT STICK FIRE", 55, -166, white);
     menuText("START PLAY / PAUSE", 55, -192, white);
-    label("PRESS ENTER OR START TO PLAY", attractPromptY.play, amber);
-    label("MOVE A DIRECTION TO VIEW TOP SCORES", attractPromptY.navigation, white);
-    label("S / BACK OR SELECT: SETTINGS", attractPromptY.settings, blue);
+    label("TAP OR PRESS ENTER / START TO PLAY", attractPromptY.play, amber);
+    label("TAP OR MOVE TO VIEW TOP SCORES", attractPromptY.navigation, white);
+    label("TAP HERE OR PRESS S / BACK FOR SETTINGS", attractPromptY.settings, blue);
   } else if (screenFlow.screen === "initials") {
     label("NEW HIGH SCORE", 150, amber);
     label("ENTER UP TO THREE INITIALS", 75, white);
@@ -475,9 +532,9 @@ function drawAttractScreen(time: number): void {
         drawing.lineTo(x + 8, -12);
       }
     });
-    label("TYPE LETTERS OR USE THE LEFT STICK FOR SLOTS", -55, white);
-    label("RIGHT STICK CHANGES LETTERS", -80, white);
-    label("BACKSPACE CORRECTS - ENTER OR START SUBMITS", -125, white);
+    label("TAP AN INITIAL TO SELECT AND CHANGE IT", -55, white);
+    label("BACKSPACE CORRECTS - TAP LOWER LEFT TO CLEAR", -80, white);
+    label("ENTER / START OR TAP LOWER RIGHT TO SUBMIT", -125, white);
   } else {
     drawBrand(time, 326);
     drawGameTitle(242, 46);
@@ -499,9 +556,9 @@ function drawAttractScreen(time: number): void {
       const value = String(entry.score);
       drawText(drawing, value, 150, y, textOptions);
     });
-    label("PRESS ENTER OR START TO PLAY", attractPromptY.play, amber);
-    label("MOVE A DIRECTION TO RETURN TO MAIN MENU", attractPromptY.navigation, white);
-    label("S / BACK OR SELECT: SETTINGS", attractPromptY.settings, blue);
+    label("TAP OR PRESS ENTER / START TO PLAY", attractPromptY.play, amber);
+    label("TAP OR MOVE TO RETURN TO MAIN MENU", attractPromptY.navigation, white);
+    label("TAP HERE OR PRESS S / BACK FOR SETTINGS", attractPromptY.settings, blue);
   }
   drawing.endFrame();
 }
@@ -526,6 +583,7 @@ function draw(time: number, wallClockTime: number): void {
   drawText(drawing, lives, 70, 350, hudOptions);
   const robotCount = `ROBOTS ${gameView.robots.length}`;
   drawText(drawing, robotCount, 440 - measureText(robotCount, hudOptions).width, 350, hudOptions);
+  drawText(drawing, "TAP TOP RIGHT TO PAUSE", 265, 316, { ...textOptions, height: 12 });
 
   const transition = gameView.transition;
   if (transition) {
@@ -555,7 +613,7 @@ function draw(time: number, wallClockTime: number): void {
     drawing.moveTo(-480, 175); drawing.lineTo(480, 175);
     drawing.moveTo(-480, -175); drawing.lineTo(480, -175);
     label("PAUSED", 84, amber);
-    label("PRESS P OR GAMEPAD START TO RESUME", 24, white);
+    label("TAP HERE OR PRESS P / START TO RESUME", 24, white);
     label("S / BACK OR SELECT: SETTINGS", -36, blue);
   }
   drawing.endFrame();
@@ -581,17 +639,61 @@ window.addEventListener("keydown", (event) => {
 window.addEventListener("keyup", (event) => input.keyUp(event.key));
 screen.addEventListener("pointerdown", (event) => {
   audio.unlock();
-  if (!settingsOpen) return;
+  if (settingsOpen) {
+    event.preventDefault();
+    screen.setPointerCapture(event.pointerId);
+    if (settings.pointer(settingsPointerPosition(event)) === "close") closeSettings();
+    return;
+  }
+
   event.preventDefault();
-  screen.setPointerCapture(event.pointerId);
-  if (settings.pointer(settingsPointerPosition(event)) === "close") closeSettings();
+  const position = canvasGamePosition(event);
+  const screenAtDown = screenFlow.screen;
+  if (screenAtDown !== "playing") {
+    touchActionAt(position);
+    return;
+  }
+
+  const pauseAction = (!paused && position[0] >= 350 && position[1] >= 285)
+    || (paused && ((Math.abs(position[0]) <= 300 && position[1] >= -10 && position[1] <= 90)
+      || (position[1] >= -58 && position[1] <= -15)));
+  if (pauseAction) {
+    touchActionAt(position);
+    return;
+  }
+  if (paused) return;
+
+  const stick = position[0] < 0 ? "move" : "aim";
+  if (touchInput.pointerDown(stick, event.pointerId, 0, 0)) {
+    touchPointerOrigins.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    screen.setPointerCapture(event.pointerId);
+  }
 });
 screen.addEventListener("pointermove", (event) => {
-  if (!settingsOpen || !event.buttons) return;
-  if (settings.pointer(settingsPointerPosition(event), false) === "close") closeSettings();
+  if (settingsOpen && event.buttons) {
+    if (settings.pointer(settingsPointerPosition(event), false) === "close") closeSettings();
+    return;
+  }
+  const origin = touchPointerOrigins.get(event.pointerId);
+  if (!origin) return;
+  event.preventDefault();
+  const rect = screen.getBoundingClientRect();
+  touchInput.pointerMove(event.pointerId,
+    (event.clientX - origin.x) / Math.max(1, rect.width * 0.18),
+    (event.clientY - origin.y) / Math.max(1, rect.height * 0.18));
 });
-screen.addEventListener("pointerup", (event) => { if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId); });
+function releasePointer(event: PointerEvent): void {
+  if (touchPointerOrigins.delete(event.pointerId)) touchInput.pointerUp(event.pointerId);
+  if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId);
+}
+screen.addEventListener("pointerup", releasePointer);
+screen.addEventListener("pointercancel", releasePointer);
+screen.addEventListener("lostpointercapture", (event) => {
+  touchPointerOrigins.delete(event.pointerId);
+  touchInput.pointerUp(event.pointerId);
+});
 function pauseForFocusLoss(): void {
+  clearTouchInput();
   input.clearKeyboard();
   latestGamepadState = readGamepadState(findStandardGamepad());
   input.suppressGamepadWhileHeld(latestGamepadState);
@@ -614,6 +716,7 @@ let sceneTime = 0;
 interface FrameInput {
   gamepad: Gamepad | undefined;
   controls: InputState;
+  fire: boolean;
 }
 
 function findStandardGamepad(): Gamepad | undefined {
@@ -638,7 +741,17 @@ function readFrameInput(): FrameInput {
   const gamepad = findStandardGamepad();
   latestGamepadState = readGamepadState(gamepad);
   const controls = input.read(latestGamepadState);
-  return { gamepad, controls };
+  const touch = touchInput.read();
+  const keyboardOrGamepadAim = controls.aim.x !== 0 || controls.aim.y !== 0;
+  return {
+    gamepad,
+    controls: {
+      ...controls,
+      move: touch.move.x || touch.move.y ? touch.move : controls.move,
+      aim: touch.fire || !keyboardOrGamepadAim ? touch.aim : controls.aim,
+    },
+    fire: touch.fire || keyboardOrGamepadAim,
+  };
 }
 
 function updateFrameAudioAndSceneTime(delta: number): void {
@@ -660,6 +773,7 @@ function handleOverlayInput(time: number, frameInput: FrameInput): boolean {
     paused = !paused;
     input.clearKeyboard();
     input.suppressGamepadWhileHeld(latestGamepadState);
+    clearTouchInput();
     return true;
   }
   return false;
@@ -706,6 +820,7 @@ function addGameEventEffects(events: readonly GameEvent[]): void {
 }
 
 function finishLostRun(): void {
+  clearTouchInput();
   screenFlow = updateScreenFlow(screenFlow, {
     type: "run-ended",
     score: gameView.score,
@@ -714,7 +829,7 @@ function finishLostRun(): void {
   initialsEntry = createInitialsEntry();
 }
 
-function advanceGameFrame(delta: number, controls: InputState): void {
+function advanceGameFrame(delta: number, controls: InputState, fire: boolean): void {
   if (!gameView.transition && (controls.aim.x || controls.aim.y)) aim = controls.aim;
   const previousX = gameView.player.x;
   const previousY = gameView.player.y;
@@ -726,7 +841,7 @@ function advanceGameFrame(delta: number, controls: InputState): void {
     moveY: controls.move.y,
     aimX: controls.aim.x,
     aimY: controls.aim.y,
-    fire: !!(controls.aim.x || controls.aim.y),
+    fire,
     restartPressed: false,
   });
 
@@ -751,9 +866,11 @@ function submitInitials(): void {
   }
   screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
   input.suppressGamepadWhileHeld(latestGamepadState);
+  clearTouchInput();
 }
 
 function startRun(): void {
+  clearTouchInput();
   highlightedHighScoreIndex = null;
   restartGame(game);
   clearScoreFlyups(scoreFlyups);
@@ -796,7 +913,7 @@ function frame(time: number): void {
   updateFrameAudioAndSceneTime(delta);
 
   if (!handleOverlayInput(time, frameInput)) {
-    if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) advanceGameFrame(delta, controls);
+    if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) advanceGameFrame(delta, controls, frameInput.fire);
     else advanceScreenFlowFrame(delta, controls);
   }
 
