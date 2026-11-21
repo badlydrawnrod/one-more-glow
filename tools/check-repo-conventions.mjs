@@ -16,11 +16,25 @@ const skillEntries = (await readdir(".agents/skills", { withFileTypes: true }))
 
 for (const name of skillEntries) {
   const skillFile = `.agents/skills/${name}/SKILL.md`;
+  let skillContents;
   try {
-    await readFile(skillFile, "utf8");
+    skillContents = await readFile(skillFile, "utf8");
   } catch {
     continue;
   }
+
+  const frontMatter = skillContents.match(/^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/);
+  if (!frontMatter) {
+    errors.push(`Skill "${name}" must start with YAML front matter.`);
+  } else {
+    for (const field of ["name", "description"]) {
+      const pattern = new RegExp(`^${field}:\\s*\\S.*$`, "m");
+      if (!pattern.test(frontMatter[1])) {
+        errors.push(`Skill "${name}" front matter must include a non-empty "${field}".`);
+      }
+    }
+  }
+
   const catalogLink = `../${skillFile}`;
   if (!skillsIndex.includes(`[${name}](${catalogLink})`)) {
     errors.push(`Skill "${name}" is missing from docs/skills.md.`);
@@ -74,5 +88,5 @@ if (errors.length > 0) {
   console.error(errors.map((error) => `- ${error}`).join("\n"));
   process.exitCode = 1;
 } else {
-  console.log("Repository tool placement, README command list and skills catalog are valid.");
+  console.log("Repository tool placement, README command list, and skill metadata and catalog are valid.");
 }

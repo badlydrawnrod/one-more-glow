@@ -1,3 +1,7 @@
+---
+name: prepare-pr
+description: Prepare or update a pull request title and description from the actual diff and verification evidence.
+---
 # Prepare a pull request
 
 Use this skill when preparing or updating a PR. It produces a reviewable title
