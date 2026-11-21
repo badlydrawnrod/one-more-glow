@@ -87,6 +87,11 @@ export class TouchInputModel {
     return true;
   }
 
+  /** Cancellation releases the pointer just like pointerup, without affecting its peer. */
+  pointerCancel(pointerId: number): boolean {
+    return this.pointerUp(pointerId);
+  }
+
   /** Release every active pointer, such as when focus is lost or a screen changes. */
   clear(): void {
     this.pointerByStick.clear();

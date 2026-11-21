@@ -679,13 +679,21 @@ gameElement.addEventListener("pointerdown", (event) => {
   if (!ring) return;
   const rect = ring.getBoundingClientRect();
   const radius = Math.max(1, Math.min(rect.width, rect.height) * 0.38);
-  if (!touchInput.pointerDown(stick, event.pointerId, 0, 0)) return;
+  const x = rect.left + rect.width / 2;
+  const y = rect.top + rect.height / 2;
+  const dx = (event.clientX - x) / radius;
+  const dy = (event.clientY - y) / radius;
+  if (!touchInput.pointerDown(stick, event.pointerId, dx, dy)) return;
   touchPointerOrigins.set(event.pointerId, {
-    x: rect.left + rect.width / 2,
-    y: rect.top + rect.height / 2,
+    x,
+    y,
     radius,
     target,
   });
+  const displacement = Math.hypot(dx, dy);
+  const scale = displacement > 1 ? 1 / displacement : 1;
+  target.style.setProperty("--thumb-x", `${dx * scale * radius * 0.55}px`);
+  target.style.setProperty("--thumb-y", `${dy * scale * radius * 0.55}px`);
   target.setPointerCapture(event.pointerId);
 });
 gameElement.addEventListener("pointermove", (event) => {
@@ -704,11 +712,12 @@ gameElement.addEventListener("pointermove", (event) => {
   origin.target.style.setProperty("--thumb-x", `${dx * scale * origin.radius * 0.55}px`);
   origin.target.style.setProperty("--thumb-y", `${dy * scale * origin.radius * 0.55}px`);
 });
-function releasePointer(event: PointerEvent): void {
+function releasePointer(event: PointerEvent, canceled = false): void {
   const origin = touchPointerOrigins.get(event.pointerId);
   if (origin) {
     touchPointerOrigins.delete(event.pointerId);
-    touchInput.pointerUp(event.pointerId);
+    if (canceled) touchInput.pointerCancel(event.pointerId);
+    else touchInput.pointerUp(event.pointerId);
     origin.target.style.setProperty("--thumb-x", "0px");
     origin.target.style.setProperty("--thumb-y", "0px");
     if (origin.target.hasPointerCapture(event.pointerId)) origin.target.releasePointerCapture(event.pointerId);
@@ -716,11 +725,11 @@ function releasePointer(event: PointerEvent): void {
   if (screen.hasPointerCapture(event.pointerId)) screen.releasePointerCapture(event.pointerId);
 }
 gameElement.addEventListener("pointerup", releasePointer);
-gameElement.addEventListener("pointercancel", releasePointer);
+gameElement.addEventListener("pointercancel", (event) => releasePointer(event, true));
 gameElement.addEventListener("lostpointercapture", (event) => {
   const origin = touchPointerOrigins.get(event.pointerId);
   touchPointerOrigins.delete(event.pointerId);
-  touchInput.pointerUp(event.pointerId);
+  touchInput.pointerCancel(event.pointerId);
   origin?.target.style.setProperty("--thumb-x", "0px");
   origin?.target.style.setProperty("--thumb-y", "0px");
 });

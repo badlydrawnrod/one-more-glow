@@ -260,3 +260,31 @@ test("touch pointers control independent sticks and release only their own stick
     move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: false,
   });
 });
+
+test("touch cancellation releases only the canceled pointer and permits reuse", () => {
+  const input = new TouchInputModel();
+  input.pointerDown("move", 31, 1, 0);
+  input.pointerDown("aim", 32, 0, -1);
+
+  assert.equal(input.pointerCancel(31), true);
+  assert.equal(input.pointerCancel(31), false);
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: 0 }, aim: { x: 0, y: -1 }, fire: true,
+  });
+
+  assert.equal(input.pointerDown("move", 31, -1, 0), true);
+  assert.deepEqual(input.read().move, { x: -1, y: 0 });
+});
+
+test("clearing touch input on focus loss or screen changes releases every active pointer", () => {
+  const input = new TouchInputModel();
+  input.pointerDown("move", 41, 0, 1);
+  input.pointerDown("aim", 42, 1, 0);
+  input.clear();
+
+  assert.deepEqual(input.read(), {
+    move: { x: 0, y: 0 }, aim: { x: 1, y: 0 }, fire: false,
+  });
+  assert.equal(input.pointerMove(41, -1, 0), false);
+  assert.equal(input.pointerUp(42), false);
+});

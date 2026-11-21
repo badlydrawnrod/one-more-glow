@@ -60,9 +60,11 @@ flow, focus policy and rendering, as described in the
   interactions so page scrolling remains available elsewhere. Show controls on
   touch-capable devices and retain the existing keyboard/gamepad instructions
   and controls.
-- [ ] **Verify the full touch path.** Add focused tests for the touch-input
-  model and pointer lifecycle, then run `npm run test --workspace=very-angry-robots`
-  and `npm run build:robots` from the repository root. Manually walk through
+- [x] **Verify automated touch paths and production build.** Add focused tests
+  for the touch-input model and pointer lifecycle, then run
+  `npm run test --workspace=very-angry-robots` and `npm run build:robots` from
+  the repository root.
+- [ ] **Walk through touch hardware layouts.** Manually walk through
   start/navigation, simultaneous move and fire, pause/resume, initials and
   Settings on touch hardware in landscape and portrait. Confirm controls sit
   in the specified position, touch cancel and focus loss release input, page
@@ -83,11 +85,21 @@ Step 2 checks passed:
 - `npm run test --workspace=very-angry-robots` — 117 tests passed.
 - `npm run check --workspace=very-angry-robots` — TypeScript check passed.
 
-The production build and landscape/portrait device walkthroughs have not been
-run. The browser event integration and responsive control layout have not yet
-been exercised on touch hardware.
+Step 4 automated checks passed:
+
+- `npm run test --workspace=very-angry-robots` — 119 tests passed, including
+  touch cancellation, independent pointer release, and clearing active touch
+  input.
+- `npm run build:robots` — shared package and Very Angry Robots production
+  builds passed.
+
+The landscape and portrait walkthroughs on touch hardware remain open. The
+browser event integration and responsive layout still need device checks for
+menu and initials interactions, simultaneous movement and firing, pointer
+cancellation, focus loss, scrolling outside the controls, control placement,
+and gameplay readability.
 
 ## Next action
 
-Add focused tests for pointer lifecycle, run the app test suite and production
-build, then complete the landscape and portrait touch walkthroughs.
+Complete the landscape and portrait touch walkthroughs on touch hardware and
+close any issues they reveal.
