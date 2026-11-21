@@ -36,7 +36,7 @@ flow, focus policy and rendering, as described in the
 
 ## Work
 
-- [ ] **Add a testable touch-input model.** Start from `src/input.ts` and its
+- [x] **Add a testable touch-input model.** Start from `src/input.ts` and its
   tests. Track each stick by its active pointer, derive direction from
   displacement from the neutral center with a neutral zone, and quantize to the
   same eight directions used by existing controls. Produce movement and aim
@@ -71,9 +71,17 @@ flow, focus policy and rendering, as described in the
 
 ## Verification
 
-Not started. No implementation checks or device walkthroughs have been run.
+Step 1 checks passed:
+
+- `node --disable-warning=ExperimentalWarning --experimental-strip-types --test src/input.test.mjs`
+  from `apps/very-angry-robots` — 17 tests passed, including the new touch
+  model scenarios.
+- `npm run check --workspace=very-angry-robots` — TypeScript check passed.
+
+The remaining implementation checks and landscape/portrait device walkthroughs
+have not been run.
 
 ## Next action
 
-Implement the touch-input model, beginning with `src/input.ts` and focused tests
-for independent pointers, eight-way direction, neutral behavior and release.
+Connect browser pointer and screen actions in `src/main.ts`, feeding this model
+into the existing per-frame input and screen-flow paths.

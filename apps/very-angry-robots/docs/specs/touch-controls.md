@@ -2,7 +2,7 @@
 
 ## Scope and status
 
-**Status: Accepted. Implementation: Pending.** On touch devices, provide twin
+**Status: Accepted. Implementation: Partial.** On touch devices, provide twin
 virtual sticks in landscape, and place them below the play area in portrait.
 Every game screen must be usable without a keyboard or gamepad.
 
