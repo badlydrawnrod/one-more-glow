@@ -50,6 +50,11 @@ actions as the existing input methods; it does not change game simulation rules.
   In landscape, controls must not obscure the play area. In portrait, place the
   4:3 play area above the controls and allow the page to scroll when the full
   layout cannot fit vertically.
+- Hide the HTML page header, footer instructions and hazard hint under the same
+  primary touch-input condition used to show the thumbsticks: `(hover: none) and
+  (pointer: coarse)`. Keep the title and prompts drawn in the game, touch-stick
+  labels and their accessible names available. On hybrid devices this follows
+  the browser's choice of primary pointing device.
 - Prevent browser gestures from interrupting an active gameplay touch gesture
   while preserving normal page scrolling outside the game interaction.
 
@@ -79,3 +84,6 @@ actions as the existing input methods; it does not change game simulation rules.
 - `npm run build:robots` passed for the shared package and Very Angry Robots.
 - The user reports verifying touch behavior on a Motorola Edge 30 phone and a
   Samsung Galaxy Tab S9 FE tablet.
+- After the page header/footer and landscape grid-placement changes, the
+  developer reports checking the updated layout on a touch tablet and phone
+  and finding it good.
