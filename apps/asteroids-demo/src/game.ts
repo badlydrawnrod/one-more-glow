@@ -148,6 +148,13 @@ function saucerDistance(x1: number, y1: number, x2: number, y2: number): number 
   return Math.hypot(x1 - x2, delta(y1, y2, WORLD.halfHeight));
 }
 
+export function pauseGame(game: Game): void {
+  if (game.screen === "playing" || game.screen === "intermission") {
+    game.pausedFrom = game.screen;
+    game.screen = "paused";
+  }
+}
+
 export function updateGame(game: Game, dt: number, input: InputFrame): void {
   const step = Math.min(Math.max(dt, 0), 0.05);
   game.inputConnected = input.connected;
@@ -168,8 +175,7 @@ export function updateGame(game: Game, dt: number, input: InputFrame): void {
     return;
   }
   if (input.pausePressed && (game.screen === "playing" || game.screen === "intermission")) {
-    game.pausedFrom = game.screen;
-    game.screen = "paused";
+    pauseGame(game);
     return;
   }
   if (game.screen === "paused") {

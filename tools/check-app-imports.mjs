@@ -36,10 +36,10 @@ for (const appEntry of await readdir(appsDirectory, { withFileTypes: true })) {
     const source = await readFile(filePath, "utf8");
     for (const specifier of moduleSpecifiers(source)) {
       const resolved = path.resolve(path.dirname(filePath), specifier);
-      if (specifier.startsWith("one-more-glow/")) {
-        violations.push(`${filePath}: import "${specifier}"; use the public package entry point "one-more-glow"`);
-      } else if (resolved.startsWith(path.join(root, "packages", "one-more-glow") + path.sep)) {
-        violations.push(`${filePath}: import "${specifier}"; apps must use the one-more-glow package entry point`);
+      if (specifier.startsWith("one-more-glow/") || specifier.startsWith("@one-more-glow/game-input/")) {
+        violations.push(`${filePath}: import "${specifier}"; use the public package entry point`);
+      } else if (resolved.startsWith(path.join(root, "packages") + path.sep)) {
+        violations.push(`${filePath}: import "${specifier}"; apps must import workspace libraries by package name`);
       } else if (resolved.startsWith(path.join(root, "apps") + path.sep) && !resolved.startsWith(appRoot + path.sep)) {
         violations.push(`${filePath}: import "${specifier}"; apps must not depend on another app`);
       }

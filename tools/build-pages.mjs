@@ -13,7 +13,7 @@ await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
 await cp(path.join(root, "site"), output, { recursive: true });
 
-await runNpm(["run", "build", "--workspace=one-more-glow"]);
+await runNpm(["run", "build:libraries"]);
 
 for (const app of publishedApps) {
   const appOutput = path.join(root, "apps", app.workspace, "dist");

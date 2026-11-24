@@ -20,6 +20,7 @@ apps/
   very-angry-robots/        # Vite app for room-based robot combat
     docs/specs/             # app-specific behavior requirements
 packages/
+  game-input/               # browser-independent keyboard and gamepad state
   one-more-glow/            # reusable drawing library
     docs/specs/             # package behavior requirements
 docs/
@@ -28,9 +29,8 @@ docs/
 
 Reusable libraries live under `packages/`; runnable consumers live under
 `apps/`. The `packages/` directory may contain multiple reusable packages;
-each package owns its code, public exports and `docs/specs/`. This repository
-currently contains one package. Apps depend on packages through their public
-package names and exports. Packages must not depend on apps. Code specific to
+each package owns its code, public exports and `docs/specs/`. Apps depend on packages
+through their public package names and exports. Packages must not depend on apps. Code specific to
 one app should remain in that app. Create a shared package when a concrete
 reusable boundary emerges, rather than in anticipation of hypothetical reuse.
 
@@ -110,9 +110,9 @@ from library source or renderer internals.
 `apps/asteroids-demo/`
 
 An independent consumer of the library package. It implements a single-player
-Asteroids-style arcade game with keyboard and browser Gamepad API input. Input
-handling and game state belong to this app; it must use the public package
-entry point rather than library internals.
+Asteroids-style arcade game with keyboard and browser Gamepad API input. The
+app owns browser input, action mappings, screen policy and game state.
+It reads device state through the public Game Input entry point.
 
 ### Gyruss demo
 
@@ -126,7 +126,9 @@ than library internals.
 ### Very Angry Robots demo
 
 `apps/very-angry-robots/` is an independent vector-game consumer. Its room,
-combat and input belong to the app; it draws through the public library API.
+combat, browser input, mappings, initials editor and touch controls belong to
+the app. It draws through the public graphics API and reads keyboard and
+gamepad state through the public Game Input API.
 Its simulation and presentation boundary is described in
 [`apps/very-angry-robots/docs/architecture.md`](../apps/very-angry-robots/docs/architecture.md).
 
@@ -141,6 +143,10 @@ apps/diagnostics   apps/asteroids-demo   apps/gyruss-demo   apps/very-angry-robo
                             |
                             v
              DrawingContext <--- WebGL2 renderer
+
+apps/asteroids-demo       apps/very-angry-robots
+          \                 /
+      @one-more-glow/game-input
 ```
 
 The renderer implements the shared contract. Future renderers should also

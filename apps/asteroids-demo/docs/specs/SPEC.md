@@ -54,11 +54,19 @@ indefinitely; the run ends when the last life is lost.
   fresh press is required; holding start through the transition cannot restart.
   Return to the title screen after ten seconds, or sooner on a fresh Escape or
   gamepad B press. A fresh Enter or gamepad Start press restarts immediately.
-- Pause freezes gameplay and gameplay timers. Browser focus loss also pauses
-  and clears held keyboard input; resuming requires an explicit action. Title
-  and game-over screens remain usable.
+- Pause freezes gameplay and gameplay timers. Losing browser focus or hiding
+  the page pauses a run and clears held keyboard input and pending presses.
+  Input is inactive while unfocused or hidden. On return, a fresh key-down
+  works even if its earlier release was missed. Auto-repeat does not restore
+  held input or trigger an action. Resuming requires a fresh P or gamepad
+  Start press. Title and game-over screens remain usable.
 
 ### Controls and flight
+
+Keyboard control names refer to physical US/UK QWERTY positions. Bind actions
+by `KeyboardEvent.code`, including P for pause and S for settings. On French
+AZERTY the key labelled Z occupies `KeyW` and thrusts. An event without a usable
+code does not activate a control.
 
 Support both keyboard and standard-mapped browser gamepads throughout:
 
@@ -74,6 +82,13 @@ Start, pause and hyperspace use discrete presses; fire may be held. Ignore
 keyboard auto-repeat for discrete actions. Preserve the current analog steering
 dead zone and allow keyboard and gamepad without a mode switch. Show controls
 on the title screen and the applicable pause or restart action when relevant.
+
+Use the first connected controller. Buttons already held on first observation
+or when returning from focus loss require release and a fresh press, including
+buttons used in settings. Ordinary first observation exposes the current axes.
+When returning from focus loss, gate active gameplay axes until they return to
+their inactive range. Treat a connection that reappears after disconnection,
+omission or uncertain continuity as newly observed.
 
 Keep the current rotation, thrust, momentum, mild drag and speed limit as the
 starting flight feel. The ship starts at rest in the centre, facing up. The
@@ -267,6 +282,11 @@ players can use either of the game's supported input methods. Opening settings s
 must not also start, restart, resume or control the game. Clear or consume held
 and discrete inputs at transitions so closing settings cannot trigger an
 unintended game action; a fresh press is required for subsequent actions.
+Use the opening gamepad frame only to open settings. On close, sample current
+gamepad controls, including when a keyboard or pointer closes settings between
+frames. Gate active gameplay stick axes until they return to their inactive
+range. Settings retains keyboard routing if the browser loses focus and returns
+while it is open.
 
 Keep the selected profile across screen changes and reloads on the same browser
 using local storage. Start with the Asteroids defaults in the table when no

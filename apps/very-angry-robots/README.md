@@ -4,8 +4,10 @@ A vector interpretation of Rod Hyde's
 [Very Angry Robots](https://github.com/libgdx/libgdx-demo-very-angry-robots).
 From the repository root, run `npm run dev:robots`.
 
-Move with WASD and fire with the arrow keys; on a standard gamepad, use the
-left stick to move and the right stick to fire. Press Enter or gamepad Start
+Move with the physical WASD positions (ZQSD on French AZERTY) and fire with
+the arrow keys. On a standard gamepad, use the left stick to move and the
+right stick to fire. If a press first reveals the gamepad, release the button
+and press it again. Press Enter or gamepad Start
 to start or restart. Electrified walls, robots and robot shots are dangerous.
 Move through an open doorway to enter an adjacent room; the door behind you
 closes. You can leave before all the robots are destroyed. Closed doors are

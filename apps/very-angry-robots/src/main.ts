@@ -1,3 +1,4 @@
+import type { GamepadFrame, GamepadSnapshot } from "@one-more-glow/game-input";
 import { createWebGL2Renderer, drawCircle, drawPolygonOutline, drawText, measureText,
   type Color, type DrawingContext, type Point } from "one-more-glow";
 import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_CLOSE_DURATION,
@@ -5,12 +6,12 @@ import { createGame, restartGame, updateGame, ROOM, ROOM_SCROLL_DURATION, DOOR_C
 import { createMaze } from "./maze.ts";
 import { createRoomGeometry } from "./room-geometry.ts";
 import { wallOutline } from "./wall-outline.ts";
-import { InputController, TouchInputModel, type GamepadState, type InputState } from "./input.ts";
+import { GamepadConnections, InputController, TouchInputModel, type InputState } from "./input.ts";
 import { clippedDrawing, intersectClipBounds } from "./clipped-drawing.ts";
 import { transitionOffsets } from "./transition-presentation.ts";
 import { insertHighScore, loadHighScores, qualifiesForHighScore, saveHighScores } from "./high-scores.ts";
 import { createScreenFlow, updateScreenFlow } from "./screen-flow.ts";
-import { createInitialsEntry, updateInitialsEntry } from "./initials-entry.ts";
+import { InitialsEditor } from "./initials-entry.ts";
 import { addScoreFlyup, clearScoreFlyups, createScoreFlyupState, retainPresentedRoomFlyups,
   SCORE_FLYUP_START_OFFSET, scoreFlyupOpacity, scoreFlyupRise, updateScoreFlyups } from "./score-flyups.ts";
 import { addParticleEffect, clearParticleEffects, createParticleEffectState, particleEffectOpacity,
@@ -50,16 +51,19 @@ const settings = createSettings({
 const game = createGame();
 const gameView: GameView = game;
 const input = new InputController();
+const gamepadConnections = new GamepadConnections();
 const touchInput = new TouchInputModel();
+const settingsPointers = new Set<number>();
 const touchPointerOrigins = new Map<number, { x: number; y: number; radius: number; target: HTMLElement }>();
 let touchInitialsSlotArmed = true;
 let touchInitialsCharArmed = true;
-let latestGamepadState: GamepadState | undefined;
+let inputActive = !document.hidden && document.hasFocus();
+let initialsSubmittedBetweenFrames = false;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
 let highScores = loadHighScores(() => window.localStorage);
 let highlightedHighScoreIndex: number | null = null;
-let initialsEntry = createInitialsEntry();
+let initialsEditor = new InitialsEditor();
 const scoreFlyups = createScoreFlyupState();
 const particleEffects = createParticleEffectState();
 let aim = { x: 1, y: 0 };
@@ -71,7 +75,6 @@ let settingsOpen = false;
 let settingsNeedsGamepadNeutral = false;
 let runTauntSet: TauntSet = "standard";
 let settingsNavAt = 0;
-let previousSettingsButtons = new Set<number>();
 const cyan: Color = [0.35, 0.95, 1];
 const red: Color = [1, 0.35, 0.36];
 const amber: Color = [1, 0.75, 0.32];
@@ -104,9 +107,7 @@ function openSettings(): void {
   settingsOpen = true;
   settings.open();
   settingsNeedsGamepadNeutral = true;
-  input.clearKeyboard();
-  input.suppressGamepadWhileHeld(latestGamepadState);
-  clearTouchInput();
+  suppressTransitionInput();
 }
 
 function closeSettings(): void {
@@ -114,9 +115,7 @@ function closeSettings(): void {
   settingsOpen = false;
   settings.close();
   settingsNeedsGamepadNeutral = true;
-  input.clearKeyboard();
-  input.suppressGamepadWhileHeld(latestGamepadState);
-  clearTouchInput();
+  suppressTransitionInput();
 }
 
 function settingsPointerPosition(event: PointerEvent): Point {
@@ -132,6 +131,10 @@ function canvasGamePosition(event: PointerEvent): Point {
 }
 
 function clearTouchInput(): void {
+  for (const pointerId of settingsPointers) {
+    if (screen.hasPointerCapture(pointerId)) screen.releasePointerCapture(pointerId);
+  }
+  settingsPointers.clear();
   const captures = [...touchPointerOrigins.entries()];
   touchPointerOrigins.clear();
   touchInput.clear();
@@ -154,9 +157,7 @@ function touchActionAt(position: Point): void {
     }
     if ((!paused && x >= 350 && y >= 285) || (paused && Math.abs(x) <= 300 && y >= -10 && y <= 90)) {
       paused = !paused;
-      input.clearKeyboard();
-      input.suppressGamepadWhileHeld(latestGamepadState);
-      clearTouchInput();
+      suppressTransitionInput();
     }
     return;
   }
@@ -174,30 +175,27 @@ function touchActionAt(position: Point): void {
   if (screenFlow.screen === "initials") {
     if (y >= -32 && y <= 32) {
       const slot = Math.max(0, Math.min(2, Math.round((x + 28) / 28)));
-      initialsEntry = { ...initialsEntry, selectedSlot: slot };
-      initialsEntry = updateInitialsEntry(initialsEntry, { keyPresses: [], slotDelta: 0, charDelta: 1 });
+      initialsEditor.touchSlot(slot);
     } else if (y < -105 && x < 0) {
-      initialsEntry = updateInitialsEntry(initialsEntry,
-        { keyPresses: ["Backspace"], slotDelta: 0, charDelta: 0 });
-    } else if (y < -105 && x >= 0) submitInitials();
+      initialsEditor.touchBackspace();
+    } else if (y < -105 && x >= 0 && initialsEditor.submit()) submitInitials(true);
   }
 }
 
-function handleSettingsGamepad(time: number, gamepad: Gamepad | undefined): void {
+function handleSettingsGamepad(time: number, gamepad: GamepadFrame | undefined, raw: GamepadSnapshot | undefined): void {
   if (!settingsOpen) return;
 
-  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
-  const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(gamepad?.axes[axis] ?? 0) <= 0.2);
-  const buttonsNeutral = Array.from(gamepad?.buttons ?? []).every((button) => !button.pressed);
+  const axesNeutral = [0, 1, 2, 3].every((axis) => Math.abs(raw?.axes[axis] ?? 0) <= 0.2);
+  const buttonsNeutral = !raw?.buttons.some(Boolean);
   if (settingsNeedsGamepadNeutral && (!gamepad || (axesNeutral && buttonsNeutral))) {
     settingsNeedsGamepadNeutral = false;
   }
   if (settingsNeedsGamepadNeutral || !gamepad) return;
 
-  const isNewPress = (index: number) => buttonDown(index) && !previousSettingsButtons.has(index);
-  if (isNewPress(1)) closeSettings();
-  else if (isNewPress(0) && settings.activateSelection() === "close") closeSettings();
-  if (settingsOpen && isNewPress(3)) settings.resetDisplay();
+  const buttonDown = (index: number) => gamepad.buttonsDown.has(index);
+  if (gamepad.buttonsPressed.has(1)) closeSettings();
+  else if (gamepad.buttonsPressed.has(0) && settings.activateSelection() === "close") closeSettings();
+  if (settingsOpen && gamepad.buttonsPressed.has(3)) settings.resetDisplay();
 
   const vertical = buttonDown(13) ? 1 : buttonDown(12) ? -1
     : Math.abs(gamepad.axes[1] ?? 0) > 0.45 ? Math.sign(gamepad.axes[1]!) : 0;
@@ -210,11 +208,6 @@ function handleSettingsGamepad(time: number, gamepad: Gamepad | undefined): void
     settings.adjustSelection(horizontal);
     settingsNavAt = time + 160;
   }
-}
-
-function rememberSettingsGamepadButtons(gamepad: Gamepad | undefined): void {
-  const buttonDown = (index: number) => gamepad?.buttons[index]?.pressed ?? false;
-  previousSettingsButtons = new Set([0, 1, 3, 8, 9, 12, 13, 14, 15].filter(buttonDown));
 }
 
 function line(context: DrawingContext, points: readonly Point[], color: Color, intensity = 1): void {
@@ -530,13 +523,13 @@ function drawAttractScreen(time: number): void {
   } else if (screenFlow.screen === "initials") {
     label("NEW HIGH SCORE", 150, amber);
     label("ENTER UP TO THREE INITIALS", 75, white);
-    initialsEntry.characters.forEach((initial, index) => {
+    initialsEditor.entry.characters.forEach((initial, index) => {
       const x = -28 + index * 28;
       const value = initial || "_";
-      drawing.setColor(index === initialsEntry.selectedSlot ? amber : white);
+      drawing.setColor(index === initialsEditor.entry.selectedSlot ? amber : white);
       drawing.setIntensity(1);
       drawText(drawing, value, x - measureText(value, textOptions).width / 2, 0, textOptions);
-      if (index === initialsEntry.selectedSlot) {
+      if (index === initialsEditor.entry.selectedSlot) {
         drawing.moveTo(x - 8, -12);
         drawing.lineTo(x + 8, -12);
       }
@@ -629,27 +622,41 @@ function draw(time: number, wallClockTime: number): void {
 }
 
 window.addEventListener("keydown", (event) => {
-  if (event.ctrlKey || event.metaKey || event.altKey) return;
+  if (!inputActive || event.ctrlKey || event.metaKey || event.altKey) return;
   audio.unlock();
-  if (settingsOpen) {
+  const { code, key, repeat } = event;
+  if (initialsSubmittedBetweenFrames || screenFlow.screen === "initials") {
     event.preventDefault();
-    input.blockKey(event.key);
-    if (event.key === "Escape") { if (!event.repeat) closeSettings(); }
-    else if (event.key === "Tab") settings.moveSelection(event.shiftKey ? -1 : 1);
-    else if (event.key === "ArrowUp") settings.moveSelection(-1);
-    else if (event.key === "ArrowDown") settings.moveSelection(1);
-    else if (event.key === "ArrowLeft") settings.adjustSelection(-1);
-    else if (event.key === "ArrowRight") settings.adjustSelection(1);
-    else if (event.key === "Enter" && !event.repeat && settings.activateSelection() === "close") closeSettings();
+    input.blockKey(code, key);
+    if (!initialsSubmittedBetweenFrames && !event.isComposing && initialsEditor.keyDown(code, key, repeat)) {
+      submitInitials(true);
+    }
     return;
   }
-  if (input.keyDown(event.key, event.repeat)) event.preventDefault();
+  if (settingsOpen) {
+    event.preventDefault();
+    input.blockKey(code, key);
+    if (code === "Escape") { if (!repeat) closeSettings(); }
+    else if (code === "Tab") settings.moveSelection(event.shiftKey ? -1 : 1);
+    else if (code === "ArrowUp") settings.moveSelection(-1);
+    else if (code === "ArrowDown") settings.moveSelection(1);
+    else if (code === "ArrowLeft") settings.adjustSelection(-1);
+    else if (code === "ArrowRight") settings.adjustSelection(1);
+    else if ((code === "Enter" || code === "NumpadEnter") && !repeat && settings.activateSelection() === "close") closeSettings();
+    return;
+  }
+  if (input.keyDown(code, key, repeat)) event.preventDefault();
 });
-window.addEventListener("keyup", (event) => input.keyUp(event.key));
+window.addEventListener("keyup", ({ code, key }) => {
+  input.keyUp(code, key);
+  initialsEditor.keyUp(code, key);
+});
 screen.addEventListener("pointerdown", (event) => {
+  if (!inputActive || initialsSubmittedBetweenFrames) return;
   audio.unlock();
   if (settingsOpen) {
     event.preventDefault();
+    settingsPointers.add(event.pointerId);
     screen.setPointerCapture(event.pointerId);
     if (settings.pointer(settingsPointerPosition(event)) === "close") closeSettings();
     return;
@@ -674,7 +681,7 @@ screen.addEventListener("pointerdown", (event) => {
 });
 gameElement.addEventListener("pointerdown", (event) => {
   const target = (event.target as Element | null)?.closest<HTMLElement>("[data-touch-stick]");
-  if (!target || (screenFlow.screen !== "playing" && screenFlow.screen !== "initials")
+  if (!inputActive || !target || (screenFlow.screen !== "playing" && screenFlow.screen !== "initials")
     || paused || settingsOpen) return;
   event.preventDefault();
   audio.unlock();
@@ -702,7 +709,8 @@ gameElement.addEventListener("pointerdown", (event) => {
   target.setPointerCapture(event.pointerId);
 });
 gameElement.addEventListener("pointermove", (event) => {
-  if (settingsOpen && event.buttons) {
+  if (!inputActive) return;
+  if (settingsOpen && event.buttons && settingsPointers.has(event.pointerId)) {
     if (settings.pointer(settingsPointerPosition(event), false) === "close") closeSettings();
     return;
   }
@@ -718,6 +726,7 @@ gameElement.addEventListener("pointermove", (event) => {
   origin.target.style.setProperty("--thumb-y", `${dy * scale * origin.radius * 0.55}px`);
 });
 function releasePointer(event: PointerEvent, canceled = false): void {
+  settingsPointers.delete(event.pointerId);
   const origin = touchPointerOrigins.get(event.pointerId);
   if (origin) {
     touchPointerOrigins.delete(event.pointerId);
@@ -732,21 +741,48 @@ function releasePointer(event: PointerEvent, canceled = false): void {
 gameElement.addEventListener("pointerup", releasePointer);
 gameElement.addEventListener("pointercancel", (event) => releasePointer(event, true));
 gameElement.addEventListener("lostpointercapture", (event) => {
+  settingsPointers.delete(event.pointerId);
   const origin = touchPointerOrigins.get(event.pointerId);
   touchPointerOrigins.delete(event.pointerId);
   touchInput.pointerCancel(event.pointerId);
   origin?.target.style.setProperty("--thumb-x", "0px");
   origin?.target.style.setProperty("--thumb-y", "0px");
 });
-function pauseForFocusLoss(): void {
+function gamepadSnapshots(): GamepadSnapshot[] {
+  return gamepadConnections.snapshot(Array.from(navigator.getGamepads?.() ?? []));
+}
+
+function suppressTransitionInput(): void {
+  input.suppressKeyboardUntilReleased();
+  input.suppressGamepadWhileHeld(gamepadSnapshots());
   clearTouchInput();
-  input.clearKeyboard();
-  latestGamepadState = readGamepadState(findStandardGamepad());
-  input.suppressGamepadWhileHeld(latestGamepadState);
+}
+
+function pauseForFocusLoss(): void {
+  inputActive = false;
+  clearTouchInput();
+  initialsEditor.clearTypingKeys();
+  input.clearForFocusLoss();
+  gamepadConnections.clear();
+  if (settingsOpen) settingsNeedsGamepadNeutral = true;
   ({ paused, settingsOpen } = focusLossOverlayState(screenFlow.screen, paused, settingsOpen));
 }
+
+function restoreInputFocus(): void {
+  if (inputActive || document.hidden || !document.hasFocus()) return;
+  inputActive = true;
+  input.suppressGamepadWhileHeld(gamepadSnapshots());
+}
+
 window.addEventListener("blur", pauseForFocusLoss);
-document.addEventListener("visibilitychange", () => { if (document.hidden) pauseForFocusLoss(); });
+window.addEventListener("focus", restoreInputFocus);
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) pauseForFocusLoss();
+  else restoreInputFocus();
+});
+for (const eventName of ["gamepadconnected", "gamepaddisconnected"] as const) {
+  window.addEventListener(eventName, ({ gamepad }) => gamepadConnections.forget(gamepad.index));
+}
 function resize(): void {
   const rect = screen.getBoundingClientRect();
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
@@ -760,33 +796,15 @@ resize();
 let lastTime = 0;
 let sceneTime = 0;
 interface FrameInput {
-  gamepad: Gamepad | undefined;
+  gamepad: GamepadFrame | undefined;
+  rawGamepad: GamepadSnapshot | undefined;
   controls: InputState;
   fire: boolean;
 }
 
-function findStandardGamepad(): Gamepad | undefined {
-  const gamepad = Array.from(navigator.getGamepads?.() ?? [])
-    .find((candidate) => candidate?.connected && candidate.mapping === "standard");
-  return gamepad ?? undefined;
-}
-
-function readGamepadState(gamepad: Gamepad | undefined): GamepadState | undefined {
-  if (!gamepad) return undefined;
-  return {
-    leftX: gamepad.axes[0] ?? 0,
-    leftY: gamepad.axes[1] ?? 0,
-    rightX: gamepad.axes[2] ?? 0,
-    rightY: gamepad.axes[3] ?? 0,
-    startPressed: gamepad.buttons[9]?.pressed ?? false,
-    backPressed: gamepad.buttons[8]?.pressed ?? false,
-  };
-}
-
 function readFrameInput(): FrameInput {
-  const gamepad = findStandardGamepad();
-  latestGamepadState = readGamepadState(gamepad);
-  const controls = input.read(latestGamepadState);
+  const snapshots = inputActive ? gamepadSnapshots() : [];
+  const { gamepad, ...controls } = input.read(snapshots);
   const touch = touchInput.read();
   let initialsSlotDelta = controls.initialsSlotDelta;
   let initialsCharDelta = controls.initialsCharDelta;
@@ -811,6 +829,7 @@ function readFrameInput(): FrameInput {
   const keyboardOrGamepadAim = controls.aim.x !== 0 || controls.aim.y !== 0;
   return {
     gamepad,
+    rawGamepad: snapshots[0],
     controls: {
       ...controls,
       move: touch.move.x || touch.move.y ? touch.move : controls.move,
@@ -830,7 +849,7 @@ function updateFrameAudioAndSceneTime(delta: number): void {
 
 function handleOverlayInput(time: number, frameInput: FrameInput): boolean {
   if (settingsOpen) {
-    handleSettingsGamepad(time, frameInput.gamepad);
+    handleSettingsGamepad(time, frameInput.gamepad, frameInput.rawGamepad);
     return true;
   }
   if (frameInput.controls.settingsPressed && canOpenSettings()) {
@@ -839,9 +858,7 @@ function handleOverlayInput(time: number, frameInput: FrameInput): boolean {
   }
   if (screenFlow.screen === "playing" && frameInput.controls.pausePressed) {
     paused = !paused;
-    input.clearKeyboard();
-    input.suppressGamepadWhileHeld(latestGamepadState);
-    clearTouchInput();
+    suppressTransitionInput();
     return true;
   }
   return false;
@@ -888,13 +905,13 @@ function addGameEventEffects(events: readonly GameEvent[]): void {
 }
 
 function finishLostRun(): void {
-  clearTouchInput();
+  suppressTransitionInput();
   screenFlow = updateScreenFlow(screenFlow, {
     type: "run-ended",
     score: gameView.score,
     qualifies: qualifiesForHighScore(highScores, gameView.score),
   });
-  initialsEntry = createInitialsEntry();
+  initialsEditor = new InitialsEditor();
 }
 
 function advanceGameFrame(delta: number, controls: InputState, fire: boolean): void {
@@ -923,8 +940,9 @@ function advanceGameFrame(delta: number, controls: InputState, fire: boolean): v
   if (gameView.outcome === "lost") finishLostRun();
 }
 
-function submitInitials(): void {
-  const submittedInitials = initialsEntry.characters.join("");
+function submitInitials(betweenFrames: boolean): void {
+  initialsSubmittedBetweenFrames = betweenFrames;
+  const submittedInitials = initialsEditor.entry.characters.join("");
   const finalScore = screenFlow.runScore;
   if (finalScore !== null) {
     const lowerScoreIndex = highScores.findIndex((entry) => entry.score < finalScore);
@@ -933,8 +951,7 @@ function submitInitials(): void {
     saveHighScores(() => window.localStorage, highScores);
   }
   screenFlow = updateScreenFlow(screenFlow, { type: "initials-submitted", initials: submittedInitials });
-  input.suppressGamepadWhileHeld(latestGamepadState);
-  clearTouchInput();
+  suppressTransitionInput();
 }
 
 function startRun(): void {
@@ -943,7 +960,7 @@ function startRun(): void {
   restartGame(game);
   clearScoreFlyups(scoreFlyups);
   clearParticleEffects(particleEffects);
-  initialsEntry = createInitialsEntry();
+  initialsEditor = new InitialsEditor();
   screenFlow = updateScreenFlow(screenFlow, { type: "start-run" });
   runTauntSet = "standard";
   audio.setGameplayState(true, false);
@@ -953,12 +970,9 @@ function startRun(): void {
 
 function advanceScreenFlowFrame(delta: number, controls: InputState): void {
   if (screenFlow.screen === "initials") {
-    initialsEntry = updateInitialsEntry(initialsEntry, {
-      keyPresses: controls.keyPresses,
-      slotDelta: controls.initialsSlotDelta,
-      charDelta: controls.initialsCharDelta,
-    });
-    if (controls.startPressed) submitInitials();
+    if (initialsEditor.poll(controls.initialsSlotDelta, controls.initialsCharDelta, controls.startPressed)) {
+      submitInitials(false);
+    }
   } else if (screenFlow.screen !== "playing" && controls.startPressed) {
     startRun();
   } else if (screenFlow.screen !== "playing" && controls.screenAdvancePressed) {
@@ -980,12 +994,13 @@ function frame(time: number): void {
   }
   updateFrameAudioAndSceneTime(delta);
 
-  if (!handleOverlayInput(time, frameInput)) {
+  const routeInput = inputActive && !initialsSubmittedBetweenFrames;
+  initialsSubmittedBetweenFrames = false;
+  if (routeInput && !handleOverlayInput(time, frameInput)) {
     if (shouldAdvanceGame(screenFlow.screen, paused, settingsOpen)) advanceGameFrame(delta, controls, frameInput.fire);
     else advanceScreenFlowFrame(delta, controls);
   }
 
-  rememberSettingsGamepadButtons(frameInput.gamepad);
   draw(sceneTime, time);
   requestAnimationFrame(frame);
 }
