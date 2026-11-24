@@ -27,6 +27,9 @@ npm install
 npm run dev
 ```
 
+Run `npm install` again after adding a workspace package or changing its
+dependencies so npm links the package into the workspace.
+
 Open the local URL printed in the terminal. The diagnostics app opens on
 **Canvas & Environment**. To see the Test Card, open **Renderer & Performance**
 and select **Test card**. See the [diagnostics guide](apps/diagnostics/README.md)
