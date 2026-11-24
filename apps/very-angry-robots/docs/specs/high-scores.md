@@ -9,6 +9,9 @@ highlight is implemented but has no dedicated automated coverage. The
 original game's exact high-score rules are not recalled; this capability uses a conventional arcade
 top-ten table and the flow described for this port.
 
+The sequential keyboard entry and Backspace behavior clarified below is accepted;
+its implementation has not been verified against that clarification.
+
 - Keep the ten highest scores, ordered from highest to lowest. When a run ends,
   qualify its final score if it would appear in the top ten. If it qualifies,
   show an initials-entry screen before the score table. Otherwise, go directly
@@ -17,7 +20,10 @@ top-ten table and the flow described for this port.
   of a new tied score.
 - Let the player enter up to three initials, including no initials at all.
   On a keyboard, accept letters directly, convert lowercase letters to
-  uppercase, use backspace to correct, and Enter to submit. On a gamepad, use
+  uppercase, use Backspace to remove the last entered letter, and Enter to
+  submit. Keyboard entry is sequential; arrow keys do not select a slot. To
+  change an earlier letter, remove letters back to it and type forward again.
+  On a gamepad, use
   the left stick to select a character slot, the right stick's vertical
   direction to change that character, and Start to submit; the player can
   submit with no characters selected. The left stick selects slots 1–3 from

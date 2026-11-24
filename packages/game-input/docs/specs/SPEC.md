@@ -51,8 +51,13 @@ export interface GamepadSnapshot {
 }
 
 export interface KeyboardFrame {
-  down: ReadonlySet<string>;
-  pressed: ReadonlySet<string>;
+  down: readonly KeyboardEntry[];
+  pressed: readonly KeyboardEntry[];
+}
+
+export interface KeyboardEntry {
+  code: string | null;
+  key: string;
 }
 
 export interface GamepadFrame {
@@ -75,18 +80,19 @@ One candidate owner API is:
 
 ```ts
 class InputDevices {
-  keyDown(rawKey: string, repeat?: boolean): void;
-  keyUp(rawKey: string): void;
-  blockKeyUntilReleased(rawKey: string): void;
+  keyDown(code: string | null, rawKey: string, repeat?: boolean): void;
+  keyUp(code: string | null, rawKey: string): void;
+  blockKeyUntilReleased(code: string | null, rawKey: string): void;
   clearKeyboard(): void;
   suppressGamepadButtonsWhileHeld(snapshot: GamepadSnapshot): void;
   read(gamepads: readonly GamepadSnapshot[]): DeviceInputFrame;
 }
 ```
 
-This sketch is for discussion. In particular, reviewers should check whether
-one owner object and explicit suppression methods make lifecycle and
-consume-on-read behavior clear enough for both consumers.
+**Accepted decision — state owner:** The developer chose one `InputDevices`
+owner for keyboard and gamepad state. Keyboard and gamepad lifecycle operations
+must remain independent, including operations affecting one gamepad connection.
+The exact methods and their consume-on-read behavior remain open for API review.
 
 ### Keyboard controls and typing
 
@@ -96,16 +102,32 @@ text and editing intent: it may require ordered input, repeated characters or
 deletion, composition, and keyboard layout support. Do not infer text from a
 gameplay frame or apply gameplay repeat and normalization rules to typing.
 
-This proposal leaves text entry with the app and its browser integration. It
-does not yet propose a shared text API or decide how the browser adapter captures
-text and editing commands. A future shared capability would need its own contract
-and a concrete consumer need. An app decides which input mode is active and
+**Accepted decision — typing:** Each app owns text entry and its browser
+integration, including how it captures text and editing commands. A future shared
+capability would need its own contract and a concrete consumer need. An app decides which input mode is active and
 routes input accordingly; text-entry keys must not trigger unrelated gameplay
 actions. The app handles focus and transitions between modes and suppresses
 controls as needed so a held key does not leak into the next screen.
 
 ### Keyboard control tracking
 
+- **Accepted decision — keyboard identity:** Use both the physical key `code`
+  and the `key` value observed on key-down. Track a held key by its `code` so
+  key-up can release it even if its `key` value changes. Games will typically
+  map controls using `code`; the observed `key` value remains available for
+  value-based mappings. **Accepted decision — simultaneous keys:** Expose each
+  code with its own key-down value, even when multiple codes share that value;
+  releasing one does not release another. **Accepted decision — frame entries:**
+  Held and freshly pressed keys are exposed as separate collections of entries,
+  each containing a `code` and its key-down `key` value.
+- **Accepted decision — unavailable code:** Do not invent a physical code when
+  an event has a missing or unusable code. Make its reported key value available
+  so the app can choose a value-based fallback. Such a fallback cannot reliably
+  distinguish inputs with the same value or match a release if its value changes;
+  it does not activate a code-based binding automatically. The adapter supplies
+  `null` for an unavailable code; the package tracks such input by normalized key
+  value as a best effort. If a changed value prevents matching key-up, an explicit
+  keyboard clear removes the remaining held state.
 - Accept key-down and key-up values from the app's browser event handlers.
 - Normalize single-character keys to lowercase. Preserve named key strings such
   as `ArrowLeft`, `Enter` and `Backspace`.
@@ -116,6 +138,12 @@ controls as needed so a held key does not leak into the next screen.
   order and multiplicity are not retained in the gameplay frame. **Accepted
   decision:** The developer chose this behavior to match the current games'
   discrete actions. This acceptance covers the coalescing behavior only.
+- **Accepted decision — coalescing identity and value:** Coalesce presses by
+  `code`, or by normalized `key` when `code` is unavailable. Different codes
+  remain separate even when their key values match. If the same identity is
+  pressed more than once before a read, retain the normalized key-down value
+  from the first press (for example, `1` rather than `!` if those values occur
+  in that order for the same code).
 - Return a fresh snapshot from `read()`; reading consumes pending press edges,
   but held keys remain held until key-up or an explicit clear.
 - **Accepted decision — focus recovery:** The developer chose to allow a fresh
@@ -140,6 +168,11 @@ controllers. Its indices identify currently connected devices and may be reused;
 they are not persistent player identities. Browser availability can depend on
 user interaction, focus, and permissions. The adapter owns these concerns.
 
+**Accepted decision — shared button tracking:** The package owns gamepad button
+held state, press edges and suppression until release. Apps choose button
+mappings and when to request suppression; axis gating remains app-owned. The
+exact suppression API remains open for review.
+
 - **Accepted decision — multiple gamepads:** The developer chose to support
   multiple independently tracked controllers in the first version while apps
   choose which controllers to use. Accept a complete collection of
@@ -151,9 +184,13 @@ user interaction, focus, and permissions. The adapter owns these concerns.
   connections and different for every new connection, even if the browser reuses
   an index. Keep button history and suppression independent for each token. The
   browser adapter must observe disconnection and generate a new token on
-  reconnection, including when both occur between reads. If that cannot be
-  observed, the adapter must reset the affected connection rather than claim
-  continuity. Duplicate tokens are invalid; the API's error handling remains open.
+  reconnection, including when both occur between reads. **Accepted decision —
+  uncertain continuity:** When the adapter cannot establish continuity, it
+  discards the old token and supplies a new one. The first-observation policy
+  then applies. A reusable browser index alone cannot establish continuity.
+- **Accepted decision — duplicate tokens:** If a read contains duplicate
+  connection tokens, throw an error. Validate the collection before changing
+  tracking state so a rejected read leaves that state unchanged.
 - Preserve axis values and report held buttons and fresh button edges by index.
   **Accepted decision — first observation:** The developer chose to suppress
   buttons already held when a connection is first observed. They produce no
@@ -171,6 +208,13 @@ user interaction, focus, and permissions. The adapter owns these concerns.
   thresholds and transition policy differ by game and remain in the app. A
   shared dead-zone helper may be considered if both consumers need the same
   well-defined scalar or radial behavior; no universal threshold is proposed.
+
+  **Accepted decision — dead-zone helpers:** Keep dead-zone calculations in the
+  apps for now. Consider shared helpers during integration when consumers need
+  the same defined calculation. Candidates include scalar and radial dead zones
+  and digital threshold checks. App-defined profiles may combine parameters;
+  package-provided profiles and defaults are deferred. Any shared helper needs
+  explicit boundary, scaling and invalid-value behavior.
 
 ### Read and state lifecycle
 
@@ -279,6 +323,9 @@ device-state contract.
   browser key values.
 - Two fresh presses of the same gameplay key before a read produce one pressed
   entry, which is absent from the next read unless pressed again.
+- Two presses of one code with different key-down values retain the first
+  normalized value; different codes with the same value produce separate entries.
+  Code-less presses coalesce by normalized key value.
 - In Very Angry Robots initials entry, enter `A`, `A`, then Backspace before the
   next game update: the app processes them in order, preserves the accepted
   initials behavior, and does not trigger gameplay actions. Check transitions
@@ -301,8 +348,8 @@ device-state contract.
   A new connection token prevents history from leaking when the browser reuses
   an index, including a disconnect and reconnect between reads.
 - An empty collection removes all gamepad state; reordering snapshots does not
-  exchange their histories. Duplicate connection tokens follow the selected error
-  policy once that policy is decided.
+  exchange their histories. Duplicate connection tokens cause an error without
+  changing tracking state.
 - Multiple reads in a frame do not duplicate a press edge; the documented
   consume-on-read behavior is covered explicitly.
 - Asteroids integration preserves turn, thrust, fire, hyperspace, start, pause
@@ -316,29 +363,21 @@ device-state contract.
 
 ## Open review questions
 
-- Is one `InputDevices` owner sufficient, or should keyboard and gamepad state
-  be separate trackers so a consumer can reset either independently?
-- How should duplicate connection tokens be reported? How does the adapter
-  identify a new connection if a disconnect event is not observed, including
-  when visibility or focus changes? It cannot reliably distinguish an unseen
-  replacement using the browser's reusable index alone.
-- Does tracking by `KeyboardEvent.key` handle changes in modifiers or keyboard
-  layout between key-down and key-up? If not, should the adapter identify the
-  physical key separately using `code`? Consider simultaneous physical keys
-  with the same key value and values that change while held.
-- How should Very Angry Robots capture ordered initials and editing input while
-  preserving its accepted behavior? Should typing eventually be a separate shared
-  capability if another app needs it, and what would justify that scope?
-- Which dead-zone helpers, if any, have identical semantics needed by both
-  initial consumers?
-- Are shared gamepad button-edge tracking and button suppression useful enough
-  if axis gating remains app-owned?
+- How should each adapter detect uncertain connection continuity, including
+  across visibility or focus changes, and issue new tokens when needed?
+- How should Very Angry Robots implement its app-owned typing path for ordered
+  initials and editing input?
+- During integration, do consumers need any identical dead-zone calculations
+  that justify a shared helper?
 - Which app-specific integration tests belong in each app versus package-level
   contract tests?
 
 ## Implementation status
 
-Not implemented. Except for the explicitly accepted decisions on gameplay press
-coalescing, focus recovery, multiple controllers, first observation, package
-name and excluding touch from the first version, the package API, app migration
+Not implemented. Except for the explicitly accepted decisions on the state owner,
+gameplay press coalescing, keyboard identity, frame entries, simultaneous keys and unavailable codes, app-owned typing,
+focus recovery, multiple controllers, first observation, shared button tracking,
+dead-zone helper direction,
+uncertain connection continuity, duplicate tokens, package name and excluding touch
+from the first version, the package API, app migration
 and build configuration remain proposed; no verification result is claimed.
