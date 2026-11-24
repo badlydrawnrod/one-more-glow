@@ -166,6 +166,16 @@ defined by the [vector display specification](../../../../packages/one-more-glow
 
 ## Verification status
 
+**2026-11-24.** The diagnostics input adapter now uses the public
+`@one-more-glow/game-input` entry point. Its deterministic tests cover Escape
+device-state edges, first-observation button suppression, fresh connection
+tokens after index reuse, first standard-mapped controller selection, axis
+pass-through, and the existing 0.25 left-stick neutral threshold. The diagnostics
+TypeScript check, all 12 diagnostics tests,
+production build, and app import-boundary check passed. Browser walkthrough
+of the integrated controls was not run because the browser automation host was
+unavailable; physical-controller behavior remains unverified.
+
 **2026-11-20.** Six diagnostics sizing tests, the diagnostics TypeScript check,
 and production build passed. Chrome walkthroughs verified Letterbox, Stretch,
 and Crop in both renderers; Canvas and Content orientation independently;

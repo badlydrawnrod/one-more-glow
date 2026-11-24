@@ -35,7 +35,7 @@ package while preserving the accepted keyboard and standard-gamepad behavior.
 
 ## Work
 
-- [ ] **Integrate the device-state owner.** Add the package dependency and
+- [x] **Integrate the device-state owner.** Add the package dependency and
   adapt DOM keyboard events and standard-mapped Gamepad API snapshots into
   `InputDevices`. Generate a new connection token for each observed controller
   connection; do not treat a reusable browser index as a persistent identity.
@@ -60,7 +60,9 @@ package while preserving the accepted keyboard and standard-gamepad behavior.
   browser setup to verify gamepad navigation, editing, screen switching and
   lifecycle recovery.
   **Checkpoint:** checks and build pass; the workbench spec describes verified
-  coverage and any physical-controller limitation accurately.
+  coverage and any physical-controller limitation accurately. **Code,
+  deterministic tests and docs complete; browser walkthrough pending** because
+  the browser automation host was unavailable in this session.
 - [ ] **Close the plan.** Apply the closure rule in `plans/README.md` before
   reporting completion or preparing a PR: confirm every success criterion,
   transfer lasting behavior changes to the spec, record verification evidence,
@@ -68,12 +70,19 @@ package while preserving the accepted keyboard and standard-gamepad behavior.
 
 ## Verification
 
-Not started. Record commands, observed results and any remaining platform or
-physical-controller gaps as the work proceeds. Do not claim physical-controller
-coverage from simulated browser input.
+Passed: `npm run build:libraries`,
+`npm run check --workspace=diagnostics`,
+`npm run test --workspace=diagnostics` (12 tests),
+`npm run build --workspace=diagnostics`, and `npm run check:boundaries`.
+The local verification tree was `dbbaf83a3c70525c1f2e2895781fd7f4e1cd978e`;
+the tree matched before and after the diagnostics checks/build.
+The `device-input.test.ts` cases cover keyboard Escape state, initial and
+reconnected held-button suppression, fresh connection tokens, standard-pad
+selection and axis passthrough. Browser walkthrough and physical-controller
+verification remain outstanding; do not claim those from deterministic tests.
 
 ## Next action
 
-Inspect the current `pollGamepad` and Escape handlers in
-`apps/diagnostics/src/main.ts`, then add the workspace dependency and integrate
-`InputDevices` while preserving diagnostics-owned navigation and axis policy.
+Repeat the integrated gamepad and Escape walkthrough when a browser automation
+host is available, verify native keyboard navigation and lifecycle recovery,
+then update this plan with observed evidence before closing it.

@@ -100,10 +100,10 @@ expose them.
 
 `apps/diagnostics/`
 
-An independent consumer of the library package. It provides test-card and
-sample-scene views for checking rendering and exploring display behavior. It
-must import the library by package name through the public entry point, not
-from library source or renderer internals.
+An independent consumer of the rendering and Game Input packages. It provides
+test-card and sample-scene views for checking rendering and exploring display
+behavior. It must import packages by name through their public entry points,
+not from package source or implementation modules.
 
 ### Asteroids demo
 
@@ -144,9 +144,11 @@ apps/diagnostics   apps/asteroids-demo   apps/gyruss-demo   apps/very-angry-robo
                             v
              DrawingContext <--- WebGL2 renderer
 
-apps/asteroids-demo       apps/very-angry-robots
-          \                 /
-      @one-more-glow/game-input
+apps/diagnostics   apps/asteroids-demo   apps/very-angry-robots
+       |                    |                    |
+       +--------------------+--------------------+
+                            v
+                @one-more-glow/game-input
 ```
 
 The renderer implements the shared contract. Future renderers should also
