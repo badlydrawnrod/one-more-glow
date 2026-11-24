@@ -2,31 +2,26 @@
 
 ## Scope and status
 
-**Status: Proposed. Implementation: Not started.** This proposal describes a
-small workspace package for input-device state shared by the Asteroids and Very
-Angry Robots apps. **Accepted decision:** The developer chose the package name
-`@one-more-glow/game-input`, retaining `one-more-glow` for the graphics package.
-The input API remains open for review. This document records candidate
-requirements and the explicitly accepted decisions identified below. It does not authorize
-implementation of proposed behavior before the developer accepts it.
+**Status: Accepted. Implementation: Device state implemented.** The accepted scope
+includes the public device-frame contract, physical gameplay bindings
+in both consumers, and app-owned typing, axis policy, and touch controls.
 
-The package turns keyboard events and caller-supplied snapshots of zero or more
+The workspace package `@one-more-glow/game-input` turns keyboard events and caller-supplied snapshots of zero or more
 gamepads into device-level state that a game can read once per frame. Each app
 remains responsible for mapping that state to its controls, screens and actions.
 
 ## Purpose
 
-Asteroids and Very Angry Robots each maintain keyboard state, one-shot key
-presses, gamepad button edges and held-input suppression across focus or screen
-transitions. Keep these shared device mechanics in one tested package while
-preserving each app's own control mapping and screen policy.
+Asteroids and Very Angry Robots share keyboard state tracking, one-shot press
+detection and held-input suppression across focus and screen transitions.
+Each game owns its control mappings and decides when to apply suppression.
 
 The package is an independent workspace library. It has no dependency on an app
 or on `one-more-glow`, and consumers import it through its public package entry
 point. Its source and tests do not access browser globals; apps adapt DOM and
 Gamepad API events into the package's input values.
 
-## Proposed capability
+## Capability
 
 ### Device frame
 
@@ -41,7 +36,7 @@ The package reports device state. It does not produce game actions such as
 not depend on a game's screen type. Each consumer maps device state to its own
 action frame and decides when actions are valid.
 
-Candidate public types:
+Public types follow.
 
 ```ts
 export interface GamepadSnapshot {
@@ -73,16 +68,14 @@ export interface DeviceInputFrame {
 }
 ```
 
-The types are illustrative pending API review. The public contract is their
-semantics, not the requirement to use these exact names or class layout.
-
-One candidate owner API is:
+The package exports the following state owner.
 
 ```ts
-class InputDevices {
+export class InputDevices {
   keyDown(code: string | null, rawKey: string, repeat?: boolean): void;
   keyUp(code: string | null, rawKey: string): void;
   blockKeyUntilReleased(code: string | null, rawKey: string): void;
+  suppressKeyboardUntilReleased(): void;
   clearKeyboard(): void;
   suppressGamepadButtonsWhileHeld(snapshot: GamepadSnapshot): void;
   read(gamepads: readonly GamepadSnapshot[]): DeviceInputFrame;
@@ -92,7 +85,6 @@ class InputDevices {
 **Accepted decision — state owner:** The developer chose one `InputDevices`
 owner for keyboard and gamepad state. Keyboard and gamepad lifecycle operations
 must remain independent, including operations affecting one gamepad connection.
-The exact methods and their consume-on-read behavior remain open for API review.
 
 ### Keyboard controls and typing
 
@@ -131,13 +123,11 @@ controls as needed so a held key does not leak into the next screen.
 - Accept key-down and key-up values from the app's browser event handlers.
 - Normalize single-character keys to lowercase. Preserve named key strings such
   as `ArrowLeft`, `Enter` and `Backspace`.
-- Ignore auto-repeat for press-edge generation. Repeating key-down events must
-  not create additional edges.
-- A pressed-key set reports whether a key had at least one fresh press since
-  the last read. Multiple presses of the same key between reads are coalesced;
-  order and multiplicity are not retained in the gameplay frame. **Accepted
-  decision:** The developer chose this behavior to match the current games'
-  discrete actions. This acceptance covers the coalescing behavior only.
+- Ignore repeating key-down events entirely, including orphan repeats after
+  focus recovery.
+- The pressed collection reports whether each key had at least one fresh press
+  since the last read. Multiple presses of the same key between reads coalesce
+  into one entry. The frame carries no ordered action queue.
 - **Accepted decision — coalescing identity and value:** Coalesce presses by
   `code`, or by normalized `key` when `code` is unavailable. Different codes
   remain separate even when their key values match. If the same identity is
@@ -155,9 +145,15 @@ controls as needed so a held key does not leak into the next screen.
   after focus returns. The app still decides when input is active and whether
   the game is paused. Suppression explicitly used for modal or screen
   transitions remains a separate concern.
-- Allow an app to block a specific key until its key-up, for example when a
-  modal consumes it. Blocking affects the package's reported state and edges;
-  the app still owns `preventDefault` and event propagation policy.
+- `blockKeyUntilReleased()` immediately removes the matching held entry and
+  pending edge, including a pending edge left by a completed tap. Further
+  presses of that identity stay blocked until key-up.
+- `suppressKeyboardUntilReleased()` discards all pending edges and blocks every
+  currently held identity. Previously blocked identities stay blocked until
+  key-up. An app can also block an individual key it consumed at the transition.
+- `clearKeyboard()` clears held entries, pending edges, and blocked identities
+  on focus loss. The active modal owns keyboard routing, including
+  `preventDefault` and event propagation policy.
 - Return unrecognized keys in the device frame rather than imposing a game-wide
   key allowlist. Each app chooses which keys to map or prevent in the browser.
 
@@ -170,8 +166,7 @@ user interaction, focus, and permissions. The adapter owns these concerns.
 
 **Accepted decision — shared button tracking:** The package owns gamepad button
 held state, press edges and suppression until release. Apps choose button
-mappings and when to request suppression; axis gating remains app-owned. The
-exact suppression API remains open for review.
+mappings and when to request suppression. Axis gating remains app-owned.
 
 - **Accepted decision — multiple gamepads:** The developer chose to support
   multiple independently tracked controllers in the first version while apps
@@ -190,7 +185,7 @@ exact suppression API remains open for review.
   then applies. A reusable browser index alone cannot establish continuity.
 - **Accepted decision — duplicate tokens:** If a read contains duplicate
   connection tokens, throw an error. Validate the collection before changing
-  tracking state so a rejected read leaves that state unchanged.
+  any tracking state, including pending keyboard edges.
 - Preserve axis values and report held buttons and fresh button edges by index.
   **Accepted decision — first observation:** The developer chose to suppress
   buttons already held when a connection is first observed. They produce no
@@ -199,10 +194,13 @@ exact suppression API remains open for review.
   second press.
 - Omission of a previously supplied connection removes its state and suppression
   history without affecting other connections. A new token has new history.
-- Allow the caller to suppress buttons held on a specified connection at a
-  transition; other connections are unaffected. Suppressed buttons become
-  available after release and a fresh press. The app may apply this operation to
-  each connection when a transition affects all players.
+- `suppressGamepadButtonsWhileHeld()` samples one connection at a transition.
+  Every currently down button is blocked until observed up. The sample
+  recognizes releases and generates no edges. Buttons absent from the sample
+  count as up. Other connections, keyboard state, and previously returned frames
+  are unaffected. An app can apply the operation to each affected connection,
+  including when a keyboard or pointer action triggers a transition between
+  frames.
 - Report axes as supplied in the snapshot. Do not assign action meanings, apply
   dead zones, or suppress axes through a universal rule. Axis grouping,
   thresholds and transition policy differ by game and remain in the app. A
@@ -225,11 +223,10 @@ exact suppression API remains open for review.
 - Gameplay key presses are retained until the next read; gamepad edges are
   inferred only from successive supplied snapshots. A gamepad press and release
   entirely between polls cannot be observed by the package.
-- Clearing or suppressing input discards pending edges so transitions cannot
-  replay an action on the next screen.
-- The package exposes no mutable internal collections. Returned frames are
-  snapshots and may be retained by the caller without changing later package
-  state.
+- The package exposes no mutable internal collections. Supplied snapshots and
+  returned frames share no mutable tracking state with the package.
+- Route each frame to a single screen so the triggering edge cannot also act
+  on the next screen.
 - The package does not decide when focus is lost, a modal opens, or a screen
   changes. The app calls the relevant clear or suppression operation at those
   boundaries.
@@ -278,29 +275,13 @@ consumer need; it is not part of the first version.
 
 ## Compatibility and consumers
 
-The first integrations considered are:
-
-- **Asteroids:** map the shared frame to its turn, thrust, fire, hyperspace,
-  start, pause and title actions. Preserve its existing keyboard/gamepad
-  mappings, simultaneous keyboard and gamepad support, and screen-specific
-  Start and Back behavior.
-- **Very Angry Robots:** map the shared frame to movement, aim, start, pause,
-  settings and initials-entry actions. Preserve independent movement and aim,
-  one-step initials stick flicks, and its current key and standard-gamepad
-  mappings.
-
-Each migration must preserve its app's observable control behavior, subject to
-the explicitly chosen first-observation and focus-recovery policies. The package
-must not force both games to use the same control mapping, thresholds, or action
-names. Very Angry Robots must retain its accepted initials-entry behavior,
-including ordered letters and Backspace, through an app-owned typing path rather
-than a gameplay press set. Both apps currently treat an observed gamepad button
-as a fresh edge when there is no previous pressed state; the accepted
-first-observation policy deliberately differs. Check the owning app specs and
-record any separately approved changes to their accepted requirements before
-migration. Gyruss is not
-an initial migration target; consider it only if it has a concrete need for this
-device-state contract.
+Asteroids and Very Angry Robots consume the package. Both map gameplay controls
+by physical `code` to preserve US and UK QWERTY control positions across layouts.
+Very Angry Robots uses the typed letter for initials and processes ordered
+editing in the app. Each app owns its mappings, thresholds, action names, and
+controller selection. See the [Asteroids specification](../../../../apps/asteroids-demo/docs/specs/SPEC.md)
+and the [Very Angry Robots specification](../../../../apps/very-angry-robots/docs/specs/SPEC.md)
+for their input behavior. Gyruss is outside the initial integration scope.
 
 ## Public package boundary
 
@@ -344,8 +325,7 @@ device-state contract.
 - Two gamepads can hold and press the same button independently; suppressing or
   disconnecting one leaves the other's state and edges intact.
 - A button held on first observation is suppressed until released and freshly
-  pressed. Verify the difference from both apps' current first-press behavior.
-  A new connection token prevents history from leaking when the browser reuses
+  pressed. Verify this in both consumers. A new connection token prevents history from leaking when the browser reuses
   an index, including a disconnect and reconnect between reads.
 - An empty collection removes all gamepad state; reordering snapshots does not
   exchange their histories. Duplicate connection tokens cause an error without
@@ -361,23 +341,9 @@ device-state contract.
   cancellation, loss of capture, focus loss and screen transitions against the
   app's touch scenarios, including that stale touches do not resume actions.
 
-## Open review questions
-
-- How should each adapter detect uncertain connection continuity, including
-  across visibility or focus changes, and issue new tokens when needed?
-- How should Very Angry Robots implement its app-owned typing path for ordered
-  initials and editing input?
-- During integration, do consumers need any identical dead-zone calculations
-  that justify a shared helper?
-- Which app-specific integration tests belong in each app versus package-level
-  contract tests?
-
 ## Implementation status
 
-Not implemented. Except for the explicitly accepted decisions on the state owner,
-gameplay press coalescing, keyboard identity, frame entries, simultaneous keys and unavailable codes, app-owned typing,
-focus recovery, multiple controllers, first observation, shared button tracking,
-dead-zone helper direction,
-uncertain connection continuity, duplicate tokens, package name and excluding touch
-from the first version, the package API, app migration
-and build configuration remain proposed; no verification result is claimed.
+The package implements keyboard and gamepad tracking, consume-on-read frames,
+and transition suppression. Deterministic tests cover the package contract.
+See the owning app specifications for integration behavior and verification.
+Shared dead-zone helpers and shared touch controls remain outside this capability.

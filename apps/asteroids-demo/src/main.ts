@@ -10,13 +10,14 @@ import {
 } from "one-more-glow";
 import {
   createGame,
+  pauseGame,
   respawnIsWaiting,
   updateGame,
   WORLD,
   type Asteroid,
   type Game,
 } from "./game.ts";
-import { InputController } from "./input.ts";
+import { canOpenSettings, InputController, inputDestination, preventsGameplayDefault, settingsKeyAction } from "./input.ts";
 import { readHighScore, writeHighScore } from "./high-score.ts";
 import { ASTEROIDS_DEFAULT_DISPLAY_PROFILE, readDisplayProfile, writeDisplayProfile } from "./display-profile.ts";
 import "./style.css";
@@ -38,23 +39,21 @@ function saveProfile(): void { writeDisplayProfile(() => window.localStorage, pr
 const profileRanges = [[0.5, 4], [0.5, 4], [0, 2], [0.5, 2]] as const;
 let settingsOpen = false;
 let selectedSetting = 0;
-let gamepadButtons = new Set<number>();
 let gamepadNavAt = 0;
-function canOpenSettings(): boolean { return game.screen === "title" || game.screen === "paused"; }
+let inputActive = document.hasFocus() && !document.hidden;
+function currentGamepads(): (Gamepad | null)[] { return Array.from(navigator.getGamepads?.() ?? []); }
 function displayProfile(): void { renderer.setDisplayProfile(profile); }
-function openSettings(): void {
-  if (settingsOpen || !canOpenSettings()) return;
+function openSettings(pads = currentGamepads()): void {
+  if (settingsOpen || !canOpenSettings(game.screen)) return;
   settingsOpen = true;
   selectedSetting = 0;
-  input.clearKeyboard();
-  input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
+  input.suppressAtSettingsTransition(pads);
   screen.focus();
 }
-function closeSettings(): void {
+function closeSettings(pads = currentGamepads()): void {
   if (!settingsOpen) return;
-  input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
+  input.suppressAtSettingsTransition(pads);
   settingsOpen = false;
-  input.clearKeyboard();
   screen.focus();
 }
 function setProfileField(index: number, value: number): void {
@@ -72,9 +71,9 @@ function resetProfile(): void {
   displayProfile();
   saveProfile();
 }
-function activateSelected(): void {
+function activateSelected(pads?: (Gamepad | null)[]): void {
   if (selectedSetting === 4) resetProfile();
-  else if (selectedSetting === 5) closeSettings();
+  else if (selectedSetting === 5) closeSettings(pads);
   else adjustSelected(1);
 }
 function moveSelection(direction: number): void { selectedSetting = (selectedSetting + direction + 6) % 6; }
@@ -388,7 +387,7 @@ function updateSliderFromPointer(index: number, x: number): void {
 
 screen.addEventListener("pointerdown", (event) => {
   const [x, y] = logicalPointerPosition(event);
-  if (!settingsOpen) return;
+  if (!inputActive || !settingsOpen) return;
   if (x >= -180 && x <= -20 && y >= -232 && y <= -188) { event.preventDefault(); closeSettings(); return; }
   if (x >= -454 && x <= -205 && y >= -232 && y <= -188) {
     event.preventDefault();
@@ -420,45 +419,44 @@ function draw(gameState: Game, now: number): void {
 }
 
 window.addEventListener("keydown", (event) => {
-  if (event.key.toLowerCase() === "s" && !event.ctrlKey && !event.metaKey && !event.altKey && (settingsOpen || canOpenSettings())) {
+  if (!inputActive) return;
+  if (event.code === "KeyS" && !event.ctrlKey && !event.metaKey && !event.altKey && (settingsOpen || canOpenSettings(game.screen))) {
     event.preventDefault();
+    input.blockKey(event);
     if (!settingsOpen && !event.repeat) openSettings();
     return;
   }
   if (settingsOpen) {
-    if (event.key === "Escape") { event.preventDefault(); closeSettings(); }
-    else if (event.key === "ArrowUp" || event.key === "ArrowDown" || event.key === "Tab") {
+    input.blockKey(event);
+    if (preventsGameplayDefault(event.code) || event.code === "ArrowDown" || event.code === "Tab") {
       event.preventDefault();
-      input.blockKey(event.key);
-      const backwards = event.key === "ArrowUp" || (event.key === "Tab" && event.shiftKey);
-      moveSelection(backwards ? -1 : 1);
-    } else if (event.key === "ArrowLeft" || event.key === "ArrowRight") {
-      event.preventDefault();
-      input.blockKey(event.key);
-      adjustSelected(event.key === "ArrowLeft" ? -1 : 1);
-    } else if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      input.blockKey(event.key);
-      if (!event.repeat) activateSelected();
-    } else {
-      input.blockKey(event.key);
-      if (["p", "P", "w", "W", "a", "A", "d", "D", "Shift"].includes(event.key)) event.preventDefault();
+    }
+    switch (settingsKeyAction(event)) {
+      case "previous": moveSelection(-1); break;
+      case "next": moveSelection(1); break;
+      case "decrease": adjustSelected(-1); break;
+      case "increase": adjustSelected(1); break;
+      case "activate": activateSelected(); break;
+      case "close": closeSettings(); break;
     }
     return;
   }
-  if (input.keyDown(event.key, event.repeat)) event.preventDefault();
+  if (input.keyDown(event)) event.preventDefault();
 });
-window.addEventListener("keyup", (event) => input.keyUp(event.key));
+window.addEventListener("keyup", (event) => input.keyUp(event));
 
-function pauseForBlur(): void {
-  input.clearKeyboard();
-  input.suppressWhileModal(Array.from(navigator.getGamepads?.() ?? []));
-  if (game.screen === "playing" || game.screen === "intermission") {
-    game.pausedFrom = game.screen;
-    game.screen = "paused";
-  }
+function setInputActive(active: boolean): void {
+  if (inputActive === active) return;
+  inputActive = active;
+  if (active) return;
+  input.loseFocus();
+  pauseGame(game);
 }
-window.addEventListener("blur", pauseForBlur);
+window.addEventListener("blur", () => setInputActive(false));
+window.addEventListener("focus", () => setInputActive(!document.hidden));
+document.addEventListener("visibilitychange", () => setInputActive(!document.hidden && document.hasFocus()));
+window.addEventListener("gamepadconnected", (event) => input.forgetConnection(event.gamepad.index));
+window.addEventListener("gamepaddisconnected", (event) => input.forgetConnection(event.gamepad.index));
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
@@ -467,28 +465,30 @@ let storedHighScore = game.highScore;
 function frame(now: number): void {
   const dt = lastTime === 0 ? 0 : Math.min((now - lastTime) / 1000, 0.05);
   lastTime = now;
-  const pads = Array.from(navigator.getGamepads?.() ?? []);
-  const pad = pads.find((candidate) => candidate?.connected) ?? null;
-  const down = (index: number) => pad?.buttons[index]?.pressed ?? false;
-  if (!settingsOpen && canOpenSettings() && down(8) && !gamepadButtons.has(8)) openSettings();
-  if (settingsOpen) {
-    input.suppressWhileModal(pads);
-    if (down(1) && !gamepadButtons.has(1)) closeSettings();
-    else if (down(0) && !gamepadButtons.has(0)) activateSelected();
-    const vertical = pad?.buttons[13]?.pressed ? 1 : pad?.buttons[12]?.pressed ? -1 : 0;
+  const pads = inputActive ? currentGamepads() : null;
+  const devices = input.read(pads);
+  const destination = inputDestination(game.screen, settingsOpen, devices);
+  const pad = devices.gamepads[0];
+  const pressed = (index: number) => pad?.buttonsPressed.has(index) ?? false;
+  const down = (index: number) => pad?.buttonsDown.has(index) ?? false;
+  if (pads && destination === "open-settings") {
+    openSettings(pads);
+  } else if (pads && destination === "settings") {
+    if (pressed(1)) closeSettings(pads);
+    else if (pressed(0)) activateSelected(pads);
+    const vertical = down(13) ? 1 : down(12) ? -1 : 0;
     if (settingsOpen && vertical && now >= gamepadNavAt) {
       moveSelection(vertical); gamepadNavAt = now + 220;
     }
-    const horizontal = pad?.buttons[15]?.pressed ? 1 : pad?.buttons[14]?.pressed ? -1
-      : Math.abs(pad?.axes[0] ?? 0) > 0.45 ? Math.sign(pad!.axes[0]) : 0;
+    const axis = pad?.axes[0] ?? 0;
+    const horizontal = down(15) ? 1 : down(14) ? -1 : Math.abs(axis) > 0.45 ? Math.sign(axis) : 0;
     if (settingsOpen && horizontal && now >= gamepadNavAt) {
       adjustSelected(horizontal); gamepadNavAt = now + 160;
     }
-    if (settingsOpen && down(3) && !gamepadButtons.has(3)) resetProfile();
-  } else {
-    updateGame(game, dt, input.read(game.screen, pads));
+    if (settingsOpen && pressed(3)) resetProfile();
+  } else if (destination === "gameplay") {
+    updateGame(game, dt, input.gameplay(game.screen, devices));
   }
-  gamepadButtons = new Set([0, 1, 3, 8].filter(down));
   if (game.highScore !== storedHighScore) {
     storedHighScore = game.highScore;
     writeHighScore(() => window.localStorage, storedHighScore);

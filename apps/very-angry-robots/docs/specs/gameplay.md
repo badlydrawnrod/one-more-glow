@@ -49,11 +49,19 @@ practical; adjust them to make this slice readable and enjoyable.
 
 ## Controls and presentation
 
+- Keyboard actions use physical US/UK QWERTY positions via `KeyboardEvent.code`, including movement, pause and settings. On French AZERTY, Z/Q/S/D occupy the W/A/S/D positions. Initials entry uses the typed letter.
 - Support keyboard and standard-mapped gamepad. Use WASD to move and arrow
   keys to fire; on gamepad use the left stick to move and right stick to fire.
   Provide a clear start/restart action and display the controls. Apply a
   dead zone to gamepad sticks. Clear held keyboard inputs on focus loss so the
-  player does not continue moving or firing unexpectedly.
+  player does not continue moving or firing unexpectedly. A fresh key-down
+  after focus returns works even if the earlier key-up was missed. A repeat
+  from a held key does not restore gameplay input.
+- Use the first connected standard-mapped gamepad. A button already held when
+  that connection is first observed has no effect until release and a fresh
+  press, including in settings. Detectable reconnections and return from
+  interrupted monitoring use a new connection. On ordinary first observation
+  the sticks can still act immediately, subject to their dead zone.
 - Draw the room, player, robots and shots as clearly distinguishable glowing
   vector shapes. Make walls visibly hazardous and show the direction of fire.
   The designs should evoke the original without requiring its raster sprites.

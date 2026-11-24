@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { InputController } from "./input.ts";
+import { InputController, inputDestination, settingsKeyAction } from "./input.ts";
 import { readHighScore, writeHighScore } from "./high-score.ts";
 import {
   createGame,
+  pauseGame,
   respawnIsWaiting,
   startRun,
   updateGame,
@@ -300,106 +301,194 @@ test("wave settings follow the formulas and cap indefinitely", () => {
   assert.equal(waveSaucerFireInterval(99), 0.8);
 });
 
-test("keyboard discrete actions ignore repeat and held actions clear on blur", () => {
+function key(code, value = code, repeat = false, shiftKey = false) {
+  return { code, key: value, repeat, shiftKey };
+}
+
+function gamepad(index = 0) {
+  return {
+    index, id: "controller", mapping: "standard", connected: true,
+    axes: [0, 0],
+    buttons: Array.from({ length: 16 }, () => ({ pressed: false })),
+  };
+}
+
+function mapInput(controller, screen, pads = []) {
+  return controller.gameplay(screen, controller.read(pads));
+}
+
+test("keyboard controls use physical positions, track releases, and ignore repeat edges", () => {
   const controller = new InputController();
-  assert.equal(controller.keyDown("Enter", false), true);
-  assert.equal(controller.read("title", []).startPressed, true);
-  controller.keyDown("Enter", true);
-  assert.equal(controller.read("title", []).startPressed, false);
-  controller.keyDown("ArrowUp", false);
-  assert.equal(controller.read("playing", []).thrust, true);
-  controller.keyDown("Shift", false);
-  assert.equal(controller.read("playing", []).hyperspacePressed, true);
-  controller.keyDown("Shift", true);
-  assert.equal(controller.read("playing", []).hyperspacePressed, false);
-  controller.clear();
-  assert.equal(controller.read("playing", []).thrust, false);
+  const game = createGame();
+  assert.equal(controller.keyDown(key("Enter")), true);
+  updateGame(game, 0, mapInput(controller, game.screen));
+  assert.equal(game.screen, "playing");
+  controller.keyDown(key("Enter", "Enter", true));
+  assert.equal(mapInput(controller, game.screen).startPressed, false);
+
+  assert.equal(controller.keyDown(key("KeyW", "z")), true);
+  assert.equal(mapInput(controller, game.screen).thrust, true);
+  controller.keyUp(key("KeyW", "Z"));
+  assert.equal(controller.keyDown(key("KeyZ", "w")), false);
+  assert.equal(mapInput(controller, game.screen).thrust, false);
+  assert.equal(controller.keyDown(key("", "w")), false);
+  controller.keyDown(key("ShiftLeft", "Shift"));
+  assert.equal(mapInput(controller, game.screen).hyperspacePressed, true);
+  controller.keyDown(key("ShiftLeft", "Shift", true));
+  assert.equal(mapInput(controller, game.screen).hyperspacePressed, false);
 });
 
-test("standard gamepad maps steering, thrust, fire, hyperspace and start edges", () => {
+test("first-observed buttons are inert until release while axes are immediately available", () => {
   const controller = new InputController();
-  const buttons = Array.from({ length: 16 }, () => ({ pressed: false }));
-  const pad = { connected: true, axes: [0.4, -0.5], buttons };
-  buttons[1].pressed = true;
-  buttons[2].pressed = true;
-  buttons[9].pressed = true;
-  let frame = controller.read("title", [pad]);
+  const pad = gamepad();
+  pad.axes = [0.4, -0.5];
+  for (const index of [1, 2, 8, 9]) pad.buttons[index].pressed = true;
+  const first = controller.read([pad]);
+  assert.equal(inputDestination("title", false, first), "gameplay");
+  let frame = controller.gameplay("title", first);
+  assert.equal(frame.connected, true);
   assert.equal(frame.turn, 0.4);
   assert.equal(frame.thrust, true);
+  assert.equal(frame.fire, false);
+  assert.equal(frame.hyperspacePressed, false);
+  assert.equal(frame.startPressed, false);
+
+  for (const index of [1, 2, 8, 9]) pad.buttons[index].pressed = false;
+  controller.read([pad]);
+  for (const index of [1, 2, 9]) pad.buttons[index].pressed = true;
+  controller.keyDown(key("KeyA", "q"));
+  controller.keyDown(key("ShiftRight", "Shift"));
+  frame = mapInput(controller, "title", [pad]);
+  assert.equal(frame.turn, -0.6);
   assert.equal(frame.fire, true);
   assert.equal(frame.hyperspacePressed, true);
   assert.equal(frame.startPressed, true);
-  frame = controller.read("playing", [pad]);
+  frame = mapInput(controller, "playing", [pad]);
+  assert.equal(frame.hyperspacePressed, false);
   assert.equal(frame.pausePressed, false);
-  buttons[9].pressed = false;
-  controller.read("playing", [pad]);
-  buttons[9].pressed = true;
-  assert.equal(controller.read("playing", [pad]).pausePressed, true);
+  pad.buttons[9].pressed = false;
+  controller.read([pad]);
+  pad.buttons[9].pressed = true;
+  assert.equal(mapInput(controller, "playing", [pad]).pausePressed, true);
 });
 
 test("return to title requires a fresh Escape or gamepad B press", () => {
   const controller = new InputController();
-  const buttons = Array.from({ length: 16 }, () => ({ pressed: false }));
-  const pad = { connected: true, axes: [0, 0], buttons };
-  buttons[1].pressed = true;
-  controller.read("playing", [pad]);
-  assert.equal(controller.read("gameover", [pad]).titlePressed, false);
-  buttons[1].pressed = false;
-  controller.read("gameover", [pad]);
-  buttons[1].pressed = true;
-  assert.equal(controller.read("gameover", [pad]).titlePressed, true);
-  controller.keyDown("Escape", false);
-  assert.equal(controller.read("gameover", [pad]).titlePressed, true);
-  controller.keyDown("Escape", true);
-  assert.equal(controller.read("gameover", [pad]).titlePressed, false);
+  const pad = gamepad();
+  controller.read([pad]);
+  pad.buttons[1].pressed = true;
+  mapInput(controller, "playing", [pad]);
+  assert.equal(mapInput(controller, "gameover", [pad]).titlePressed, false);
+  pad.buttons[1].pressed = false;
+  controller.read([pad]);
+  pad.buttons[1].pressed = true;
+  assert.equal(mapInput(controller, "gameover", [pad]).titlePressed, true);
+  controller.keyDown(key("Escape"));
+  assert.equal(mapInput(controller, "gameover", [pad]).titlePressed, true);
+  controller.keyDown(key("Escape", "Escape", true));
+  assert.equal(mapInput(controller, "gameover", [pad]).titlePressed, false);
 });
 
-test("gamepad inputs held in settings stay blocked until release", () => {
+test("settings use a separate frame destination and require fresh controls on exit", () => {
   const controller = new InputController();
-  const buttons = Array.from({ length: 16 }, () => ({ pressed: false }));
-  const pad = { connected: true, axes: [-0.7, -0.8], buttons };
-  buttons[0].pressed = true;
-  buttons[1].pressed = true;
-  buttons[2].pressed = true;
-  buttons[9].pressed = true;
-  buttons[14].pressed = true;
-  controller.suppressWhileModal([pad]);
-  let frame = controller.read("paused", [pad]);
+  const pad = gamepad();
+  controller.read([pad]);
+  for (const index of [1, 8, 9]) pad.buttons[index].pressed = true;
+  const opening = controller.read([pad]);
+  assert.equal(inputDestination("paused", false, opening), "open-settings");
+  assert.equal(inputDestination("playing", false, opening), "gameplay");
+
+  controller.keyDown(key("KeyP", "p"));
+  controller.suppressAtSettingsTransition([pad]);
+  const settings = controller.read([pad]);
+  assert.equal(inputDestination("paused", true, settings), "settings");
+  assert.equal(settings.gamepads[0].buttonsPressed.has(1), false);
+  assert.deepEqual(settings.keyboard.pressed, []);
+  assert.equal(settingsKeyAction(key("Tab", "Tab", true, true)), "previous");
+  assert.equal(settingsKeyAction(key("Enter", "Enter", true)), undefined);
+  const close = key("Space", " ");
+  assert.equal(settingsKeyAction(close), "activate");
+  controller.blockKey(close);
+
+  // A keyboard or pointer close samples the newest gamepad state before the next frame.
+  pad.axes = [-0.7, -0.8];
+  for (const index of [0, 2, 14]) pad.buttons[index].pressed = true;
+  controller.suppressAtSettingsTransition([pad]);
+  controller.keyDown(close);
+  controller.keyDown(key("KeyP", "p"));
+  const frame = mapInput(controller, "paused", [pad]);
   assert.equal(frame.turn, 0);
   assert.equal(frame.thrust, false);
   assert.equal(frame.fire, false);
   assert.equal(frame.hyperspacePressed, false);
   assert.equal(frame.pausePressed, false);
-  assert.equal(frame.startPressed, false);
 
-  buttons.forEach((button) => { button.pressed = false; });
-  pad.axes[0] = 0;
-  pad.axes[1] = 0;
-  controller.read("paused", [pad]);
-  buttons[9].pressed = true;
-  assert.equal(controller.read("paused", [pad]).pausePressed, true);
+  controller.keyUp(close);
+  controller.keyDown(close);
+  pad.buttons.forEach((button) => { button.pressed = false; });
+  pad.axes = [0, 0];
+  assert.equal(mapInput(controller, "paused", [pad]).fire, true);
+  pad.buttons[9].pressed = true;
+  assert.equal(mapInput(controller, "paused", [pad]).pausePressed, true);
 });
 
-test("clearing settings keyboard state preserves gamepad edge history", () => {
+test("focus reset clears missed key releases, ignores orphan repeats, and gates returning gamepads", () => {
   const controller = new InputController();
-  const buttons = Array.from({ length: 16 }, () => ({ pressed: false }));
-  const pad = { connected: true, axes: [0, 0], buttons };
-  buttons[9].pressed = true;
-  assert.equal(controller.read("paused", [pad]).pausePressed, true);
-  controller.keyDown("p", false);
-  controller.clearKeyboard();
-  assert.equal(controller.read("paused", [pad]).pausePressed, false);
-  controller.keyDown("p", true);
-  assert.equal(controller.read("paused", [pad]).pausePressed, false);
-  controller.keyUp("p");
-  controller.keyDown(" ", false);
-  assert.equal(controller.read("playing", [pad]).fire, true);
-  controller.clearKeyboard();
-  controller.keyDown(" ", true);
-  assert.equal(controller.read("playing", [pad]).fire, false);
-  controller.keyUp(" ");
-  controller.keyDown(" ", false);
-  assert.equal(controller.read("playing", [pad]).fire, true);
+  const game = makeGame();
+  const pad = gamepad();
+  controller.read([pad]);
+  controller.keyDown(key("KeyP", "p"));
+  controller.keyDown(key("KeyW", "z"));
+  const before = controller.read([pad]).gamepads[0].connectionId;
+  controller.loseFocus();
+  pauseGame(game);
+  controller.read(null);
+  pad.axes = [0.7, -0.8];
+  pad.buttons[9].pressed = true;
+  controller.keyDown(key("KeyP", "p", true));
+  controller.keyDown(key("KeyW", "z", true));
+  const returned = controller.read([pad]);
+  assert.notEqual(returned.gamepads[0].connectionId, before);
+  let frame = controller.gameplay(game.screen, returned);
+  assert.equal(frame.turn, 0);
+  assert.equal(frame.thrust, false);
+  assert.equal(frame.pausePressed, false);
+  updateGame(game, 0, frame);
+  assert.equal(game.screen, "paused");
+
+  controller.keyDown(key("Enter"));
+  updateGame(game, 0, mapInput(controller, game.screen, [pad]));
+  assert.equal(game.screen, "paused");
+
+  controller.keyDown(key("KeyP", "p"));
+  controller.keyDown(key("KeyW", "z"));
+  frame = mapInput(controller, game.screen, [pad]);
+  assert.equal(frame.pausePressed, true);
+  assert.equal(frame.thrust, true);
+  updateGame(game, 0, frame);
+  assert.equal(game.screen, "playing");
+});
+
+test("a same-slot reconnect loses its prior history without changing another controller", () => {
+  const controller = new InputController();
+  const first = gamepad();
+  const second = gamepad(1);
+  const [oldFirst, oldSecond] = controller.read([first, second]).gamepads;
+  first.buttons[9].pressed = true;
+  second.buttons[9].pressed = true;
+  controller.forgetConnection(first.index);
+  const frame = controller.read([first, second]);
+  assert.notEqual(frame.gamepads[0].connectionId, oldFirst.connectionId);
+  assert.equal(frame.gamepads[1].connectionId, oldSecond.connectionId);
+  assert.equal(frame.gamepads[0].buttonsPressed.has(9), false);
+  assert.equal(frame.gamepads[1].buttonsPressed.has(9), true);
+  assert.equal(controller.gameplay("title", frame).startPressed, false);
+
+  const absent = controller.read([null, second]);
+  assert.equal(absent.gamepads[0].connectionId, oldSecond.connectionId);
+  const reappeared = controller.read([first, second]);
+  assert.notEqual(reappeared.gamepads[0].connectionId, frame.gamepads[0].connectionId);
+  assert.equal(reappeared.gamepads[0].buttonsDown.has(9), false);
 });
 
 test("high score persistence tolerates unavailable and failing storage", () => {

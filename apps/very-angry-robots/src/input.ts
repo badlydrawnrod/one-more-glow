@@ -1,12 +1,4 @@
-/** A browser-independent snapshot of standard gamepad sticks, Start and Back/Select. */
-export interface GamepadState {
-  leftX: number;
-  leftY: number;
-  rightX: number;
-  rightY: number;
-  startPressed: boolean;
-  backPressed?: boolean;
-}
+import { InputDevices, type GamepadFrame, type GamepadSnapshot } from "@one-more-glow/game-input";
 
 export interface Direction {
   x: number;
@@ -33,8 +25,6 @@ export interface InputState {
   pausePressed: boolean;
   /** True for one read only when S or gamepad Back/Select has just been pressed. */
   settingsPressed: boolean;
-  /** One-shot keyboard events: uppercase A–Z or Backspace. */
-  keyPresses: string[];
   /** True once when a gameplay direction is pressed or a stick leaves neutral. */
   screenAdvancePressed: boolean;
   /** One-step initials slot selection from the left stick's horizontal axis. */
@@ -43,9 +33,10 @@ export interface InputState {
   initialsCharDelta: -1 | 0 | 1;
 }
 
-const MOVEMENT_KEYS = new Set(["w", "a", "s", "d"]);
-const AIM_KEYS = new Set(["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"]);
-const INPUT_KEYS = new Set([...MOVEMENT_KEYS, ...AIM_KEYS, "Enter", "Backspace"]);
+const MOVEMENT_CODES = ["KeyW", "KeyA", "KeyS", "KeyD"];
+const AIM_CODES = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+const DIRECTION_CODES = new Set([...MOVEMENT_CODES, ...AIM_CODES]);
+const INPUT_CODES = new Set([...DIRECTION_CODES, "Enter", "NumpadEnter", "KeyP"]);
 const GAMEPAD_DEAD_ZONE = 0.2;
 const TOUCH_NEUTRAL_ZONE = 0.18;
 
@@ -118,111 +109,119 @@ export class TouchInputModel {
   }
 }
 
-/** Tracks controls without touching DOM or navigator APIs. */
+/** The browser adapter owns tokens because browser indices can be recycled. */
+export class GamepadConnections {
+  private readonly byIndex = new Map<number, { id: string; connectionId: string }>();
+  private nextConnection = 0;
+
+  forget(index: number): void {
+    this.byIndex.delete(index);
+  }
+
+  clear(): void {
+    this.byIndex.clear();
+  }
+
+  snapshot(gamepads: readonly (Gamepad | null)[]): GamepadSnapshot[] {
+    const snapshots: GamepadSnapshot[] = [];
+    const observed = new Set<number>();
+    for (const gamepad of gamepads) {
+      if (!gamepad?.connected || gamepad.mapping !== "standard") continue;
+      observed.add(gamepad.index);
+      let connection = this.byIndex.get(gamepad.index);
+      if (!connection || connection.id !== gamepad.id) {
+        connection = { id: gamepad.id, connectionId: String(this.nextConnection++) };
+        this.byIndex.set(gamepad.index, connection);
+      }
+      snapshots.push({
+        connectionId: connection.connectionId,
+        axes: [...gamepad.axes],
+        buttons: gamepad.buttons.map((button) => button.pressed),
+      });
+    }
+    for (const index of this.byIndex.keys()) {
+      if (!observed.has(index)) this.forget(index);
+    }
+    return snapshots;
+  }
+}
+
+function physicalCode(code: string): string | null {
+  return !code || code === "Unidentified" ? null : code;
+}
+
+function stickMagnitude(axes: readonly number[], index: number): number {
+  return Math.hypot(axes[index] ?? 0, axes[index + 1] ?? 0);
+}
+
+/** Maps the selected standard gamepad and physical keyboard controls to Robots actions. */
 export class InputController {
-  private readonly keysDown = new Set<string>();
-  private readonly blockedKeys = new Set<string>();
-  private enterPressedEdge = false;
-  private screenAdvanceKeyEdge = false;
-  private readonly keyPressEdges: string[] = [];
-  private previousGamepadStart = false;
-  private previousGamepadBack = false;
+  private readonly devices = new InputDevices();
   private previousGamepadDirection = false;
   private leftStickSlotArmed = true;
   private rightStickCharArmed = true;
-  private pauseKeyEdge = false;
-  private settingsKeyEdge = false;
-  private blockedLeftStick = false;
-  private blockedRightStick = false;
-  private blockedStart = false;
-  private blockedBack = false;
+  private selectedConnection: string | undefined;
+  private readonly blockedSticks = new Map<string, { left: boolean; right: boolean }>();
 
-  /** Returns whether the key is used by this controller. */
-  keyDown(rawKey: string, repeat = false): boolean {
-    const key = normalizeKey(rawKey);
-    if (!isInputKey(key)) return false;
-    if (this.blockedKeys.has(key)) return true;
-
-    const isLetter = /^[a-z]$/.test(key);
-    const freshPress = !repeat && !this.keysDown.has(key);
-    if (freshPress) {
-      if (key === "Enter") this.enterPressedEdge = true;
-      if (key === "p") this.pauseKeyEdge = true;
-      if (key === "s") this.settingsKeyEdge = true;
-      if (MOVEMENT_KEYS.has(key) || AIM_KEYS.has(key)) this.screenAdvanceKeyEdge = true;
-      if (isLetter) this.keyPressEdges.push(key.toUpperCase());
-      if (key === "Backspace") this.keyPressEdges.push("Backspace");
-    }
-    this.keysDown.add(key);
+  keyDown(code: string, key: string, repeat = false): boolean {
+    if (!INPUT_CODES.has(code)) return false;
+    this.devices.keyDown(code, key, repeat);
     return true;
   }
 
-  keyUp(rawKey: string): void {
-    const key = normalizeKey(rawKey);
-    this.keysDown.delete(key);
-    this.blockedKeys.delete(key);
+  keyUp(code: string, key: string): void {
+    this.devices.keyUp(physicalCode(code), key);
   }
 
-  /** Prevent a key used by a modal from leaking into gameplay until it is released. */
-  blockKey(rawKey: string): void {
-    const key = normalizeKey(rawKey);
-    if (isInputKey(key)) this.blockedKeys.add(key);
+  blockKey(code: string, key: string): void {
+    this.devices.blockKeyUntilReleased(physicalCode(code), key);
   }
 
-  /** Call on window blur or document visibility loss to release held keys. */
-  clearKeyboard(): void {
-    for (const key of this.keysDown) this.blockedKeys.add(key);
-    this.keysDown.clear();
-    this.enterPressedEdge = false;
-    this.screenAdvanceKeyEdge = false;
-    this.keyPressEdges.length = 0;
-    this.pauseKeyEdge = false;
-    this.settingsKeyEdge = false;
+  clearForFocusLoss(): void {
+    this.devices.clearKeyboard();
+    this.blockedSticks.clear();
+    this.selectConnection(undefined);
   }
 
-  /** Ignore gamepad controls already held during a modal or pause transition until release. */
-  suppressGamepadWhileHeld(gamepad?: GamepadState): void {
-    if (!gamepad) return;
-    this.blockedLeftStick ||= Math.hypot(gamepad.leftX, gamepad.leftY) > GAMEPAD_DEAD_ZONE;
-    this.blockedRightStick ||= Math.hypot(gamepad.rightX, gamepad.rightY) > GAMEPAD_DEAD_ZONE;
-    this.blockedStart ||= gamepad.startPressed;
-    this.blockedBack ||= Boolean(gamepad.backPressed);
-    if (gamepad.startPressed) this.previousGamepadStart = true;
-    if (gamepad.backPressed) this.previousGamepadBack = true;
+  suppressKeyboardUntilReleased(): void {
+    this.devices.suppressKeyboardUntilReleased();
   }
 
-  read(gamepad?: GamepadState): InputState {
-    const moveKeys = directionFromKeys(this.keysDown, "d", "a", "s", "w");
-    const aimKeys = directionFromKeys(this.keysDown, "ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp");
-    const leftMagnitude = gamepad ? Math.hypot(gamepad.leftX, gamepad.leftY) : 0;
-    const rightMagnitude = gamepad ? Math.hypot(gamepad.rightX, gamepad.rightY) : 0;
-    if (leftMagnitude <= GAMEPAD_DEAD_ZONE) this.blockedLeftStick = false;
-    if (rightMagnitude <= GAMEPAD_DEAD_ZONE) this.blockedRightStick = false;
-    const effectiveLeft = gamepad && !this.blockedLeftStick ? applyDeadZone(gamepad.leftX, gamepad.leftY) : ZERO;
-    const effectiveRight = gamepad && !this.blockedRightStick ? applyDeadZone(gamepad.rightX, gamepad.rightY) : ZERO;
-    const move = combineDirections(moveKeys, effectiveLeft);
-    const aim = combineDirections(aimKeys, effectiveRight);
+  suppressGamepadWhileHeld(gamepads: readonly GamepadSnapshot[]): void {
+    this.updateStickGates(gamepads);
+    for (const gamepad of gamepads) {
+      this.devices.suppressGamepadButtonsWhileHeld(gamepad);
+      this.blockedSticks.set(gamepad.connectionId, {
+        left: stickMagnitude(gamepad.axes, 0) > GAMEPAD_DEAD_ZONE,
+        right: stickMagnitude(gamepad.axes, 2) > GAMEPAD_DEAD_ZONE,
+      });
+    }
+  }
 
-    if (!gamepad?.startPressed) this.blockedStart = false;
-    if (!gamepad?.backPressed) this.blockedBack = false;
-    const gamepadStartPressed = Boolean(gamepad?.startPressed) && !this.blockedStart && !this.previousGamepadStart;
-    this.previousGamepadStart = Boolean(gamepad?.startPressed);
-    const startPressed = this.enterPressedEdge || gamepadStartPressed;
-    this.enterPressedEdge = false;
-    const gamepadBackPressed = Boolean(gamepad?.backPressed) && !this.blockedBack && !this.previousGamepadBack;
-    this.previousGamepadBack = Boolean(gamepad?.backPressed);
-    const pausePressed = this.pauseKeyEdge || gamepadStartPressed;
-    const settingsPressed = this.settingsKeyEdge || gamepadBackPressed;
-    this.pauseKeyEdge = false;
-    this.settingsKeyEdge = false;
+  read(snapshots: readonly GamepadSnapshot[] = []): InputState & { gamepad: GamepadFrame | undefined } {
+    const { keyboard, gamepads } = this.devices.read(snapshots);
+    this.updateStickGates(gamepads);
+    const gamepad = gamepads[0];
+    this.selectConnection(gamepad?.connectionId);
+    const keysDown = new Set(keyboard.down.map(({ code }) => code ?? ""));
+    const keysPressed = new Set(keyboard.pressed.map(({ code }) => code ?? ""));
+    const moveKeys = directionFromKeys(keysDown, "KeyD", "KeyA", "KeyS", "KeyW");
+    const aimKeys = directionFromKeys(keysDown, "ArrowRight", "ArrowLeft", "ArrowDown", "ArrowUp");
+    const axes = gamepad?.axes ?? [];
+    const blocked = gamepad && this.blockedSticks.get(gamepad.connectionId);
+    const left = blocked?.left ? ZERO : applyDeadZone(axes[0] ?? 0, axes[1] ?? 0);
+    const right = blocked?.right ? ZERO : applyDeadZone(axes[2] ?? 0, axes[3] ?? 0);
+    const move = combineDirections(moveKeys, left);
+    const aim = combineDirections(aimKeys, right);
+    const gamepadStartPressed = gamepad?.buttonsPressed.has(9) ?? false;
+    const gamepadBackPressed = gamepad?.buttonsPressed.has(8) ?? false;
 
-    const gamepadDirectionActive = (!this.blockedLeftStick && leftMagnitude > GAMEPAD_DEAD_ZONE)
-      || (!this.blockedRightStick && rightMagnitude > GAMEPAD_DEAD_ZONE);
+    const gamepadDirectionActive = left !== ZERO || right !== ZERO;
     const gamepadDirectionEdge = gamepadDirectionActive && !this.previousGamepadDirection;
     this.previousGamepadDirection = gamepadDirectionActive;
 
-    const leftX = this.blockedLeftStick ? 0 : (gamepad?.leftX ?? 0);
-    const rightY = this.blockedRightStick ? 0 : (gamepad?.rightY ?? 0);
+    const leftX = blocked?.left ? 0 : (axes[0] ?? 0);
+    const rightY = blocked?.right ? 0 : (axes[3] ?? 0);
     let initialsSlotDelta: -1 | 0 | 1 = 0;
     if (Math.abs(leftX) <= GAMEPAD_DEAD_ZONE) this.leftStickSlotArmed = true;
     else if (this.leftStickSlotArmed) {
@@ -236,29 +235,40 @@ export class InputController {
       this.rightStickCharArmed = false;
     }
 
-    const keyPresses = this.keyPressEdges.splice(0);
-    const screenAdvancePressed = this.screenAdvanceKeyEdge || gamepadDirectionEdge;
-    this.screenAdvanceKeyEdge = false;
     return {
+      gamepad,
       move,
       aim,
-      startPressed,
-      pausePressed,
-      settingsPressed,
-      keyPresses,
-      screenAdvancePressed,
+      startPressed: keysPressed.has("Enter") || keysPressed.has("NumpadEnter") || gamepadStartPressed,
+      pausePressed: keysPressed.has("KeyP") || gamepadStartPressed,
+      settingsPressed: keysPressed.has("KeyS") || gamepadBackPressed,
+      screenAdvancePressed: gamepadDirectionEdge || [...keysPressed].some((code) => DIRECTION_CODES.has(code)),
       initialsSlotDelta,
       initialsCharDelta,
     };
   }
-}
 
-function normalizeKey(key: string): string {
-  return key.length === 1 ? key.toLowerCase() : key;
-}
+  private selectConnection(connectionId: string | undefined): void {
+    if (this.selectedConnection === connectionId) return;
+    this.selectedConnection = connectionId;
+    this.previousGamepadDirection = false;
+    this.leftStickSlotArmed = true;
+    this.rightStickCharArmed = true;
+  }
 
-function isInputKey(key: string): boolean {
-  return INPUT_KEYS.has(key) || /^[a-z]$/.test(key);
+  private updateStickGates(gamepads: readonly Pick<GamepadSnapshot, "connectionId" | "axes">[]): void {
+    const current = new Set(gamepads.map((gamepad) => gamepad.connectionId));
+    for (const connectionId of this.blockedSticks.keys()) {
+      if (!current.has(connectionId)) this.blockedSticks.delete(connectionId);
+    }
+    for (const gamepad of gamepads) {
+      const blocked = this.blockedSticks.get(gamepad.connectionId);
+      if (!blocked) continue;
+      if (stickMagnitude(gamepad.axes, 0) <= GAMEPAD_DEAD_ZONE) blocked.left = false;
+      if (stickMagnitude(gamepad.axes, 2) <= GAMEPAD_DEAD_ZONE) blocked.right = false;
+      if (!blocked.left && !blocked.right) this.blockedSticks.delete(gamepad.connectionId);
+    }
+  }
 }
 
 const ZERO: Direction = { x: 0, y: 0 };

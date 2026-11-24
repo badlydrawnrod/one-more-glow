@@ -1,25 +1,33 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { InputController, TouchInputModel } from "./input.ts";
+import { GamepadConnections, InputController, TouchInputModel } from "./input.ts";
+
+function snapshot({ leftX = 0, leftY = 0, rightX = 0, rightY = 0, startPressed = false, backPressed = false } = {},
+  connectionId = "pad") {
+  const buttons = Array(10).fill(false);
+  buttons[8] = backPressed;
+  buttons[9] = startPressed;
+  return { connectionId, axes: [leftX, leftY, rightX, rightY], buttons };
+}
 
 test("keyboard movement and aiming are independent and support diagonals", () => {
   const input = new InputController();
-  input.keyDown("w");
-  input.keyDown("ArrowRight");
+  input.keyDown("KeyW", "w");
+  input.keyDown("ArrowRight", "ArrowRight");
   assert.deepEqual(input.read(), {
     move: { x: 0, y: -1 },
     aim: { x: 1, y: 0 },
     startPressed: false,
     pausePressed: false,
     settingsPressed: false,
-    keyPresses: ["W"],
+    gamepad: undefined,
     screenAdvancePressed: true,
     initialsSlotDelta: 0,
     initialsCharDelta: 0,
   });
 
-  input.keyDown("d");
-  input.keyDown("ArrowUp");
+  input.keyDown("KeyD", "d");
+  input.keyDown("ArrowUp", "ArrowUp");
   const state = input.read();
   assert.ok(Math.abs(state.move.x - Math.SQRT1_2) < 1e-12);
   assert.ok(Math.abs(state.move.y + Math.SQRT1_2) < 1e-12);
@@ -29,52 +37,52 @@ test("keyboard movement and aiming are independent and support diagonals", () =>
 
 test("releasing keys and clearing keyboard state stop movement and firing", () => {
   const input = new InputController();
-  input.keyDown("a");
-  input.keyDown("ArrowDown");
-  input.keyUp("a");
+  input.keyDown("KeyA", "a");
+  input.keyDown("ArrowDown", "ArrowDown");
+  input.keyUp("KeyA", "a");
   assert.deepEqual(input.read().move, { x: 0, y: 0 });
   assert.deepEqual(input.read().aim, { x: 0, y: 1 });
 
-  input.clearKeyboard();
+  input.clearForFocusLoss();
   assert.deepEqual(input.read().aim, { x: 0, y: 0 });
 });
 
 test("Enter starts on a fresh press, ignores repeats and can be pressed again after release", () => {
   const input = new InputController();
-  assert.equal(input.keyDown("Enter"), true);
+  assert.equal(input.keyDown("Enter", "Enter"), true);
   assert.equal(input.read().startPressed, true);
-  assert.equal(input.keyDown("Enter", true), true);
+  assert.equal(input.keyDown("Enter", "Enter", true), true);
   assert.equal(input.read().startPressed, false);
-  input.keyUp("Enter");
-  input.keyDown("Enter");
+  input.keyUp("Enter", "Enter");
+  input.keyDown("Enter", "Enter");
   assert.equal(input.read().startPressed, true);
 });
 
 test("gamepad sticks move and aim independently with a radial dead zone", () => {
   const input = new InputController();
-  let state = input.read({ leftX: 0.1, leftY: 0, rightX: 0, rightY: -0.2, startPressed: false });
+  let state = input.read([snapshot({ leftX: 0.1, leftY: 0, rightX: 0, rightY: -0.2, startPressed: false })]);
   assert.deepEqual(state.move, { x: 0, y: 0 });
   assert.deepEqual(state.aim, { x: 0, y: 0 });
 
-  state = input.read({ leftX: 0.8, leftY: -0.8, rightX: -1, rightY: 0, startPressed: false });
+  state = input.read([snapshot({ leftX: 0.8, leftY: -0.8, rightX: -1, rightY: 0, startPressed: false })]);
   assert.ok(Math.abs(Math.hypot(state.move.x, state.move.y) - 1) < 1e-12);
   assert.ok(state.move.x > 0 && state.move.y < 0);
   assert.deepEqual(state.aim, { x: -1, y: 0 });
 
-  state = input.read({ leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: false });
+  state = input.read([snapshot({ leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: false })]);
   assert.deepEqual(state.move, { x: 0, y: 0 });
   assert.deepEqual(state.aim, { x: 0, y: 0 });
 });
 
 test("gamepad vectors snap to the nearest of eight normalized directions", () => {
   const input = new InputController();
-  const state = input.read({
+  const state = input.read([snapshot({
     leftX: Math.cos(Math.PI / 8),
     leftY: Math.sin(Math.PI / 8),
     rightX: -0.7,
     rightY: -0.7,
     startPressed: false,
-  });
+  })]);
   assert.ok(Math.abs(state.move.x - Math.SQRT1_2) < 1e-12);
   assert.ok(Math.abs(state.move.y - Math.SQRT1_2) < 1e-12);
   assert.ok(Math.abs(Math.hypot(state.move.x, state.move.y) - 1) < 1e-12);
@@ -83,8 +91,8 @@ test("gamepad vectors snap to the nearest of eight normalized directions", () =>
 
 test("keyboard and gamepad directions combine without exceeding unit magnitude", () => {
   const input = new InputController();
-  input.keyDown("d");
-  const state = input.read({ leftX: 1, leftY: 0, rightX: 0, rightY: 0, startPressed: false });
+  input.keyDown("KeyD", "d");
+  const state = input.read([snapshot({ leftX: 1, leftY: 0, rightX: 0, rightY: 0, startPressed: false })]);
   assert.deepEqual(state.move, { x: 1, y: 0 });
 });
 
@@ -92,36 +100,31 @@ test("gamepad Start is edge-triggered and must be released before it starts agai
   const input = new InputController();
   const pressed = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: true };
   const released = { ...pressed, startPressed: false };
-  assert.equal(input.read(pressed).startPressed, true);
-  assert.equal(input.read(pressed).startPressed, false);
-  assert.equal(input.read(released).startPressed, false);
-  assert.equal(input.read(pressed).startPressed, true);
+  assert.equal(input.read([snapshot(pressed)]).startPressed, false);
+  assert.equal(input.read([snapshot(pressed)]).startPressed, false);
+  assert.equal(input.read([snapshot(released)]).startPressed, false);
+  assert.equal(input.read([snapshot(pressed)]).startPressed, true);
 });
 
-test("letter and Backspace presses are one-shot keyboard events", () => {
+test("physical gameplay keys use their code even on a different keyboard layout", () => {
   const input = new InputController();
-  assert.equal(input.keyDown("a"), true);
-  assert.equal(input.keyDown("A", true), true);
-  assert.equal(input.read().keyPresses.join(","), "A");
-  assert.deepEqual(input.read().keyPresses, []);
-
-  input.keyUp("a");
-  input.keyDown("z");
-  input.keyDown("Backspace");
-  assert.deepEqual(input.read().keyPresses, ["Z", "Backspace"]);
-  input.keyDown("Backspace", true);
-  assert.deepEqual(input.read().keyPresses, []);
+  assert.equal(input.keyDown("KeyW", "z"), true);
+  assert.equal(input.keyDown("KeyZ", "w"), false);
+  assert.equal(input.keyDown("", "w"), false);
+  assert.deepEqual(input.read().move, { x: 0, y: -1 });
+  input.keyUp("KeyW", "Z");
+  assert.deepEqual(input.read().move, { x: 0, y: 0 });
 });
 
 test("keyboard directions advance once per press while movement remains held", () => {
   const input = new InputController();
-  input.keyDown("ArrowLeft");
+  input.keyDown("ArrowLeft", "ArrowLeft");
   assert.equal(input.read().screenAdvancePressed, true);
   assert.equal(input.read().screenAdvancePressed, false);
-  input.keyDown("ArrowLeft", true);
+  input.keyDown("ArrowLeft", "ArrowLeft", true);
   assert.equal(input.read().screenAdvancePressed, false);
-  input.keyUp("ArrowLeft");
-  input.keyDown("ArrowLeft");
+  input.keyUp("ArrowLeft", "ArrowLeft");
+  input.keyDown("ArrowLeft", "ArrowLeft");
   assert.equal(input.read().screenAdvancePressed, true);
 });
 
@@ -130,80 +133,161 @@ test("either gamepad stick advances once until both sticks return to neutral", (
   const neutral = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: false };
   const left = { ...neutral, leftX: 0.5 };
   const right = { ...neutral, rightY: 0.6 };
-  assert.equal(input.read(left).screenAdvancePressed, true);
-  assert.equal(input.read(right).screenAdvancePressed, false);
-  assert.equal(input.read(neutral).screenAdvancePressed, false);
-  assert.equal(input.read(right).screenAdvancePressed, true);
+  assert.equal(input.read([snapshot(left)]).screenAdvancePressed, true);
+  assert.equal(input.read([snapshot(right)]).screenAdvancePressed, false);
+  assert.equal(input.read([snapshot(neutral)]).screenAdvancePressed, false);
+  assert.equal(input.read([snapshot(right)]).screenAdvancePressed, true);
 });
 
 test("gamepad initials controls step once and rearm in their neutral dead zones", () => {
   const input = new InputController();
   const neutral = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: false };
-  assert.deepEqual(input.read({ ...neutral, leftX: -0.8, rightY: 0.9 }), {
+  assert.deepEqual(input.read([snapshot({ ...neutral, leftX: -0.8, rightY: 0.9 })]), {
     move: { x: -1, y: 0 },
     aim: { x: 0, y: 1 },
     startPressed: false,
     pausePressed: false,
     settingsPressed: false,
-    keyPresses: [],
+    gamepad: { connectionId: "pad", axes: [-0.8, 0, 0, 0.9], buttonsDown: new Set(), buttonsPressed: new Set() },
     screenAdvancePressed: true,
     initialsSlotDelta: -1,
     initialsCharDelta: 1,
   });
-  assert.deepEqual(input.read({ ...neutral, leftX: -0.7, rightY: 0.8 }).initialsSlotDelta, 0);
-  assert.equal(input.read({ ...neutral, leftX: 0.1, rightY: -0.1 }).initialsSlotDelta, 0);
-  const next = input.read({ ...neutral, leftX: 0.9, rightY: -0.9 });
+  assert.deepEqual(input.read([snapshot({ ...neutral, leftX: -0.7, rightY: 0.8 })]).initialsSlotDelta, 0);
+  assert.equal(input.read([snapshot({ ...neutral, leftX: 0.1, rightY: -0.1 })]).initialsSlotDelta, 0);
+  const next = input.read([snapshot({ ...neutral, leftX: 0.9, rightY: -0.9 })]);
   assert.equal(next.initialsSlotDelta, 1);
   assert.equal(next.initialsCharDelta, -1);
 });
 
 test("pause and settings shortcuts are one-read edges in the input snapshot", () => {
   const input = new InputController();
-  input.keyDown("p");
-  input.keyDown("p", true);
+  input.keyDown("KeyP", "p");
+  input.keyDown("KeyP", "p", true);
   assert.equal(input.read().pausePressed, true);
   assert.equal(input.read().pausePressed, false);
-  input.keyDown("s");
+  input.keyDown("KeyS", "s");
   assert.equal(input.read().settingsPressed, true);
   assert.equal(input.read().settingsPressed, false);
-  input.keyUp("p");
-  input.keyUp("s");
+  input.keyUp("KeyP", "p");
+  input.keyUp("KeyS", "s");
 
   const pad = { leftX: 0, leftY: 0, rightX: 0, rightY: 0, startPressed: true, backPressed: false };
-  let state = input.read(pad);
+  input.read([snapshot()]);
+  let state = input.read([snapshot(pad)]);
   assert.equal(state.pausePressed, true);
   assert.equal(state.startPressed, true);
-  state = input.read(pad);
+  state = input.read([snapshot(pad)]);
   assert.equal(state.pausePressed, false);
   assert.equal(state.startPressed, false);
-  input.read({ ...pad, startPressed: false });
-  state = input.read({ ...pad, startPressed: true, backPressed: true });
+  input.read([snapshot({ ...pad, startPressed: false })]);
+  state = input.read([snapshot({ ...pad, startPressed: true, backPressed: true })]);
   assert.equal(state.pausePressed, true);
   assert.equal(state.settingsPressed, true);
 });
 
 test("clearing keyboard input discards pending pause and settings actions and held controls", () => {
   const input = new InputController();
-  input.keyDown("p"); input.keyDown("s"); input.keyDown("w");
-  input.clearKeyboard();
+  input.keyDown("KeyP", "p"); input.keyDown("KeyS", "s"); input.keyDown("KeyW", "w");
+  input.clearForFocusLoss();
+  input.keyDown("KeyW", "w", true);
   const state = input.read();
   assert.equal(state.pausePressed, false);
   assert.equal(state.settingsPressed, false);
   assert.deepEqual(state.move, { x: 0, y: 0 });
 });
 
+test("focus reset accepts a fresh press without observing the previous key-up", () => {
+  const input = new InputController();
+  input.keyDown("KeyP", "p");
+  input.clearForFocusLoss();
+  input.keyDown("KeyP", "p", true);
+  assert.equal(input.read().pausePressed, false);
+  input.keyDown("KeyP", "p");
+  assert.equal(input.read().pausePressed, true);
+});
+
+test("a modal consumes queued edges and holds its gameplay keys until release", () => {
+  const input = new InputController();
+  input.keyDown("KeyP", "p");
+  input.keyUp("KeyP", "p");
+  input.keyDown("KeyW", "z");
+  input.suppressKeyboardUntilReleased();
+  input.blockKey("Enter", "Enter");
+  input.keyDown("KeyW", "z");
+  input.keyDown("Enter", "Enter");
+  let frame = input.read();
+  assert.equal(frame.pausePressed, false);
+  assert.equal(frame.startPressed, false);
+  assert.deepEqual(frame.move, { x: 0, y: 0 });
+
+  input.keyUp("KeyW", "z");
+  input.keyUp("Enter", "Enter");
+  input.keyDown("KeyW", "z");
+  input.keyDown("Enter", "Enter");
+  frame = input.read();
+  assert.equal(frame.startPressed, true);
+  assert.deepEqual(frame.move, { x: 0, y: -1 });
+});
+
+function browserPad(index, { id = "Controller", mapping = "standard", ...state } = {}) {
+  const { axes, buttons } = snapshot(state);
+  return { index, id, mapping, connected: true, axes, buttons: buttons.map((pressed) => ({ pressed })) };
+}
+
+test("the first standard gamepad controls the app and reconnects with fresh button history", () => {
+  const connections = new GamepadConnections();
+  const input = new InputController();
+  const generic = browserPad(0, { mapping: "", startPressed: true });
+  const first = browserPad(1, { rightY: 0.8, startPressed: true });
+  const second = browserPad(2);
+  const initial = connections.snapshot([generic, first, second]);
+  let frame = input.read(initial);
+  assert.equal(initial.length, 2);
+  assert.equal(frame.gamepad.connectionId, initial[0].connectionId);
+  assert.equal(frame.startPressed, false);
+  assert.deepEqual(frame.aim, { x: 0, y: 1 });
+
+  connections.forget(first.index);
+  const replaced = connections.snapshot([generic, first, second]);
+  assert.notEqual(replaced[0].connectionId, initial[0].connectionId);
+  assert.equal(replaced[1].connectionId, initial[1].connectionId);
+  assert.equal(input.read(replaced).startPressed, false);
+
+  input.read(connections.snapshot([generic, browserPad(1), second]));
+  frame = input.read(connections.snapshot([generic, first, second]));
+  assert.equal(frame.startPressed, true);
+  assert.equal(frame.gamepad.buttonsPressed.has(9), true);
+
+  connections.clear();
+  const afterFocus = connections.snapshot([generic, first, second]);
+  assert.notEqual(afterFocus[0].connectionId, replaced[0].connectionId);
+  assert.equal(input.read(afterFocus).startPressed, false);
+});
+
+test("gamepad enumeration retires omitted indices and recognizes changed device IDs", () => {
+  const connections = new GamepadConnections();
+  const gamepad = browserPad(1);
+  const [first] = connections.snapshot([null, gamepad]);
+  connections.snapshot([null, null]);
+  const [reappeared] = connections.snapshot([null, gamepad]);
+  const [replaced] = connections.snapshot([null, browserPad(1, { id: "Other model" })]);
+  assert.notEqual(reappeared.connectionId, first.connectionId);
+  assert.notEqual(replaced.connectionId, reappeared.connectionId);
+});
+
 test("gamepad controls held across a screen transition stay suppressed until released", () => {
   const input = new InputController();
   const held = { leftX: 0.8, leftY: 0, rightX: 0, rightY: 0, startPressed: true, backPressed: true };
-  input.suppressGamepadWhileHeld(held);
-  const state = input.read(held);
+  input.suppressGamepadWhileHeld([snapshot(held)]);
+  const state = input.read([snapshot(held)]);
   assert.deepEqual(state.move, { x: 0, y: 0 });
   assert.equal(state.startPressed, false);
   assert.equal(state.pausePressed, false);
   assert.equal(state.settingsPressed, false);
 
-  input.read({ ...held, leftX: 0, startPressed: false, backPressed: false });
-  const fresh = input.read({ ...held, leftX: 0.8 });
+  input.read([snapshot({ ...held, leftX: 0, startPressed: false, backPressed: false })]);
+  const fresh = input.read([snapshot({ ...held, leftX: 0.8 })]);
   assert.ok(fresh.move.x > 0);
   assert.equal(fresh.startPressed, true);
   assert.equal(fresh.settingsPressed, true);

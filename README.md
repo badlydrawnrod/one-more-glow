@@ -149,9 +149,9 @@ Run these commands from the repository root.
 | Command | Purpose |
 | --- | --- |
 | `npm run dev` | Build the library and start diagnostics. |
-| `npm run dev:asteroids` | Build the library and start Asteroids. |
+| `npm run dev:asteroids` | Build both libraries and start Asteroids. |
 | `npm run dev:gyruss` | Build the library and start Gyruss. |
-| `npm run dev:robots` | Build the library and start Very Angry Robots. |
+| `npm run dev:robots` | Build both libraries and start Very Angry Robots. |
 | `npm run preview` | Preview the production diagnostics build. |
 | `npm run preview:asteroids` | Preview the production Asteroids build. |
 | `npm run preview:gyruss` | Preview the production Gyruss build. |
@@ -161,14 +161,15 @@ Run these commands from the repository root.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run check` | Check repository conventions and app dependencies, build the library, type-check all apps, and run all behavioral tests. |
+| `npm run check` | Check repository conventions and app dependencies, build both libraries, type-check all apps, and run all behavioral tests. |
 | `npm run check:repo-conventions` | Check the README command list, skill front matter and catalog, and placement of check scripts in `tools/`. |
-| `npm run check:boundaries` | Check that apps import the library through its public entry point and avoid dependencies on other apps. |
+| `npm run check:boundaries` | Check that apps import libraries through their public entry points and avoid dependencies on other apps. |
 | `npm run verification:tree` | Print the Git tree ID for local [verification evidence](docs/engineering.md#verification-evidence), including uncommitted source. |
-| `npm run check:asteroids` | Build the library and type-check Asteroids. |
+| `npm run check:asteroids` | Build both libraries and type-check Asteroids. |
 | `npm run check:gyruss` | Build the library and type-check Gyruss. |
-| `npm run check:robots` | Build the library and type-check Very Angry Robots. |
-| `npm test` | Run behavioral tests for the library and apps that have test suites. |
+| `npm run check:robots` | Build both libraries and type-check Very Angry Robots. |
+| `npm test` | Run behavioral tests for both libraries and apps that have test suites. |
+| `npm run test --workspace=@one-more-glow/game-input` | Run the device-state contract tests. |
 | `npm run test --workspace=diagnostics` | Run the diagnostics sizing and frame-timing tests. |
 | `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
 | `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
@@ -182,10 +183,11 @@ example `cat pr-description.md | npm run pr:merge` or
 
 | Command | Purpose |
 | --- | --- |
-| `npm run build` | Build the library and all production apps. |
-| `npm run build:asteroids` | Build the library and production Asteroids app. |
+| `npm run build` | Build both libraries and all production apps. |
+| `npm run build:libraries` | Build the drawing and game input packages. |
+| `npm run build:asteroids` | Build both libraries and production Asteroids app. |
 | `npm run build:gyruss` | Build the library and production Gyruss app. |
-| `npm run build:robots` | Build the library and production Very Angry Robots app. |
+| `npm run build:robots` | Build both libraries and production Very Angry Robots app. |
 | `npm run build:pages` | Build the apps selected for GitHub Pages and assemble the site in `.pages-output/`. |
 
 ## Repository layout
@@ -195,5 +197,6 @@ example `cat pr-description.md | npm run pr:merge` or
 - [`packages/one-more-glow/`](packages/one-more-glow/) contains the reusable
   library, its tests, and its specifications. The library build writes
   JavaScript and TypeScript declarations to `packages/one-more-glow/dist/`.
+- [Game Input](packages/game-input/docs/specs/SPEC.md) tracks keyboard and gamepad state for Asteroids and Very Angry Robots.
 - [Repository architecture](docs/architecture.md) explains which parts of the
   repository own each responsibility and how they depend on one another.

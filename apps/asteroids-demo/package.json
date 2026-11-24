@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@one-more-glow/game-input": "0.0.0",
     "one-more-glow": "0.0.0"
   }
 }

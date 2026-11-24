@@ -14,7 +14,9 @@ root, run `npm run dev:asteroids` and open the local address printed by Vite.
 | Start / restart | Enter | Start |
 | Pause / resume | P | Start |
 
-Fire can be held. Hyperspace and start/pause activate on a fresh press. The
+Keyboard labels refer to physical US/UK QWERTY positions. Fire can be held.
+Hyperspace and start/pause activate on a fresh press. A button already held
+when a gamepad first appears needs to be released and pressed again. The
 spacecraft carries momentum, and the playfield wraps around its edges. Clearing
 an asteroid wave advances to a faster wave; saucers enter periodically.
 

@@ -25,7 +25,10 @@ The shared display profile and its valid values are defined by the
   from the paused state without resetting it.
 - Losing browser focus while a run is active pauses it and clears held keyboard
   input. Returning focus does not resume automatically; require an explicit
-  resume input. A pause that was already active remains paused.
+  resume input. A pause that was already active remains paused. Ignore input
+  while the page is unfocused or hidden. On return, held sticks and buttons
+  must reach neutral before they can act again. A fresh keyboard press can
+  register even if its previous release was missed.
 - Pause is available during active play and room transitions, including a
   death interval before respawn. It is not an action on the Main Menu, Top
   Scores, initials-entry or game-over flow screens.
