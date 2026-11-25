@@ -49,9 +49,11 @@ package while preserving the accepted keyboard and standard-gamepad behavior.
   browser default prevention. Clear keyboard state on focus loss; reset or
   suppress controller state at blur, hidden-page, disconnect, reconnect and
   neutral-gate boundaries so held controls do not fire after recovery.
-  **Checkpoint:** focused tests or a small browser walkthrough demonstrate
-  keyboard native navigation, Escape behavior, held-button and held-axis
-  gating, focus return, and reconnect without stale state.
+  **Checkpoint:** the Nov 25 browser walkthrough confirmed native Tab/Return
+  navigation between both screens and Escape closing Controls help. Focused
+  tests cover keyboard Escape state, held-button suppression and reconnect
+  tokens. Held-axis gating, focus return after lifecycle loss, and behavior
+  with a connected controller still need an integrated controller walkthrough.
 - [ ] **Document and verify.** Update diagnostics' input verification notes
   with the actual scenarios and outcomes. Run
   `npm run check --workspace=diagnostics`,
@@ -59,10 +61,10 @@ package while preserving the accepted keyboard and standard-gamepad behavior.
   `npm run build --workspace=diagnostics`; use the repository's available
   browser setup to verify gamepad navigation, editing, screen switching and
   lifecycle recovery.
-  **Checkpoint:** checks and build pass; the workbench spec describes verified
-  coverage and any physical-controller limitation accurately. **Code,
-  deterministic tests and docs complete; browser walkthrough pending** because
-  the browser automation host was unavailable in this session.
+  **Checkpoint:** checks and build pass; the workbench spec records the Nov 25
+  keyboard walkthrough and notes that gamepad behavior was not rechecked
+  because no standard-mapped controller was connected. Gamepad navigation,
+  editing and lifecycle recovery remain to be exercised in the browser.
 - [ ] **Close the plan.** Apply the closure rule in `plans/README.md` before
   reporting completion or preparing a PR: confirm every success criterion,
   transfer lasting behavior changes to the spec, record verification evidence,
@@ -83,6 +85,7 @@ verification remain outstanding; do not claim those from deterministic tests.
 
 ## Next action
 
-Repeat the integrated gamepad and Escape walkthrough when a browser automation
-host is available, verify native keyboard navigation and lifecycle recovery,
-then update this plan with observed evidence before closing it.
+When a standard-mapped controller is available, use the local browser to verify
+gamepad navigation, activation, editing, screen switching, held-input gating,
+and disconnect/reconnect recovery. Then update the evidence and close the plan
+only after all success criteria are met.

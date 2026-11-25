@@ -198,3 +198,10 @@ screen navigation passed.
 Physical touchscreen drag, pinch zoom, and device rotation still need a phone
 or tablet. Final gamepad verification needs a standard-mapped controller.
 Installed PWA offline verification remains deferred.
+
+**2026-11-25.** A local browser walkthrough confirmed the Diagnostics workbench
+loads, Tab and Return move between Canvas & Environment and Renderer &
+Performance, and Escape closes Controls help. No browser console errors were
+reported. Controls help still prompted to connect a standard-mapped gamepad, so
+gamepad navigation, editing, and reconnection were not exercised in this
+walkthrough.
