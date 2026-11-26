@@ -118,10 +118,11 @@ It reads device state through the public Game Input entry point.
 
 `apps/gyruss-demo/`
 
-An independent consumer of the library. It demonstrates a simple orbital
-shooter with keyboard and browser Gamepad API input. Input handling and game
-state belong to this app; it must use the public package entry point rather
-than library internals.
+An independent consumer of the drawing and Game Input libraries. It demonstrates
+a simple orbital shooter with keyboard and browser Gamepad API input. Browser
+input adaptation, key and button mappings, axis policy, first-connected-controller
+selection, and game state belong to this app. It uses the public package entry
+points rather than library internals.
 
 ### Very Angry Robots demo
 
@@ -144,9 +145,9 @@ apps/diagnostics   apps/asteroids-demo   apps/gyruss-demo   apps/very-angry-robo
                             v
              DrawingContext <--- WebGL2 renderer
 
-apps/diagnostics   apps/asteroids-demo   apps/very-angry-robots
-       |                    |                    |
-       +--------------------+--------------------+
+apps/diagnostics   apps/asteroids-demo   apps/gyruss-demo   apps/very-angry-robots
+       |                    |                   |                    |
+       +--------------------+-------------------+--------------------+
                             v
                 @one-more-glow/game-input
 ```
