@@ -7,7 +7,7 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "npm run build --workspace=one-more-glow && npm run dev --workspace=diagnostics",
+    "dev": "npm run build:libraries && npm run dev --workspace=diagnostics",
     "dev:asteroids": "npm run build:libraries && npm run dev --workspace=asteroids-demo",
     "dev:gyruss": "npm run build --workspace=one-more-glow && npm run dev --workspace=gyruss-demo",
     "check": "npm run check:repo-conventions && npm run check:boundaries && npm run check --workspace=@one-more-glow/game-input && npm test && npm run check --workspace=diagnostics && npm run check --workspace=asteroids-demo && npm run check --workspace=gyruss-demo && npm run check --workspace=very-angry-robots",

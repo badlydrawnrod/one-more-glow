@@ -166,6 +166,32 @@ defined by the [vector display specification](../../../../packages/one-more-glow
 
 ## Verification status
 
+**2026-11-26.** A local browser walkthrough with a standard-mapped gamepad
+verified focus navigation and activation, shoulder switching to Renderer &
+Performance, opening and changing the Backing scale select (1×, then restoring
+Device scale), and Display profile editing (Beam width 1.5 to 1.6) followed by
+Reset profile. B closed Controls help. After disconnect and reconnect while
+holding A, and again while holding the left stick down, Controls help stayed
+open and focus did not move. Releasing the controls cleared the gate; a fresh A
+closed Controls help, and a fresh left-stick movement moved focus. Returning to
+the Diagnostics browser tab and pressing D-pad down moved focus to Enter
+fullscreen. The controller gate now waits for 250 ms of continuous neutral
+input after connection before accepting gamepad actions. `npm run check
+--workspace=diagnostics`, `npm run test --workspace=diagnostics` (12 tests),
+`npm run build --workspace=diagnostics`, and `npm run check:boundaries` passed.
+The verification tree was
+`fe9271d5a6ab4701d0985f615b12385251acb0e0` before and after those checks.
+
+**2026-11-24.** The diagnostics input adapter now uses the public
+`@one-more-glow/game-input` entry point. Its deterministic tests cover Escape
+device-state edges, first-observation button suppression, fresh connection
+tokens after index reuse, first standard-mapped controller selection, axis
+pass-through, and the existing 0.25 left-stick neutral threshold. The diagnostics
+TypeScript check, all 12 diagnostics tests,
+production build, and app import-boundary check passed. Browser walkthrough
+of the integrated controls was not run because the browser automation host was
+unavailable; physical-controller behavior remains unverified.
+
 **2026-11-20.** Six diagnostics sizing tests, the diagnostics TypeScript check,
 and production build passed. Chrome walkthroughs verified Letterbox, Stretch,
 and Crop in both renderers; Canvas and Content orientation independently;
@@ -188,3 +214,10 @@ screen navigation passed.
 Physical touchscreen drag, pinch zoom, and device rotation still need a phone
 or tablet. Final gamepad verification needs a standard-mapped controller.
 Installed PWA offline verification remains deferred.
+
+**2026-11-25.** A local browser walkthrough confirmed the Diagnostics workbench
+loads, Tab and Return move between Canvas & Environment and Renderer &
+Performance, and Escape closes Controls help. No browser console errors were
+reported. Controls help still prompted to connect a standard-mapped gamepad, so
+gamepad navigation, editing, and reconnection were not exercised in this
+walkthrough.

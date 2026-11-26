@@ -275,11 +275,15 @@ consumer need; it is not part of the first version.
 
 ## Compatibility and consumers
 
-Asteroids and Very Angry Robots consume the package. Both map gameplay controls
-by physical `code` to preserve US and UK QWERTY control positions across layouts.
-Very Angry Robots uses the typed letter for initials and processes ordered
-editing in the app. Each app owns its mappings, thresholds, action names, and
-controller selection. See the [Asteroids specification](../../../../apps/asteroids-demo/docs/specs/SPEC.md)
+Diagnostics, Asteroids and Very Angry Robots consume the package. Diagnostics
+uses device state for Escape handling and standard-mapped gamepad navigation;
+native keyboard focus and controls remain browser-managed. Asteroids and Very
+Angry Robots map gameplay controls by physical `code` to preserve US and UK
+QWERTY control positions across layouts. Very Angry Robots uses the typed
+letter for initials and processes ordered editing in the app. Each app owns
+its mappings, thresholds, action names, and controller selection. See the
+[diagnostics workbench specification](../../../../apps/diagnostics/docs/specs/diagnostics-workbench.md),
+[Asteroids specification](../../../../apps/asteroids-demo/docs/specs/SPEC.md)
 and the [Very Angry Robots specification](../../../../apps/very-angry-robots/docs/specs/SPEC.md)
 for their input behavior. Gyruss is outside the initial integration scope.
 
@@ -325,7 +329,7 @@ for their input behavior. Gyruss is outside the initial integration scope.
 - Two gamepads can hold and press the same button independently; suppressing or
   disconnecting one leaves the other's state and edges intact.
 - A button held on first observation is suppressed until released and freshly
-  pressed. Verify this in both consumers. A new connection token prevents history from leaking when the browser reuses
+  pressed. Verify this in all consumers. A new connection token prevents history from leaking when the browser reuses
   an index, including a disconnect and reconnect between reads.
 - An empty collection removes all gamepad state; reordering snapshots does not
   exchange their histories. Duplicate connection tokens cause an error without
@@ -334,6 +338,9 @@ for their input behavior. Gyruss is outside the initial integration scope.
   consume-on-read behavior is covered explicitly.
 - Asteroids integration preserves turn, thrust, fire, hyperspace, start, pause
   and title behavior, including modal suppression.
+- Diagnostics integration routes Escape key edges and standard-mapped
+  controller button state through the package while preserving native keyboard
+  focus, diagnostics-owned UI actions and axis policy.
 - Very Angry Robots integration preserves movement and aim independently,
   pause/settings edges, initials-entry input and screen-transition suppression.
 - Very Angry Robots integration retains independent simultaneous touch sticks,

@@ -17,6 +17,7 @@ import { drawSegmentStudy, drawSpacingStudy } from "./segment-study.ts";
 import { registerAppServiceWorker } from "./pwa.ts";
 import { ASPECT_PRESETS, aspectDimensions, aspectRatio, fitCanvasSize, genericMap, planBackingAllocation, swapDimensions, type AspectOrientation, type AspectPreset, type CanvasSize } from "./calibration-sizing.ts";
 import { hasEnoughFrameSample, summarizeFrameIntervals, type FrameTimingResult } from "./frame-timing.ts";
+import { DiagnosticsDeviceInput, isGamepadNeutral } from "./device-input.ts";
 
 registerAppServiceWorker();
 
@@ -1385,7 +1386,11 @@ watchDevicePixelRatio();
 
 document.addEventListener("visibilitychange", () => {
   resetTimingSample();
-  if (document.hidden) stopAnimation();
+  if (document.hidden) {
+    stopAnimation();
+    clearGamepadState(true);
+    deviceInput.clearKeyboard();
+  }
   else if (activeScreen === "renderer") renderCurrentScene();
   scheduleMeasurements("visibility");
 });
@@ -1624,13 +1629,14 @@ type SelectEdit = { select: HTMLSelectElement; originalValue: string };
 let numericEdit: NumericEdit | null = null;
 let selectEdit: SelectEdit | null = null;
 let selectMenu: HTMLDivElement | null = null;
-let previousPadButtons = new Set<number>();
-let previousPadIndex: number | null = null;
+const deviceInput = new DiagnosticsDeviceInput();
+let previousPadConnectionId: string | null = null;
 let nextPadRepeatAt = 0;
 let repeatedPadDirection = "";
 let repeatedEditDirection = "";
 let nextPadEditAt = 0;
 let requirePadNeutral = false;
+let padNeutralSince: number | null = null;
 let fullscreenInitiator: HTMLButtonElement | null = null;
 const gamepadStatus = requireElement(document.querySelector<HTMLElement>("#gamepad-status"), "#gamepad-status");
 
@@ -1846,50 +1852,57 @@ function switchScreenFromGamepad(screenName: "environment" | "renderer"): void {
 }
 
 function clearGamepadState(requireNeutral: boolean): void {
-  previousPadButtons.clear();
-  previousPadIndex = null;
+  deviceInput.resetGamepads();
+  previousPadConnectionId = null;
   repeatedPadDirection = "";
   repeatedEditDirection = "";
   nextPadRepeatAt = 0;
   nextPadEditAt = 0;
   requirePadNeutral = requireNeutral;
+  padNeutralSince = null;
   if (numericEdit) cancelNumericEdit();
   if (selectEdit) finishSelectEdit(false);
 }
 
 function pollGamepad(time: number): void {
-  const pad = Array.from(navigator.getGamepads?.() ?? []).find((candidate) => candidate?.connected && candidate.mapping === "standard") ?? null;
+  const { frame, gamepad: pad } = deviceInput.read(Array.from(navigator.getGamepads?.() ?? []));
+  const gamepad = frame.gamepads[0] ?? null;
   if (!pad) {
-    if (previousPadIndex !== null) clearGamepadState(false);
+    if (previousPadConnectionId !== null) clearGamepadState(false);
     if (gamepadStatus.textContent !== "Connect a standard-mapped gamepad to navigate.") {
       gamepadStatus.textContent = "Connect a standard-mapped gamepad to navigate.";
     }
     requestAnimationFrame(pollGamepad);
     return;
   }
-  if (previousPadIndex !== pad.index) {
-    previousPadButtons = new Set(Array.from(pad.buttons, (button, index) => button.pressed ? index : -1).filter((index) => index >= 0));
-    previousPadIndex = pad.index;
+  if (gamepad && previousPadConnectionId !== gamepad.connectionId) {
+    previousPadConnectionId = gamepad.connectionId;
     requirePadNeutral = true;
+    padNeutralSince = null;
     gamepadStatus.textContent = "Standard gamepad connected. Release held controls to begin.";
   }
   if (!document.hasFocus() || document.hidden) {
     clearGamepadState(true);
+    deviceInput.clearKeyboard();
     requestAnimationFrame(pollGamepad);
     return;
   }
 
-  const down = (index: number): boolean => pad.buttons[index]?.pressed ?? false;
-  const buttonsNeutral = Array.from(pad.buttons).every((button) => !button.pressed);
-  const axesNeutral = (pad.axes[0] ?? 0) ** 2 + (pad.axes[1] ?? 0) ** 2 < 0.25 ** 2;
+  const down = (index: number): boolean => gamepad?.buttonsDown.has(index) ?? false;
   if (requirePadNeutral) {
-    if (buttonsNeutral && axesNeutral) requirePadNeutral = false;
-    previousPadButtons = new Set(Array.from(pad.buttons, (button, index) => button.pressed ? index : -1).filter((index) => index >= 0));
+    if (!isGamepadNeutral(pad)) {
+      padNeutralSince = null;
+    } else if (padNeutralSince === null) {
+      padNeutralSince = time;
+    } else if (time - padNeutralSince >= 250) {
+      requirePadNeutral = false;
+      gamepadStatus.textContent = "Standard gamepad connected.";
+    }
     requestAnimationFrame(pollGamepad);
     return;
   }
 
-  const buttonEdge = (index: number): boolean => down(index) && !previousPadButtons.has(index);
+  const buttonEdge = (index: number): boolean => gamepad?.buttonsPressed.has(index) ?? false;
   const dpadX = Number(down(15)) - Number(down(14));
   const dpadY = Number(down(13)) - Number(down(12));
   const axisX = Math.abs(pad.axes[0] ?? 0) > 0.25 ? Math.sign(pad.axes[0] ?? 0) : 0;
@@ -1921,16 +1934,27 @@ function pollGamepad(time: number): void {
     if (buttonEdge(4)) switchScreenFromGamepad("environment");
     if (buttonEdge(5)) switchScreenFromGamepad("renderer");
   }
-  previousPadButtons = new Set(Array.from(pad.buttons, (button, index) => button.pressed ? index : -1).filter((index) => index >= 0));
   requestAnimationFrame(pollGamepad);
 }
 
-window.addEventListener("blur", () => clearGamepadState(true));
+window.addEventListener("blur", () => {
+  clearGamepadState(true);
+  deviceInput.clearKeyboard();
+});
 window.addEventListener("focus", () => { requirePadNeutral = true; });
-window.addEventListener("gamepaddisconnected", () => clearGamepadState(false));
-window.addEventListener("gamepadconnected", () => { gamepadStatus.textContent = "Gamepad connected; checking for standard mapping."; });
+window.addEventListener("gamepaddisconnected", (event: GamepadEvent) => {
+  deviceInput.gamepadDisconnected(event.gamepad.index);
+  clearGamepadState(false);
+});
+window.addEventListener("gamepadconnected", (event: GamepadEvent) => {
+  deviceInput.gamepadConnected(event.gamepad.index);
+  gamepadStatus.textContent = "Gamepad connected; checking for standard mapping.";
+});
 document.addEventListener("keydown", (event: KeyboardEvent) => {
+  deviceInput.keyDown(event.code || null, event.key, event.repeat);
   if (event.key !== "Escape") return;
+  const keyboard = deviceInput.readCached().keyboard;
+  if (!keyboard.pressed.some((entry) => entry.key === "Escape")) return;
   if (numericEdit) {
     event.preventDefault();
     cancelNumericEdit();
@@ -1944,6 +1968,9 @@ document.addEventListener("keydown", (event: KeyboardEvent) => {
     fullscreenInitiator = fullscreenToggle;
     void document.exitFullscreen().then(() => fullscreenInitiator?.focus()).catch(() => {});
   }
+});
+document.addEventListener("keyup", (event: KeyboardEvent) => {
+  deviceInput.keyUp(event.code || null, event.key);
 });
 fullscreenToggle.addEventListener("click", () => { fullscreenInitiator = fullscreenToggle; });
 requestAnimationFrame(pollGamepad);
