@@ -153,7 +153,7 @@ Run these commands from the repository root.
 | --- | --- |
 | `npm run dev` | Build the library and start diagnostics. |
 | `npm run dev:asteroids` | Build both libraries and start Asteroids. |
-| `npm run dev:gyruss` | Build the library and start Gyruss. |
+| `npm run dev:gyruss` | Build both libraries and start Gyruss. |
 | `npm run dev:robots` | Build both libraries and start Very Angry Robots. |
 | `npm run preview` | Preview the production diagnostics build. |
 | `npm run preview:asteroids` | Preview the production Asteroids build. |
@@ -169,12 +169,13 @@ Run these commands from the repository root.
 | `npm run check:boundaries` | Check that apps import libraries through their public entry points and avoid dependencies on other apps. |
 | `npm run verification:tree` | Print the Git tree ID for local [verification evidence](docs/engineering.md#verification-evidence), including uncommitted source. |
 | `npm run check:asteroids` | Build both libraries and type-check Asteroids. |
-| `npm run check:gyruss` | Build the library and type-check Gyruss. |
+| `npm run check:gyruss` | Build both libraries and type-check Gyruss. |
 | `npm run check:robots` | Build both libraries and type-check Very Angry Robots. |
 | `npm test` | Run behavioral tests for both libraries and apps that have test suites. |
 | `npm run test --workspace=@one-more-glow/game-input` | Run the device-state contract tests. |
 | `npm run test --workspace=diagnostics` | Run the diagnostics sizing and frame-timing tests. |
 | `npm run test --workspace=asteroids-demo` | Run the Asteroids simulation and input tests. |
+| `npm run test --workspace=gyruss-demo` | Run the Gyruss input adapter and mapping tests. |
 | `npm run test --workspace=very-angry-robots` | Run the Very Angry Robots tests. |
 | `npm run pr:merge [-- --title <title>] [--body-file <file>]` | Push the current branch, open a PR with the supplied title and description, watch its checks, then squash-merge it. Without `--title`, the title is filled from commits. The description must include non-empty **Summary** and **Verification** sections; see the [prepare-pr skill](.agents/skills/prepare-pr/SKILL.md). |
 
@@ -189,7 +190,7 @@ example `cat pr-description.md | npm run pr:merge` or
 | `npm run build` | Build both libraries and all production apps. |
 | `npm run build:libraries` | Build the drawing and game input packages. |
 | `npm run build:asteroids` | Build both libraries and production Asteroids app. |
-| `npm run build:gyruss` | Build the library and production Gyruss app. |
+| `npm run build:gyruss` | Build both libraries and the production Gyruss app. |
 | `npm run build:robots` | Build both libraries and production Very Angry Robots app. |
 | `npm run build:pages` | Build the apps selected for GitHub Pages and assemble the site in `.pages-output/`. |
 
@@ -200,6 +201,6 @@ example `cat pr-description.md | npm run pr:merge` or
 - [`packages/one-more-glow/`](packages/one-more-glow/) contains the reusable
   library, its tests, and its specifications. The library build writes
   JavaScript and TypeScript declarations to `packages/one-more-glow/dist/`.
-- [Game Input](packages/game-input/docs/specs/SPEC.md) tracks keyboard and gamepad state for Asteroids and Very Angry Robots.
+- [Game Input](packages/game-input/docs/specs/SPEC.md) tracks keyboard and gamepad state for Asteroids, Gyruss, and Very Angry Robots.
 - [Repository architecture](docs/architecture.md) explains which parts of the
   repository own each responsibility and how they depend on one another.

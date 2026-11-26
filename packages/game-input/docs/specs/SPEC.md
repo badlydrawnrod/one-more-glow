@@ -275,17 +275,22 @@ consumer need; it is not part of the first version.
 
 ## Compatibility and consumers
 
-Diagnostics, Asteroids and Very Angry Robots consume the package. Diagnostics
-uses device state for Escape handling and standard-mapped gamepad navigation;
-native keyboard focus and controls remain browser-managed. Asteroids and Very
-Angry Robots map gameplay controls by physical `code` to preserve US and UK
-QWERTY control positions across layouts. Very Angry Robots uses the typed
-letter for initials and processes ordered editing in the app. Each app owns
-its mappings, thresholds, action names, and controller selection. See the
+Diagnostics, Asteroids, Gyruss and Very Angry Robots consume the package.
+Diagnostics uses device state for Escape handling and standard-mapped gamepad
+navigation; native keyboard focus and controls remain browser-managed. Asteroids
+and Very Angry Robots map gameplay controls by physical `code` to preserve US
+and UK QWERTY control positions across layouts. Very Angry Robots uses the typed
+letter for initials and processes ordered editing in the app. Gyruss preserves
+its existing normalized `event.key` value mappings (`a`/`d`, arrows, Space,
+ArrowUp, and `z`) rather than switching to physical-key bindings. Each app owns
+its mappings, thresholds, action names, and controller selection. Gyruss uses
+the first connected controller in browser enumeration order for gameplay; other
+controllers do not contribute gameplay input. See the
 [diagnostics workbench specification](../../../../apps/diagnostics/docs/specs/diagnostics-workbench.md),
-[Asteroids specification](../../../../apps/asteroids-demo/docs/specs/SPEC.md)
+[Asteroids specification](../../../../apps/asteroids-demo/docs/specs/SPEC.md),
+[Gyruss specification](../../../../apps/gyruss-demo/docs/specs/SPEC.md),
 and the [Very Angry Robots specification](../../../../apps/very-angry-robots/docs/specs/SPEC.md)
-for their input behavior. Gyruss is outside the initial integration scope.
+for their input behavior.
 
 ## Public package boundary
 
@@ -347,6 +352,13 @@ for their input behavior. Gyruss is outside the initial integration scope.
   touch-only screen actions and the input combination rules. Verify release,
   cancellation, loss of capture, focus loss and screen transitions against the
   app's touch scenarios, including that stale touches do not resume actions.
+- Gyruss integration preserves normalized `event.key` mappings for A/D,
+  Left/Right, Space, ArrowUp and Z, keyboard-plus-controller turn combination,
+  and gameplay from only the first connected controller in enumeration order.
+  Verify browser snapshots preserve that order and app-owned axis/D-pad policy;
+  a button held on first observation stays suppressed until release and a fresh
+  press; and R produces one fresh restart edge only while game over, with
+  auto-repeat ignored.
 
 ## Implementation status
 

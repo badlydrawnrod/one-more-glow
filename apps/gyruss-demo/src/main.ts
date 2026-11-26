@@ -5,6 +5,7 @@ import {
   type Color,
   type DrawingContext,
 } from "one-more-glow";
+import { GyrussInput, type GameplayInput } from "./input.ts";
 import "./style.css";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#screen");
@@ -28,7 +29,7 @@ const outerRailBlue: Color = [0.12, 0.42, 1];
 const world = { halfWidth: 512, halfHeight: 384 };
 const orbitRadius = 330;
 const tau = Math.PI * 2;
-const pressedKeys = new Set<string>();
+const input = new GyrussInput();
 type Point = readonly [number, number];
 
 interface Bullet {
@@ -42,12 +43,6 @@ interface Enemy {
   angularSpeed: number;
   size: number;
   spin: number;
-}
-
-interface Input {
-  turn: number;
-  fire: boolean;
-  connected: boolean;
 }
 
 interface Particle {
@@ -250,7 +245,7 @@ function drawParticles(): void {
   }
 }
 
-function drawHud(input: Input): void {
+function drawHud(input: GameplayInput): void {
   const options = { font: "segment22", height: 14, spacing: "kerned" } as const;
   drawing.setColor(paleBlue);
   drawing.setIntensity(0.88);
@@ -264,7 +259,7 @@ function drawHud(input: Input): void {
   drawText(drawing, "EARTH: 1 SECTOR", 260, -340, options);
 }
 
-function drawFrame(time: number, input: Input): void {
+function drawFrame(time: number, input: GameplayInput): void {
   drawing.beginFrame();
   drawTunnel(time);
   for (const bullet of bullets) drawBullet(bullet);
@@ -275,23 +270,6 @@ function drawFrame(time: number, input: Input): void {
   drawing.endFrame();
 }
 
-function readInput(): Input {
-  const keyboardTurn = Number(pressedKeys.has("ArrowRight") || pressedKeys.has("d"))
-    - Number(pressedKeys.has("ArrowLeft") || pressedKeys.has("a"));
-  const keyboardFire = pressedKeys.has(" ") || pressedKeys.has("ArrowUp") || pressedKeys.has("z");
-  const gamepad = Array.from(navigator.getGamepads?.() ?? []).find((pad) => pad?.connected) ?? null;
-  if (!gamepad) return { turn: keyboardTurn, fire: keyboardFire, connected: false };
-
-  const stickTurn = Math.abs(gamepad.axes[0] ?? 0) > 0.16 ? gamepad.axes[0] ?? 0 : 0;
-  const dpadTurn = Number(gamepad.buttons[15]?.pressed ?? false)
-    - Number(gamepad.buttons[14]?.pressed ?? false);
-  const gamepadFire = gamepad.buttons[0]?.pressed ?? false;
-  return {
-    turn: clamp(keyboardTurn + (stickTurn || dpadTurn), -1, 1),
-    fire: keyboardFire || gamepadFire,
-    connected: true,
-  };
-}
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
@@ -341,7 +319,7 @@ function updateParticles(deltaSeconds: number): void {
   }
 }
 
-function update(deltaSeconds: number, input: Input): void {
+function update(deltaSeconds: number, input: GameplayInput): void {
   updateParticles(deltaSeconds);
   game.respawnTimer = Math.max(0, game.respawnTimer - deltaSeconds);
   if (game.gameOver) return;
@@ -442,23 +420,13 @@ function restartGame(): void {
   game.waveDirection = 1;
 }
 
-const handledKeys = new Set(["ArrowLeft", "ArrowRight", "ArrowUp", "a", "d", "z", " "]);
 window.addEventListener("keydown", (event) => {
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  if (key === "r" && game.gameOver) {
-    restartGame();
-    return;
-  }
-  if (handledKeys.has(key)) {
-    event.preventDefault();
-    pressedKeys.add(key);
-  }
+  if (input.keyDown(event)) event.preventDefault();
 });
-window.addEventListener("keyup", (event) => {
-  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
-  pressedKeys.delete(key);
-});
-window.addEventListener("blur", () => pressedKeys.clear());
+window.addEventListener("keyup", (event) => input.keyUp(event));
+window.addEventListener("blur", () => input.blur());
+window.addEventListener("gamepadconnected", (event) => input.forgetConnection(event.gamepad.index));
+window.addEventListener("gamepaddisconnected", (event) => input.forgetConnection(event.gamepad.index));
 window.addEventListener("resize", resizeCanvas);
 restartButton.addEventListener("click", restartGame);
 resizeCanvas();
@@ -467,10 +435,11 @@ let lastTime = 0;
 function frame(time: number): void {
   const deltaSeconds = lastTime === 0 ? 0 : Math.min((time - lastTime) / 1000, 0.05);
   lastTime = time;
-  const input = readInput();
-  update(deltaSeconds, input);
+  const controls = input.controls(input.read(navigator.getGamepads?.() ?? []), time, document.hasFocus() && !document.hidden);
+  if (game.gameOver && controls.restartPressed) restartGame();
+  update(deltaSeconds, controls);
   updateHud();
-  drawFrame(time, input);
+  drawFrame(time, controls);
   requestAnimationFrame(frame);
 }
 

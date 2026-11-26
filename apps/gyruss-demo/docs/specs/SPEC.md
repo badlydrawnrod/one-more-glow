@@ -20,6 +20,15 @@ run and control it.
 - The scene uses glowing vector geometry, with a star field, tunnel, ships and
   projectiles. Enemies and projectiles appear smaller toward the tunnel centre.
 
+## Controller neutral gate
+
+**Accepted (2026-11-26).** On selecting a controller or returning focus, wait for all its
+buttons to be released and its horizontal stick axis to be within the 0.16
+dead zone continuously for 100 ms before accepting controller gameplay input.
+Keyboard input remains available, and gameplay continues on focus loss. A
+disconnect of another controller does not reset the selected controller's gate.
+The developer accepted this behavior after trying the 100 ms gate.
+
 ## Experimental explosions
 
 **Implementation: Present as an experiment.**
