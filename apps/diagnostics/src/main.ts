@@ -1636,6 +1636,7 @@ let repeatedPadDirection = "";
 let repeatedEditDirection = "";
 let nextPadEditAt = 0;
 let requirePadNeutral = false;
+let padNeutralSince: number | null = null;
 let fullscreenInitiator: HTMLButtonElement | null = null;
 const gamepadStatus = requireElement(document.querySelector<HTMLElement>("#gamepad-status"), "#gamepad-status");
 
@@ -1858,6 +1859,7 @@ function clearGamepadState(requireNeutral: boolean): void {
   nextPadRepeatAt = 0;
   nextPadEditAt = 0;
   requirePadNeutral = requireNeutral;
+  padNeutralSince = null;
   if (numericEdit) cancelNumericEdit();
   if (selectEdit) finishSelectEdit(false);
 }
@@ -1876,6 +1878,7 @@ function pollGamepad(time: number): void {
   if (gamepad && previousPadConnectionId !== gamepad.connectionId) {
     previousPadConnectionId = gamepad.connectionId;
     requirePadNeutral = true;
+    padNeutralSince = null;
     gamepadStatus.textContent = "Standard gamepad connected. Release held controls to begin.";
   }
   if (!document.hasFocus() || document.hidden) {
@@ -1887,7 +1890,14 @@ function pollGamepad(time: number): void {
 
   const down = (index: number): boolean => gamepad?.buttonsDown.has(index) ?? false;
   if (requirePadNeutral) {
-    if (isGamepadNeutral(pad)) requirePadNeutral = false;
+    if (!isGamepadNeutral(pad)) {
+      padNeutralSince = null;
+    } else if (padNeutralSince === null) {
+      padNeutralSince = time;
+    } else if (time - padNeutralSince >= 250) {
+      requirePadNeutral = false;
+      gamepadStatus.textContent = "Standard gamepad connected.";
+    }
     requestAnimationFrame(pollGamepad);
     return;
   }
