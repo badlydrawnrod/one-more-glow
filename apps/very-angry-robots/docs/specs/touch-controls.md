@@ -40,9 +40,11 @@ actions as the existing input methods; it does not change game simulation rules.
   correction, and submission. On the initials screen, use the left stick's
   horizontal flick to move the selected slot and the right stick's vertical
   flick to cycle its character. Each stick produces one step per flick and
-  rearms after returning to neutral. Taps may also select and cycle initials;
-  lower-screen tap areas correct and submit. Existing pointer-operated
-  Settings controls remain available to touch.
+  rearms after returning to neutral. Label the sticks **MOVE** and **AIM**
+  during play, and **CHOOSE SLOT** and **CHOOSE LETTER** during initials entry.
+  Keep their accessible names in sync with the visible labels. Taps may also
+  select and cycle initials; lower-screen tap areas correct and submit.
+  Existing pointer-operated Settings controls remain available to touch.
 - Release held touch input on pointer release or cancellation, loss of pointer
   capture, browser focus loss, and screen transitions. A stale touch must not
   move or fire after returning to the game or resuming play.
