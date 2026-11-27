@@ -31,6 +31,15 @@ if (!canvas) throw new Error("Missing game canvas");
 const screen = canvas;
 const gameElement = document.querySelector<HTMLElement>(".game");
 if (!gameElement) throw new Error("Missing game controls container");
+const touchStickLabels = {
+  move: document.querySelector<HTMLElement>('[data-touch-stick="move"] .stick-label'),
+  aim: document.querySelector<HTMLElement>('[data-touch-stick="aim"] .stick-label'),
+  moveControl: document.querySelector<HTMLElement>('[data-touch-stick="move"]'),
+  aimControl: document.querySelector<HTMLElement>('[data-touch-stick="aim"]'),
+};
+if (Object.values(touchStickLabels).some((element) => !element)) {
+  throw new Error("Missing touch stick labels");
+}
 const gl = screen.getContext("webgl2");
 if (!gl) throw new Error("WebGL2 is unavailable");
 const drawing = createWebGL2Renderer(gl);
@@ -61,6 +70,7 @@ let inputActive = !document.hidden && document.hasFocus();
 let initialsSubmittedBetweenFrames = false;
 const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
 let screenFlow = createScreenFlow();
+let touchStickLabelsForInitials: boolean | null = null;
 let highScores = loadHighScores(() => window.localStorage);
 let highlightedHighScoreIndex: number | null = null;
 let initialsEditor = new InitialsEditor();
@@ -92,6 +102,16 @@ const captainEyes: Color = [1, 0.25, 0.2];
 const roomCenterY = -60;
 const textOptions = { font: "segment22", height: 19, spacing: "kerned" } as const;
 const attractPromptY = { play: -246, navigation: -288, settings: -330 } as const;
+
+function updateTouchStickLabels(): void {
+  const enteringInitials = screenFlow.screen === "initials";
+  if (touchStickLabelsForInitials === enteringInitials) return;
+  touchStickLabelsForInitials = enteringInitials;
+  touchStickLabels.move!.textContent = enteringInitials ? "CHOOSE SLOT" : "MOVE";
+  touchStickLabels.aim!.textContent = enteringInitials ? "CHOOSE LETTER" : "AIM";
+  touchStickLabels.moveControl!.setAttribute("aria-label", enteringInitials ? "Choose slot" : "Move");
+  touchStickLabels.aimControl!.setAttribute("aria-label", enteringInitials ? "Choose letter" : "Aim");
+}
 
 function label(text: string, y: number, color: Color = white): void {
   drawing.setColor(color); drawing.setIntensity(1);
@@ -1001,6 +1021,7 @@ function frame(time: number): void {
     else advanceScreenFlowFrame(delta, controls);
   }
 
+  updateTouchStickLabels();
   draw(sceneTime, time);
   requestAnimationFrame(frame);
 }
