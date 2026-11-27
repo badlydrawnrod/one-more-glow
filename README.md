@@ -1,13 +1,14 @@
 # One More Glow
 
-One More Glow is a TypeScript library for drawing retro-style 2D vector
-graphics. Try the browser demos to see what it can draw and check how the
-graphics look on your display.
+One More Glow is a TypeScript workspace for retro-style browser games and
+vector graphics. It contains a reusable drawing library, a shared keyboard and
+gamepad input library, a rendering workbench, and three games.
 
 [Try an app online](#try-an-app-online) ·
 [Run an app locally](#run-an-app-locally) ·
 [Ask for a change](#ask-for-a-change) ·
-[Use the drawing library](#use-the-drawing-library)
+[Use the drawing library](#use-the-drawing-library) ·
+[Use the input library](#use-the-input-library)
 
 ## Try an app online
 
@@ -110,6 +111,28 @@ letters automatically. Spacing is fixed by default. See the
 [segment text specification](packages/one-more-glow/docs/specs/segment-text.md)
 for character coverage and layout rules.
 
+## Use the input library
+
+Import `InputDevices` from `@one-more-glow/game-input` to track keyboard and
+gamepad device state. Call `keyDown` and `keyUp` from the app's keyboard event
+handlers. Once per frame, pass the app's gamepad snapshots to `read`:
+
+```ts
+import { InputDevices, type GamepadSnapshot } from "@one-more-glow/game-input";
+
+const devices = new InputDevices();
+const gamepadSnapshots: GamepadSnapshot[] = []; // Supply snapshots from the browser Gamepad API.
+const frame = devices.read(gamepadSnapshots);
+const moveHeld = frame.keyboard.down.some(({ code }) => code === "KeyW");
+const firstButtonPressed = frame.gamepads[0]?.buttonsPressed.has(0) ?? false;
+```
+
+The library reports held keys, fresh key presses, gamepad buttons and axes. Each
+app adapts browser events and gamepad snapshots, then maps the device state to
+its own actions such as movement or firing. See the
+[Game Input specification](packages/game-input/docs/specs/SPEC.md) for the
+public frame contract and input behavior.
+
 ## Publish an app
 
 The [GitHub Pages site](https://badlydrawnrod.github.io/one-more-glow/) hosts
@@ -151,7 +174,7 @@ Run these commands from the repository root.
 
 | Command | Purpose |
 | --- | --- |
-| `npm run dev` | Build the library and start diagnostics. |
+| `npm run dev` | Build both libraries and start diagnostics. |
 | `npm run dev:asteroids` | Build both libraries and start Asteroids. |
 | `npm run dev:gyruss` | Build both libraries and start Gyruss. |
 | `npm run dev:robots` | Build both libraries and start Very Angry Robots. |
@@ -197,10 +220,12 @@ example `cat pr-description.md | npm run pr:merge` or
 ## Repository layout
 
 - [`apps/`](apps/) contains the demos and the diagnostics app. Each app owns
-  its behavior and imports the library by package name.
+  its behavior and imports libraries by package name.
 - [`packages/one-more-glow/`](packages/one-more-glow/) contains the reusable
-  library, its tests, and its specifications. The library build writes
+  drawing library, its tests, and its specifications. The library build writes
   JavaScript and TypeScript declarations to `packages/one-more-glow/dist/`.
-- [Game Input](packages/game-input/docs/specs/SPEC.md) tracks keyboard and gamepad state for Asteroids, Gyruss, and Very Angry Robots.
+- [`packages/game-input/`](packages/game-input/) contains the reusable keyboard
+  and gamepad device-state library, consumed by Diagnostics, Asteroids, Gyruss,
+  and Very Angry Robots. See its [specification](packages/game-input/docs/specs/SPEC.md).
 - [Repository architecture](docs/architecture.md) explains which parts of the
   repository own each responsibility and how they depend on one another.

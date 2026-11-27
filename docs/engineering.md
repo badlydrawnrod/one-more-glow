@@ -35,6 +35,13 @@ An abstraction or dependency must justify its maintenance cost. Do not add frame
 | **Plan** | How will we achieve the objective, check the result, and resume the work? | In a temporary [active plan](../plans/README.md) when sequencing or handoff warrants one. |
 | **Specification** | What behavior should a user, caller, or maintainer be able to rely on? | In the owning app's or package's `docs/specs/`, or in root `docs/specs/` for shared behavior. Use `SPEC.md` as the entry point. |
 | **Architecture** | What owns each responsibility, where are the boundaries, and why do they matter? | In [repository architecture](architecture.md) for shared structure and in the owning app or package for local boundaries. |
+| **README** | What does the project contain, how can someone run or use it, and what is published? | In the root [README](../README.md), with detailed behavior and API contracts kept in the owning specs. |
+
+When a change affects the project's overview, review the root README. This
+includes adding, removing or renaming an app or package; changing workspace
+commands or published apps; and introducing or changing a reusable library's
+user-facing purpose or usage. Update affected sections and remove stale
+references so the README reflects the current workspace.
 
 ### Objectives and verification
 
